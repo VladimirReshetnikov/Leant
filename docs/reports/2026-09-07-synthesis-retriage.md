@@ -2,26 +2,50 @@
 
 This 2026-09-07 update preserves the active goal to implement priorities 1–4
 from the [accepted roadmap](../../lib/Djex/docs/reports/2026-09-06-synthesis-next-priorities.md).
-The shared implementation and acceptance checklist are maintained in Djex's
-`docs/reports/2026-09-07-synthesis-priorities-1-4.md`; its updated execution
-recommendation is `docs/reports/2026-09-07-synthesis-retriage.md`. These new
-documents are not yet part of Leant's pinned Djex revision.
+The shared [implementation and acceptance checklist](../../lib/Djex/docs/reports/2026-09-07-synthesis-priorities-1-4.md)
+and [execution recommendation](../../lib/Djex/docs/reports/2026-09-07-synthesis-retriage.md)
+are maintained in the pinned Djex dependency.
 
 ## Current boundary
 
-At Leant `769369d4f85f07341bc8d444234a18e330d0edbf`, the Djex submodule is
-`7ea70a8e594762872d6511ecd0891294bd053022`. Standalone Djex has since reached
+At the original re-triage baseline, Leant
+`769369d4f85f07341bc8d444234a18e330d0edbf` pinned Djex
+`7ea70a8e594762872d6511ecd0891294bd053022`. Standalone Djex was then at
 `0a79d2311d966f7689c52a33c211f49f3a15bbea`, implementing Haskell source-graph
 rendering and bounded behavioral elaboration retries. Its recorded 100 facade,
 466 shared-synthesis, and 98 CLI tests are Djex checkpoint evidence. They do
 not establish acceptance in this Leant checkout.
 
-The positive GHC repair fixture exercises a graph-rendered impredicative let;
-successful repair through the complete live public query path is still open.
+The initial positive GHC repair fixture exercises a graph-rendered impredicative
+let. A subsequent public Exference query now demonstrates live repair under
+`all` selection, exact display and independent GHC replay, and rejection of the
+same repaired expression by a false predicate; see the implementation checklist.
 The inspected live `reverse` failure had no source graph and therefore could
 not authorize an annotation retry. Keep those two failure classes separate.
 
 ## Delivery order
+
+The dependency has now been advanced to
+`6890bb5a8a56902c2baf137581e23c25a376fad0`, including the Haskell elaboration
+renderer, behavioral retry, and Exference implicit local graph evidence.
+The GHC 9.12.4 `-Werror` build passed for `exe:leant` and
+`test:leant-synth-tests`. All 615 Leant boundary tests passed in 256.23 seconds.
+The executable and source hashes remained unchanged during that test run.
+The [unit receipt](../../test-church/receipts/unit-elaboration-integration.json)
+records source and executable hashes. The strict build log is
+`dist-newstyle/priority-elaboration-integration-build.log`.
+The [live behavioral receipt](../../test-church/receipts/behavior-elaboration-integration.json)
+passed all 18 cases: the existing six operations under Djinn, Exference, and
+Both, with an additional `where False` rejection control per engine mode.
+Independent Lean 4.32.0 replay accepted the exact displayed implementations,
+their predicates, and the oracle controls; all 69 recorded axiom inventories
+were empty. The executable remained unchanged throughout the run. Settings
+were a 65,536 candidate/verification window, 500,000 Djinn choice points,
+100,000 Exference steps, interleaving, and a 90-second command deadline.
+This validates the existing six-operation corpus at this dependency revision;
+it does not complete priority 4's broader corpus.
+This is integration evidence for the dependency checkpoint; remaining priority
+1 acceptance and priorities 2–4 below still apply.
 
 1. **Close priority 1 acceptance, then integrate and validate Djex in Leant.**
    Require a live graph-present repair, exact checked/displayed text across

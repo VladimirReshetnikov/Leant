@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "test_executable": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+  "test_executable_sha256": "2760b7ce8e541a7e95c10dc36975afbe8b59172123bf61135a23dbdabb03be0c",
+  "source_hashes": {
+    "C:\\Leant\\test-unit\\Spec.hs": "5d1bcb00a36ba30aad01b66d808a04fb5c2fd80104f805df883879c9ede5f08d",
+    "C:\\Leant\\src\\Leant\\Synth\\Engine.hs": "19b85bfac4216de8f44869ce11787e169437adab15394af15851173d5fcf315d",
+    "C:\\Leant\\src\\Leant\\Synth\\Observability.hs": "05bce8a4756dc76f89e37f5a3145e728932f9980e89ea8fce4657d5f21d4ccfc",
+    "C:\\Leant\\src\\Main.hs": "293d51484f2bdb5395594eb834c78378b1cfd7e8dbb4b2aa14c4b09cb19a7343"
+  },
+  "tests": 615,
+  "suite_seconds": 256.23,
+  "processes": [
+    {
+      "label": "unit",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+        "-j1"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T17:59:00Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\streaming-acceptance\\priority-elaboration-integration\\unit.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\streaming-acceptance\\priority-elaboration-integration\\unit.stderr.txt",
+      "owned_root_pid": 38676,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 256.3927899999835,
+      "finished_utc": "2026-09-07T18:03:16Z",
+      "stdout_sha256": "98b19a3a35210e03fca5115a94ad2fe754c213995aa5e4e72c047e244d0bacb0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

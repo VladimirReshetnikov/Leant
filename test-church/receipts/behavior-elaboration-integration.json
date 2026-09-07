@@ -1,0 +1,1887 @@
+{
+  "status": "passed",
+  "validation_mode": "live_synthesis_then_exact_kernel_behavior_replay",
+  "provenance": {
+    "manifest_path": "C:\\Leant\\lib\\Djex\\test-church\\manifest.json",
+    "manifest_sha256": "0c2954eeb36811ea065aba86187d09cd8761529de1acefd5111ccf088b189ed9",
+    "church_source_path": "C:\\Leant\\lib\\Djex\\docs\\examples\\Church.hs",
+    "church_source_raw_sha256": "9dadbc9c3491cff3b371db8e1c3039807df37a2f4258fad9c34fc25d269ae80b",
+    "church_source_canonical_lf_sha256": "782e4edaa5bf813e30e39ae02d52278ab0566315ebc521401a947b98c44cfd11",
+    "operations": [
+      {
+        "id": "church_case_009",
+        "name": "not",
+        "line": 170,
+        "source_signature": "Bool -> Bool",
+        "expanded_type": {
+          "tag": "arrow",
+          "domain": {
+            "tag": "forall",
+            "binders": [
+              "church0"
+            ],
+            "body": {
+              "tag": "arrow",
+              "domain": {
+                "tag": "name",
+                "name": "church0"
+              },
+              "codomain": {
+                "tag": "arrow",
+                "domain": {
+                  "tag": "name",
+                  "name": "church0"
+                },
+                "codomain": {
+                  "tag": "name",
+                  "name": "church0"
+                }
+              }
+            }
+          },
+          "codomain": {
+            "tag": "forall",
+            "binders": [
+              "church1"
+            ],
+            "body": {
+              "tag": "arrow",
+              "domain": {
+                "tag": "name",
+                "name": "church1"
+              },
+              "codomain": {
+                "tag": "arrow",
+                "domain": {
+                  "tag": "name",
+                  "name": "church1"
+                },
+                "codomain": {
+                  "tag": "name",
+                  "name": "church1"
+                }
+              }
+            }
+          }
+        },
+        "haskell_target": "((forall church0. (church0 -> (church0 -> church0))) -> (forall church1. (church1 -> (church1 -> church1))))",
+        "lean_target": "((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1))))"
+      },
+      {
+        "id": "church_case_016",
+        "name": "swap",
+        "line": 195,
+        "source_signature": "a `Pair` b -> b `Pair` a",
+        "expanded_type": {
+          "tag": "forall",
+          "binders": [
+            "church0",
+            "church1"
+          ],
+          "body": {
+            "tag": "arrow",
+            "domain": {
+              "tag": "forall",
+              "binders": [
+                "church2"
+              ],
+              "body": {
+                "tag": "arrow",
+                "domain": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "name",
+                    "name": "church0"
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church1"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church2"
+                    }
+                  }
+                },
+                "codomain": {
+                  "tag": "name",
+                  "name": "church2"
+                }
+              }
+            },
+            "codomain": {
+              "tag": "forall",
+              "binders": [
+                "church3"
+              ],
+              "body": {
+                "tag": "arrow",
+                "domain": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "name",
+                    "name": "church1"
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church0"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church3"
+                    }
+                  }
+                },
+                "codomain": {
+                  "tag": "name",
+                  "name": "church3"
+                }
+              }
+            }
+          }
+        },
+        "haskell_target": "(forall church0 church1. ((forall church2. ((church0 -> (church1 -> church2)) -> church2)) -> (forall church3. ((church1 -> (church0 -> church3)) -> church3))))",
+        "lean_target": "(∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3))))"
+      },
+      {
+        "id": "church_case_056",
+        "name": "map",
+        "line": 397,
+        "source_signature": "_ -> List a -> List b",
+        "expanded_type": {
+          "tag": "forall",
+          "binders": [
+            "church0",
+            "church1"
+          ],
+          "body": {
+            "tag": "arrow",
+            "domain": {
+              "tag": "arrow",
+              "domain": {
+                "tag": "name",
+                "name": "church0"
+              },
+              "codomain": {
+                "tag": "name",
+                "name": "church1"
+              }
+            },
+            "codomain": {
+              "tag": "arrow",
+              "domain": {
+                "tag": "forall",
+                "binders": [
+                  "church2"
+                ],
+                "body": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church0"
+                    },
+                    "codomain": {
+                      "tag": "arrow",
+                      "domain": {
+                        "tag": "name",
+                        "name": "church2"
+                      },
+                      "codomain": {
+                        "tag": "name",
+                        "name": "church2"
+                      }
+                    }
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church2"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church2"
+                    }
+                  }
+                }
+              },
+              "codomain": {
+                "tag": "forall",
+                "binders": [
+                  "church3"
+                ],
+                "body": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church1"
+                    },
+                    "codomain": {
+                      "tag": "arrow",
+                      "domain": {
+                        "tag": "name",
+                        "name": "church3"
+                      },
+                      "codomain": {
+                        "tag": "name",
+                        "name": "church3"
+                      }
+                    }
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church3"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church3"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "haskell_target": "(forall church0 church1. ((church0 -> church1) -> ((forall church2. ((church0 -> (church2 -> church2)) -> (church2 -> church2))) -> (forall church3. ((church1 -> (church3 -> church3)) -> (church3 -> church3))))))",
+        "lean_target": "(∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3))))))"
+      },
+      {
+        "id": "church_case_054",
+        "name": "append",
+        "line": 391,
+        "source_signature": "List a -> List a -> List a",
+        "expanded_type": {
+          "tag": "forall",
+          "binders": [
+            "church0"
+          ],
+          "body": {
+            "tag": "arrow",
+            "domain": {
+              "tag": "forall",
+              "binders": [
+                "church1"
+              ],
+              "body": {
+                "tag": "arrow",
+                "domain": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "name",
+                    "name": "church0"
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church1"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church1"
+                    }
+                  }
+                },
+                "codomain": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "name",
+                    "name": "church1"
+                  },
+                  "codomain": {
+                    "tag": "name",
+                    "name": "church1"
+                  }
+                }
+              }
+            },
+            "codomain": {
+              "tag": "arrow",
+              "domain": {
+                "tag": "forall",
+                "binders": [
+                  "church2"
+                ],
+                "body": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church0"
+                    },
+                    "codomain": {
+                      "tag": "arrow",
+                      "domain": {
+                        "tag": "name",
+                        "name": "church2"
+                      },
+                      "codomain": {
+                        "tag": "name",
+                        "name": "church2"
+                      }
+                    }
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church2"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church2"
+                    }
+                  }
+                }
+              },
+              "codomain": {
+                "tag": "forall",
+                "binders": [
+                  "church3"
+                ],
+                "body": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church0"
+                    },
+                    "codomain": {
+                      "tag": "arrow",
+                      "domain": {
+                        "tag": "name",
+                        "name": "church3"
+                      },
+                      "codomain": {
+                        "tag": "name",
+                        "name": "church3"
+                      }
+                    }
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church3"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church3"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "haskell_target": "(forall church0. ((forall church1. ((church0 -> (church1 -> church1)) -> (church1 -> church1))) -> ((forall church2. ((church0 -> (church2 -> church2)) -> (church2 -> church2))) -> (forall church3. ((church0 -> (church3 -> church3)) -> (church3 -> church3))))))",
+        "lean_target": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))"
+      },
+      {
+        "id": "church_case_061",
+        "name": "reverse",
+        "line": 412,
+        "source_signature": "List a -> List a",
+        "expanded_type": {
+          "tag": "forall",
+          "binders": [
+            "church0"
+          ],
+          "body": {
+            "tag": "arrow",
+            "domain": {
+              "tag": "forall",
+              "binders": [
+                "church1"
+              ],
+              "body": {
+                "tag": "arrow",
+                "domain": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "name",
+                    "name": "church0"
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church1"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church1"
+                    }
+                  }
+                },
+                "codomain": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "name",
+                    "name": "church1"
+                  },
+                  "codomain": {
+                    "tag": "name",
+                    "name": "church1"
+                  }
+                }
+              }
+            },
+            "codomain": {
+              "tag": "forall",
+              "binders": [
+                "church2"
+              ],
+              "body": {
+                "tag": "arrow",
+                "domain": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "name",
+                    "name": "church0"
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church2"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church2"
+                    }
+                  }
+                },
+                "codomain": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "name",
+                    "name": "church2"
+                  },
+                  "codomain": {
+                    "tag": "name",
+                    "name": "church2"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "haskell_target": "(forall church0. ((forall church1. ((church0 -> (church1 -> church1)) -> (church1 -> church1))) -> (forall church2. ((church0 -> (church2 -> church2)) -> (church2 -> church2)))))",
+        "lean_target": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2)))))"
+      },
+      {
+        "id": "church_case_059",
+        "name": "filter",
+        "line": 406,
+        "source_signature": "(a -> Bool) -> List a -> List a",
+        "expanded_type": {
+          "tag": "forall",
+          "binders": [
+            "church0"
+          ],
+          "body": {
+            "tag": "arrow",
+            "domain": {
+              "tag": "arrow",
+              "domain": {
+                "tag": "name",
+                "name": "church0"
+              },
+              "codomain": {
+                "tag": "forall",
+                "binders": [
+                  "church1"
+                ],
+                "body": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "name",
+                    "name": "church1"
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church1"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church1"
+                    }
+                  }
+                }
+              }
+            },
+            "codomain": {
+              "tag": "arrow",
+              "domain": {
+                "tag": "forall",
+                "binders": [
+                  "church2"
+                ],
+                "body": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church0"
+                    },
+                    "codomain": {
+                      "tag": "arrow",
+                      "domain": {
+                        "tag": "name",
+                        "name": "church2"
+                      },
+                      "codomain": {
+                        "tag": "name",
+                        "name": "church2"
+                      }
+                    }
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church2"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church2"
+                    }
+                  }
+                }
+              },
+              "codomain": {
+                "tag": "forall",
+                "binders": [
+                  "church3"
+                ],
+                "body": {
+                  "tag": "arrow",
+                  "domain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church0"
+                    },
+                    "codomain": {
+                      "tag": "arrow",
+                      "domain": {
+                        "tag": "name",
+                        "name": "church3"
+                      },
+                      "codomain": {
+                        "tag": "name",
+                        "name": "church3"
+                      }
+                    }
+                  },
+                  "codomain": {
+                    "tag": "arrow",
+                    "domain": {
+                      "tag": "name",
+                      "name": "church3"
+                    },
+                    "codomain": {
+                      "tag": "name",
+                      "name": "church3"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "haskell_target": "(forall church0. ((church0 -> (forall church1. (church1 -> (church1 -> church1)))) -> ((forall church2. ((church0 -> (church2 -> church2)) -> (church2 -> church2))) -> (forall church3. ((church0 -> (church3 -> church3)) -> (church3 -> church3))))))",
+        "lean_target": "(∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))"
+      }
+    ]
+  },
+  "runner_sha256": "c891f561faf266fc1e96e79f98b97ca14559177beda8b6a1da38e4fa3d2dcbfe",
+  "spec_sha256": "0adee4ac9eaad21c525b91930ca835a2fe5da27a94228ed3265a029b6854f797",
+  "input_sha256": "a6399e35901c94229de759abcd6d9c76c5962d6381f6d2cb6cff6576d42a5ee6",
+  "input_canonical_lf_sha256": "7adf006f26e8d594c56b00baefefa75fab93b9179770ef38773817aec6c4417a",
+  "engines": [
+    "djinn",
+    "exference",
+    "both"
+  ],
+  "operations": [
+    "not",
+    "swap",
+    "map",
+    "append",
+    "reverse",
+    "filter"
+  ],
+  "expected_candidate_count": 18,
+  "expected_false_oracle_count": 3,
+  "settings": {
+    "ranking": "balanced",
+    "shown": 1,
+    "window": 65536,
+    "djinn_strategy": "interleave",
+    "verify": 65536,
+    "exference_steps": 100000,
+    "djinn_choice_budget": 500000,
+    "synthesis_timeout_seconds": 90,
+    "separate_process_guard_seconds": 900.0
+  },
+  "latency_observation_enabled": false,
+  "named_synthesis_providers": [],
+  "universe_policy": "element and eliminator-result Type0; predicative Church encodings live in Type1",
+  "oracle_control_source": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\OracleControls.lean",
+  "oracle_control_sha256": "bfffaf3b30a632fb73289afa08b22525122fa36585099cfb1648e2f1350fcb57",
+  "oracle_control_inventory_count": 33,
+  "cases": [
+    {
+      "engine": "djinn",
+      "operation": "not",
+      "name": "behavior_djinn_not",
+      "type": "((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1))))",
+      "command": ":synth behavior_djinn_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_djinn_not = true",
+      "expected": "candidate",
+      "finite_observation_count": 2
+    },
+    {
+      "engine": "djinn",
+      "operation": "swap",
+      "name": "behavior_djinn_swap",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3))))",
+      "command": ":synth behavior_djinn_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_djinn_swap = true",
+      "expected": "candidate",
+      "finite_observation_count": 15
+    },
+    {
+      "engine": "djinn",
+      "operation": "map",
+      "name": "behavior_djinn_map",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_djinn_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_djinn_map = true",
+      "expected": "candidate",
+      "finite_observation_count": 200
+    },
+    {
+      "engine": "djinn",
+      "operation": "append",
+      "name": "behavior_djinn_append",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_djinn_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_djinn_append = true",
+      "expected": "candidate",
+      "finite_observation_count": 169
+    },
+    {
+      "engine": "djinn",
+      "operation": "reverse",
+      "name": "behavior_djinn_reverse",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2)))))",
+      "command": ":synth behavior_djinn_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_djinn_reverse = true",
+      "expected": "candidate",
+      "finite_observation_count": 40
+    },
+    {
+      "engine": "djinn",
+      "operation": "filter",
+      "name": "behavior_djinn_filter",
+      "type": "(∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_djinn_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_djinn_filter = true",
+      "expected": "candidate",
+      "finite_observation_count": 200
+    },
+    {
+      "engine": "djinn",
+      "operation": "reject_all",
+      "name": "behavior_djinn_reject_all",
+      "type": "Nat → Nat",
+      "command": ":synth behavior_djinn_reject_all : Nat → Nat where False",
+      "expected": "no_candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "not",
+      "name": "behavior_exference_not",
+      "type": "((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1))))",
+      "command": ":synth behavior_exference_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_exference_not = true",
+      "expected": "candidate",
+      "finite_observation_count": 2
+    },
+    {
+      "engine": "exference",
+      "operation": "swap",
+      "name": "behavior_exference_swap",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3))))",
+      "command": ":synth behavior_exference_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_exference_swap = true",
+      "expected": "candidate",
+      "finite_observation_count": 15
+    },
+    {
+      "engine": "exference",
+      "operation": "map",
+      "name": "behavior_exference_map",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_exference_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_exference_map = true",
+      "expected": "candidate",
+      "finite_observation_count": 200
+    },
+    {
+      "engine": "exference",
+      "operation": "append",
+      "name": "behavior_exference_append",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_exference_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_exference_append = true",
+      "expected": "candidate",
+      "finite_observation_count": 169
+    },
+    {
+      "engine": "exference",
+      "operation": "reverse",
+      "name": "behavior_exference_reverse",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2)))))",
+      "command": ":synth behavior_exference_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_exference_reverse = true",
+      "expected": "candidate",
+      "finite_observation_count": 40
+    },
+    {
+      "engine": "exference",
+      "operation": "filter",
+      "name": "behavior_exference_filter",
+      "type": "(∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_exference_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_exference_filter = true",
+      "expected": "candidate",
+      "finite_observation_count": 200
+    },
+    {
+      "engine": "exference",
+      "operation": "reject_all",
+      "name": "behavior_exference_reject_all",
+      "type": "Nat → Nat",
+      "command": ":synth behavior_exference_reject_all : Nat → Nat where False",
+      "expected": "no_candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "not",
+      "name": "behavior_both_not",
+      "type": "((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1))))",
+      "command": ":synth behavior_both_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_both_not = true",
+      "expected": "candidate",
+      "finite_observation_count": 2
+    },
+    {
+      "engine": "both",
+      "operation": "swap",
+      "name": "behavior_both_swap",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3))))",
+      "command": ":synth behavior_both_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_both_swap = true",
+      "expected": "candidate",
+      "finite_observation_count": 15
+    },
+    {
+      "engine": "both",
+      "operation": "map",
+      "name": "behavior_both_map",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_both_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_both_map = true",
+      "expected": "candidate",
+      "finite_observation_count": 200
+    },
+    {
+      "engine": "both",
+      "operation": "append",
+      "name": "behavior_both_append",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_both_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_both_append = true",
+      "expected": "candidate",
+      "finite_observation_count": 169
+    },
+    {
+      "engine": "both",
+      "operation": "reverse",
+      "name": "behavior_both_reverse",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2)))))",
+      "command": ":synth behavior_both_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_both_reverse = true",
+      "expected": "candidate",
+      "finite_observation_count": 40
+    },
+    {
+      "engine": "both",
+      "operation": "filter",
+      "name": "behavior_both_filter",
+      "type": "(∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_both_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_both_filter = true",
+      "expected": "candidate",
+      "finite_observation_count": 200
+    },
+    {
+      "engine": "both",
+      "operation": "reject_all",
+      "name": "behavior_both_reject_all",
+      "type": "Nat → Nat",
+      "command": ":synth behavior_both_reject_all : Nat → Nat where False",
+      "expected": "no_candidate"
+    }
+  ],
+  "executable_path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+  "executable_sha256": "5a90de8af69595e2ac549091185bfdf3f3bf8f87f392bbe1a5015960df2ecb25",
+  "results": [
+    {
+      "engine": "djinn",
+      "operation": "not",
+      "name": "behavior_djinn_not",
+      "type": "((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1))))",
+      "command": ":synth behavior_djinn_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_djinn_not = true",
+      "expected": "candidate",
+      "finite_observation_count": 2,
+      "status": "candidate",
+      "candidate": "fun f _ x y => f _ y x",
+      "observations": {
+        "passed": 1,
+        "falsified": 6,
+        "inconclusive": 0
+      },
+      "output": "behavior_djinn_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_djinn_not = true\npreparing synthesis environment (session imports + Lean)...\n  it1  fun f _ x y => f _ y x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 6 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "swap",
+      "name": "behavior_djinn_swap",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3))))",
+      "command": ":synth behavior_djinn_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_djinn_swap = true",
+      "expected": "candidate",
+      "finite_observation_count": 15,
+      "status": "candidate",
+      "candidate": "fun _ _ f _ g => f _ (fun x y => g y x)",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "behavior_djinn_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_djinn_swap = true\n  it1  fun _ _ f _ g => f _ (fun x y => g y x)\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "map",
+      "name": "behavior_djinn_map",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_djinn_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_djinn_map = true",
+      "expected": "candidate",
+      "finite_observation_count": 200,
+      "status": "candidate",
+      "candidate": "fun _ _ f g _ h x => g _ (fun y => h (f y)) x",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "behavior_djinn_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_djinn_map = true\n  it1  fun _ _ f g _ h x => g _ (fun y => h (f y)) x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "append",
+      "name": "behavior_djinn_append",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_djinn_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_djinn_append = true",
+      "expected": "candidate",
+      "finite_observation_count": 169,
+      "status": "candidate",
+      "candidate": "fun _ f g _ h x => f _ h (g _ h x)",
+      "observations": {
+        "passed": 1,
+        "falsified": 77,
+        "inconclusive": 0
+      },
+      "output": "behavior_djinn_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_djinn_append = true\n  it1  fun _ f g _ h x => f _ h (g _ h x)\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 77 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "reverse",
+      "name": "behavior_djinn_reverse",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2)))))",
+      "command": ":synth behavior_djinn_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_djinn_reverse = true",
+      "expected": "candidate",
+      "finite_observation_count": 40,
+      "status": "candidate",
+      "candidate": "fun _ f _ g => f _ (fun x h y => h (g x y)) (fun z => z)",
+      "observations": {
+        "passed": 1,
+        "falsified": 178,
+        "inconclusive": 0
+      },
+      "output": "behavior_djinn_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_djinn_reverse = true\n  it1  fun _ f _ g => f _ (fun x h y => h (g x y)) (fun z => z)\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 178 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "filter",
+      "name": "behavior_djinn_filter",
+      "type": "(∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_djinn_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_djinn_filter = true",
+      "expected": "candidate",
+      "finite_observation_count": 200,
+      "status": "candidate",
+      "candidate": "fun _ f g _ h => g _ (fun x y => f x _ (h x y) y)",
+      "observations": {
+        "passed": 1,
+        "falsified": 83,
+        "inconclusive": 0
+      },
+      "output": "behavior_djinn_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_djinn_filter = true\n  it1  fun _ f g _ h => g _ (fun x y => f x _ (h x y) y)\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 83 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "reject_all",
+      "name": "behavior_djinn_reject_all",
+      "type": "Nat → Nat",
+      "command": ":synth behavior_djinn_reject_all : Nat → Nat where False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 5,
+        "inconclusive": 0
+      },
+      "output": "behavior_djinn_reject_all : Nat → Nat where False\nthe engine proposed 3 candidate(s) but none passed both Lean verification and the supplied assertion\nsupplied behavioral assertion: 0 passed, 5 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    },
+    {
+      "engine": "exference",
+      "operation": "not",
+      "name": "behavior_exference_not",
+      "type": "((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1))))",
+      "command": ":synth behavior_exference_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_exference_not = true",
+      "expected": "candidate",
+      "finite_observation_count": 2,
+      "status": "candidate",
+      "candidate": "fun f _ x y => f _ y x",
+      "observations": {
+        "passed": 1,
+        "falsified": 2,
+        "inconclusive": 0
+      },
+      "output": "behavior_exference_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_exference_not = true\n  it1  fun f _ x y => f _ y x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 2 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "swap",
+      "name": "behavior_exference_swap",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3))))",
+      "command": ":synth behavior_exference_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_exference_swap = true",
+      "expected": "candidate",
+      "finite_observation_count": 15,
+      "status": "candidate",
+      "candidate": "fun _ _ f _ g => f _ (fun x y => g y x)",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "behavior_exference_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_exference_swap = true\n  it1  fun _ _ f _ g => f _ (fun x y => g y x)\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "map",
+      "name": "behavior_exference_map",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_exference_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_exference_map = true",
+      "expected": "candidate",
+      "finite_observation_count": 200,
+      "status": "candidate",
+      "candidate": "fun _ _ f g _ h => g _ (fun x => h (f x))",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "behavior_exference_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_exference_map = true\n  it1  fun _ _ f g _ h => g _ (fun x => h (f x))\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "append",
+      "name": "behavior_exference_append",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_exference_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_exference_append = true",
+      "expected": "candidate",
+      "finite_observation_count": 169,
+      "status": "candidate",
+      "candidate": "fun _ f g _ h x => f _ h (g _ h x)",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "behavior_exference_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_exference_append = true\n  it1  fun _ f g _ h x => f _ h (g _ h x)\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "reverse",
+      "name": "behavior_exference_reverse",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2)))))",
+      "command": ":synth behavior_exference_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_exference_reverse = true",
+      "expected": "candidate",
+      "finite_observation_count": 40,
+      "status": "candidate",
+      "candidate": "fun _ f _ g => f _ (fun x h y => h (g x y)) (fun z => z)",
+      "observations": {
+        "passed": 1,
+        "falsified": 21,
+        "inconclusive": 0
+      },
+      "output": "behavior_exference_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_exference_reverse = true\n  it1  fun _ f _ g => f _ (fun x h y => h (g x y)) (fun z => z)\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 21 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "filter",
+      "name": "behavior_exference_filter",
+      "type": "(∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_exference_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_exference_filter = true",
+      "expected": "candidate",
+      "finite_observation_count": 200,
+      "status": "candidate",
+      "candidate": "fun _ f g _ h x => g _ (fun y z => let f1 := f y; f1 _ (h y z) z) x",
+      "observations": {
+        "passed": 1,
+        "falsified": 8,
+        "inconclusive": 0
+      },
+      "output": "behavior_exference_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_exference_filter = true\n  it1  fun _ f g _ h x => g _ (fun y z => let f1 := f y; f1 _ (h y z) z) x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 8 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "reject_all",
+      "name": "behavior_exference_reject_all",
+      "type": "Nat → Nat",
+      "command": ":synth behavior_exference_reject_all : Nat → Nat where False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 128,
+        "inconclusive": 0
+      },
+      "output": "behavior_exference_reject_all : Nat → Nat where False\nthe engine proposed 120 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search truncated: step limit reached, queue limit pruned 980828\nsupplied behavioral assertion: 0 passed, 128 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    },
+    {
+      "engine": "both",
+      "operation": "not",
+      "name": "behavior_both_not",
+      "type": "((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1))))",
+      "command": ":synth behavior_both_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_both_not = true",
+      "expected": "candidate",
+      "finite_observation_count": 2,
+      "status": "candidate",
+      "candidate": "fun f _ x y => f _ y x",
+      "observations": {
+        "passed": 1,
+        "falsified": 2,
+        "inconclusive": 0
+      },
+      "output": "behavior_both_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_both_not = true\n  it1  fun f _ x y => f _ y x\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 2 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "swap",
+      "name": "behavior_both_swap",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3))))",
+      "command": ":synth behavior_both_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_both_swap = true",
+      "expected": "candidate",
+      "finite_observation_count": 15,
+      "status": "candidate",
+      "candidate": "fun _ _ f _ g => f _ (fun x y => g y x)",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "behavior_both_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_both_swap = true\n  it1  fun _ _ f _ g => f _ (fun x y => g y x)\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "map",
+      "name": "behavior_both_map",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_both_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_both_map = true",
+      "expected": "candidate",
+      "finite_observation_count": 200,
+      "status": "candidate",
+      "candidate": "fun _ _ f g _ h => g _ (fun x => h (f x))",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "behavior_both_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_both_map = true\n  it1  fun _ _ f g _ h => g _ (fun x => h (f x))\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "append",
+      "name": "behavior_both_append",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_both_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_both_append = true",
+      "expected": "candidate",
+      "finite_observation_count": 169,
+      "status": "candidate",
+      "candidate": "fun _ f g _ h x => f _ h (g _ h x)",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "behavior_both_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_both_append = true\n  it1  fun _ f g _ h x => f _ h (g _ h x)\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "reverse",
+      "name": "behavior_both_reverse",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2)))))",
+      "command": ":synth behavior_both_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_both_reverse = true",
+      "expected": "candidate",
+      "finite_observation_count": 40,
+      "status": "candidate",
+      "candidate": "fun _ f _ g => f _ (fun x h y => h (g x y)) (fun z => z)",
+      "observations": {
+        "passed": 1,
+        "falsified": 21,
+        "inconclusive": 0
+      },
+      "output": "behavior_both_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_both_reverse = true\n  it1  fun _ f _ g => f _ (fun x h y => h (g x y)) (fun z => z)\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 21 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "filter",
+      "name": "behavior_both_filter",
+      "type": "(∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_both_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_both_filter = true",
+      "expected": "candidate",
+      "finite_observation_count": 200,
+      "status": "candidate",
+      "candidate": "fun _ f g _ h x => g _ (fun y z => let f1 := f y; f1 _ (h y z) z) x",
+      "observations": {
+        "passed": 1,
+        "falsified": 8,
+        "inconclusive": 0
+      },
+      "output": "behavior_both_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_both_filter = true\n  it1  fun _ f g _ h x => g _ (fun y z => let f1 := f y; f1 _ (h y z) z) x\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 8 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "reject_all",
+      "name": "behavior_both_reject_all",
+      "type": "Nat → Nat",
+      "command": ":synth behavior_both_reject_all : Nat → Nat where False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 133,
+        "inconclusive": 0
+      },
+      "output": "behavior_both_reject_all : Nat → Nat where False\nthe engine proposed 123 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: exference: search truncated: step limit reached, queue limit pruned 980828\nsupplied behavioral assertion: 0 passed, 133 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    }
+  ],
+  "kernel_replays": [
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate0.lean",
+      "source_sha256": "390f783a0bb1202e97a985316e05472f5531f053664e5a226d2d4d14b670b166",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_djinn_not",
+        "BehaviorCandidates.behavior_djinn_not_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate1.lean",
+      "source_sha256": "bfcf085831d8df9d756e895f9b9ceef251a1cc1c5cae73ae3b1f6786ecb59cf5",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_djinn_swap",
+        "BehaviorCandidates.behavior_djinn_swap_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate2.lean",
+      "source_sha256": "5a43c90e90e8f8155b3b860343736efda96678f772ad3e49f7271f10014a9ed1",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_djinn_map",
+        "BehaviorCandidates.behavior_djinn_map_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate3.lean",
+      "source_sha256": "0ba68c18ee041dec6ac60d71b5baf526423fef7838cac855430a6057ba492788",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_djinn_append",
+        "BehaviorCandidates.behavior_djinn_append_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate4.lean",
+      "source_sha256": "da06be32abf832c8fb3bf9c14d6991531fe48008e0254706af5e8a2c373ee7d8",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_djinn_reverse",
+        "BehaviorCandidates.behavior_djinn_reverse_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate5.lean",
+      "source_sha256": "e6703a85f464d4dc3fc4bbfcb866a092f34c8ad29920e65e0d518eb58947bc96",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_djinn_filter",
+        "BehaviorCandidates.behavior_djinn_filter_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate6.lean",
+      "source_sha256": "1cd6cb65691cfaa4711efda2471dd29c43f39f3e007ea69fe1804ef95fc31b34",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_exference_not",
+        "BehaviorCandidates.behavior_exference_not_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate7.lean",
+      "source_sha256": "8a4f5d04043ae723f19b947fdc9f0d3ae31af70262ce994ba938796b7f6adf6b",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_exference_swap",
+        "BehaviorCandidates.behavior_exference_swap_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate8.lean",
+      "source_sha256": "92e23ab78e0ce14adbe69b2035bac80b3dfab1d49d27b7f61bec4eecd83a7b42",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_exference_map",
+        "BehaviorCandidates.behavior_exference_map_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate9.lean",
+      "source_sha256": "d55892679cdd9e38bbccade36daddbc1d6d650c2391c58fb54690ea8c50b2fb1",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_exference_append",
+        "BehaviorCandidates.behavior_exference_append_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate10.lean",
+      "source_sha256": "213b1670024b20778f0207c844042ad6ce20319372b7f6a670286a733676645e",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_exference_reverse",
+        "BehaviorCandidates.behavior_exference_reverse_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate11.lean",
+      "source_sha256": "201ca266a0698221cba9b07fd50f746cefd5b940b73ed1a934046ce50ce46729",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_exference_filter",
+        "BehaviorCandidates.behavior_exference_filter_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate12.lean",
+      "source_sha256": "3ae62457b0f14ca2885f4ac3a565ab0f61becb1c266bbbfc1ca5626e2740dba0",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_both_not",
+        "BehaviorCandidates.behavior_both_not_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate13.lean",
+      "source_sha256": "80ffdb596a51cacef7adf06355d0b259578f853415d0fce1edc9a0ff3c79b596",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_both_swap",
+        "BehaviorCandidates.behavior_both_swap_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate14.lean",
+      "source_sha256": "64a7b114f368fe21ab20a35a4fea0a972db40b6b33a5498110ffa48d5079adbe",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_both_map",
+        "BehaviorCandidates.behavior_both_map_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate15.lean",
+      "source_sha256": "bbcde60ac657c64e0c1cdf6a36620ccdb04044b89149b0e9ae6476075cc4834d",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_both_append",
+        "BehaviorCandidates.behavior_both_append_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate16.lean",
+      "source_sha256": "84634c880110e53cff44f7d9e385e9b1b47a7d4a683abced2a6ea8b63de263fb",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_both_reverse",
+        "BehaviorCandidates.behavior_both_reverse_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate17.lean",
+      "source_sha256": "5c7ef4c191a82c80a19075e09cf60c89dd3361fcd784a8d65f0acb47fc9e828b",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorCandidates.behavior_both_filter",
+        "BehaviorCandidates.behavior_both_filter_passes"
+      ],
+      "empty_axiom_inventory_count": 2,
+      "status": "passed"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\OracleControls.lean",
+      "source_sha256": "bfffaf3b30a632fb73289afa08b22525122fa36585099cfb1648e2f1350fcb57",
+      "exit_code": 0,
+      "declarations": [
+        "BehaviorControl.witness_not",
+        "BehaviorControl.witness_not_passes",
+        "BehaviorControl.witness_swap",
+        "BehaviorControl.witness_swap_passes",
+        "BehaviorControl.witness_map",
+        "BehaviorControl.witness_map_passes",
+        "BehaviorControl.witness_append",
+        "BehaviorControl.witness_append_passes",
+        "BehaviorControl.witness_reverse",
+        "BehaviorControl.witness_reverse_passes",
+        "BehaviorControl.witness_filter",
+        "BehaviorControl.witness_filter_passes",
+        "BehaviorControl.wrong_not_identity",
+        "BehaviorControl.wrong_not_identity_rejected",
+        "BehaviorControl.wrong_not_constant_false",
+        "BehaviorControl.wrong_not_constant_false_rejected",
+        "BehaviorControl.wrong_map_empty",
+        "BehaviorControl.wrong_map_empty_rejected",
+        "BehaviorControl.wrong_append_first",
+        "BehaviorControl.wrong_append_first_rejected",
+        "BehaviorControl.wrong_append_reversed",
+        "BehaviorControl.wrong_append_reversed_rejected",
+        "BehaviorControl.wrong_reverse_identity",
+        "BehaviorControl.wrong_reverse_identity_rejected",
+        "BehaviorControl.wrong_reverse_empty",
+        "BehaviorControl.wrong_reverse_empty_rejected",
+        "BehaviorControl.wrong_filter_identity",
+        "BehaviorControl.wrong_filter_identity_rejected",
+        "BehaviorControl.wrong_filter_empty",
+        "BehaviorControl.wrong_filter_empty_rejected",
+        "BehaviorControl.wrong_filter_negated",
+        "BehaviorControl.wrong_filter_negated_rejected",
+        "BehaviorControl.swap_specialized_identity_rejected"
+      ],
+      "empty_axiom_inventory_count": 33,
+      "status": "passed"
+    }
+  ],
+  "candidate_count": 18,
+  "false_oracle_count": 3,
+  "kernel_exit_code": 0,
+  "kernel_inventory_count": 69,
+  "empty_axiom_inventory_count": 69,
+  "exact_type_wrong_controls": 10,
+  "oracle_positive_controls": 6,
+  "specialized_swap_control": 1,
+  "executable_unchanged": true,
+  "processes": [
+    {
+      "label": "live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:03:35Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\live.input.txt",
+      "input_sha256": "a6399e35901c94229de759abcd6d9c76c5962d6381f6d2cb6cff6576d42a5ee6",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\live.stderr.txt",
+      "owned_root_pid": 40432,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 189.0240286999906,
+      "finished_utc": "2026-09-07T18:06:44Z",
+      "stdout_sha256": "7487c6c752f90477c5eb90a7e45744a1310592b79c46506a047ed0162051d5f2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-0",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate0.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:44Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-0.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-0.stderr.txt",
+      "owned_root_pid": 8108,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.3209296000131872,
+      "finished_utc": "2026-09-07T18:06:45Z",
+      "stdout_sha256": "2bbcea75c86eddc254e00d36bd7fb5029e88de4345ad8915e97f84200606cee9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-1",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate1.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:45Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-1.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-1.stderr.txt",
+      "owned_root_pid": 42472,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.1616548000019975,
+      "finished_utc": "2026-09-07T18:06:46Z",
+      "stdout_sha256": "09ba8b0c5201439a4ba1f872adc86e379f93b65bb2818e13c644b31d378269c8",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-2",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate2.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:46Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-2.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-2.stderr.txt",
+      "owned_root_pid": 28212,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.3095470999833196,
+      "finished_utc": "2026-09-07T18:06:48Z",
+      "stdout_sha256": "bbe421b3b78c18b8a8c28c483e50414313a842da0fdc46b580a383ffde8af3ae",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-3",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate3.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:48Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-3.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-3.stderr.txt",
+      "owned_root_pid": 31696,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.161613700009184,
+      "finished_utc": "2026-09-07T18:06:49Z",
+      "stdout_sha256": "ac868780891d3d2bfe2f801c8495d24885861169eba13ff32e179cba03ec500d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-4",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate4.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:49Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-4.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-4.stderr.txt",
+      "owned_root_pid": 14580,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.0159172999847215,
+      "finished_utc": "2026-09-07T18:06:50Z",
+      "stdout_sha256": "53b1f51f25c1269b33d4a58728ca674c1249c68f7c6f05ded306e262cfbc8520",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-5",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate5.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:50Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-5.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-5.stderr.txt",
+      "owned_root_pid": 36188,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.4798118000035174,
+      "finished_utc": "2026-09-07T18:06:51Z",
+      "stdout_sha256": "01076eabd98d0fc2c5d4cd2c659b3dae095c6004f3441085873ac5dda0abedf9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-6",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate6.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:51Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-6.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-6.stderr.txt",
+      "owned_root_pid": 26512,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.3641084000119008,
+      "finished_utc": "2026-09-07T18:06:53Z",
+      "stdout_sha256": "1f4490a6dc9b9768cca0496e524ca490565770e674b79fbc563b9dfbf9fb29da",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-7",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate7.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:53Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-7.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-7.stderr.txt",
+      "owned_root_pid": 38600,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.2121096000191756,
+      "finished_utc": "2026-09-07T18:06:54Z",
+      "stdout_sha256": "4e36c6497fea562b46c21054df693df1605a5f4f6fd15e5bf40905231b18c2ba",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-8",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate8.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:54Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-8.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-8.stderr.txt",
+      "owned_root_pid": 24684,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.9848872000002302,
+      "finished_utc": "2026-09-07T18:06:55Z",
+      "stdout_sha256": "6a156638dd620678c170bd37b5172a954eb2d1ddffa6d65527a8ae3a3cb4fc92",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-9",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate9.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:55Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-9.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-9.stderr.txt",
+      "owned_root_pid": 33468,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.022747699986212,
+      "finished_utc": "2026-09-07T18:06:56Z",
+      "stdout_sha256": "c3606e4cc6e0f6a696f855a1af922753d87b1157760214bc62743ed25751f40c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-10",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate10.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:56Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-10.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-10.stderr.txt",
+      "owned_root_pid": 37672,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.942089299991494,
+      "finished_utc": "2026-09-07T18:06:57Z",
+      "stdout_sha256": "540210cc2da966d0425c4faaccf562f1c34f0b37e9d7b6d58a978294acca1e8e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-11",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate11.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:57Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-11.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-11.stderr.txt",
+      "owned_root_pid": 12592,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.9580122999905143,
+      "finished_utc": "2026-09-07T18:06:58Z",
+      "stdout_sha256": "25106e555360c7c17ce3bbd10faddc16591684ae2dd044cb5939fdff1c0ec946",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-12",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate12.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:58Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-12.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-12.stderr.txt",
+      "owned_root_pid": 34608,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.885395100020105,
+      "finished_utc": "2026-09-07T18:06:59Z",
+      "stdout_sha256": "aa7f547d719698789286f56b9b2a994067ed2cc520117f1631b2503d232a2b11",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-13",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate13.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:06:59Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-13.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-13.stderr.txt",
+      "owned_root_pid": 39392,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.880329299980076,
+      "finished_utc": "2026-09-07T18:07:00Z",
+      "stdout_sha256": "536a2d426a787ead0355812be696d3f952b612fdbf428b58e1b1c5edb4080e5c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-14",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate14.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:07:00Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-14.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-14.stderr.txt",
+      "owned_root_pid": 11524,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.007534400006989,
+      "finished_utc": "2026-09-07T18:07:01Z",
+      "stdout_sha256": "af0a6f0e00eb7281eb95e98700a5ea180a1ff6b97078f4463e70d583a8a9225b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-15",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate15.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:07:01Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-15.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-15.stderr.txt",
+      "owned_root_pid": 6520,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.968665599997621,
+      "finished_utc": "2026-09-07T18:07:02Z",
+      "stdout_sha256": "4ff06cf82b9040f15606e12110b9cc8705ddc83f4bcbf7a92096de1a9bbaed85",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-16",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate16.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:07:02Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-16.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-16.stderr.txt",
+      "owned_root_pid": 31452,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.894029999995837,
+      "finished_utc": "2026-09-07T18:07:03Z",
+      "stdout_sha256": "d8b6d2321fcb0182039bfa7d637f09c5fb5019060d0bb87811476127925a44d6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-17",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\BehaviorCandidate17.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:07:03Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-17.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-17.stderr.txt",
+      "owned_root_pid": 34744,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.9394265000009909,
+      "finished_utc": "2026-09-07T18:07:04Z",
+      "stdout_sha256": "afaf96e4c5e670b0974002c7e11f0bf7b300af1c957a1231b50626c60ccfc454",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-18",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\OracleControls.lean"
+      ],
+      "process_timeout_seconds": 900.0,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T18:07:04Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-18.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\priority-elaboration-integration-behavior\\kernel-18.stderr.txt",
+      "owned_root_pid": 39332,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.2860656999982893,
+      "finished_utc": "2026-09-07T18:07:05Z",
+      "stdout_sha256": "92da1bfdf933ecd939ef9203e18e7639677a1caa89efedf822cdfb808867fdb6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
