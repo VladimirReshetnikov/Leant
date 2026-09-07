@@ -8,13 +8,12 @@ are maintained in the pinned Djex dependency.
 
 ## Current boundary
 
-At the original re-triage baseline, Leant
-`769369d4f85f07341bc8d444234a18e330d0edbf` pinned Djex
-`7ea70a8e594762872d6511ecd0891294bd053022`. Standalone Djex was then at
-`0a79d2311d966f7689c52a33c211f49f3a15bbea`, implementing Haskell source-graph
-rendering and bounded behavioral elaboration retries. Its recorded 100 facade,
-466 shared-synthesis, and 98 CLI tests are Djex checkpoint evidence. They do
-not establish acceptance in this Leant checkout.
+Leant `aab110e99e3c3d96549a05d3975b26bea93dc6ef` pins Djex
+`6890bb5a8a56902c2baf137581e23c25a376fad0`. Integration of the Haskell
+elaboration checkpoint is accepted at the receipt boundaries below. First/best
+selection of a repaired candidate remains outstanding. The canonical Djex
+worktree also contains an uncommitted recursive-case experiment; it has not
+been integrated into this dependency.
 
 The initial positive GHC repair fixture exercises a graph-rendered impredicative
 let. A subsequent public Exference query now demonstrates live repair under
@@ -47,15 +46,19 @@ it does not complete priority 4's broader corpus.
 This is integration evidence for the dependency checkpoint; remaining priority
 1 acceptance and priorities 2–4 below still apply.
 
-1. **Close priority 1 acceptance, then integrate and validate Djex in Leant.**
-   Require a live graph-present repair, exact checked/displayed text across
-   selection modes, missing-authority and scope rejection controls, and the
-   original resource bounds. Advancing the submodule alone is not integration
-   acceptance.
-2. **Implement priority 2's one-layer cases.** Target ordinary `null`,
-   `headOr`, `tailOr`, and shallow tree inspection. Preserve exact family and
-   constructor identities, opaque recursive fields, and independent Lean
-   replay. `tailOr` needs compatible input and result views.
+1. **Close priority 2's failing one-layer case experiment.** Canonical Djex's
+   latest public synthesis/GHC execution fixture finds matching `headOr` and
+   shallow tree implementations, but fails for `null` and `tailOr`. The focused
+   strict build passes; full affected-suite acceptance and Lean replay are
+   outstanding. Fix compatible input/result views and then require all four
+   behaviors, exact family/constructor evidence, and independent Lean replay.
+   Checked case graphs alone did not catch the earlier constant-scrutinee
+   failure. Keep the accepted dependency until this bounded milestone passes.
+2. **Close priority 1's remaining acceptance.** Require live first/best
+   selection of a repaired candidate, exact checked/displayed text, retained
+   missing-authority and scope controls, and the original resource bounds.
+   Preserve the accepted all-selection fixture. Integrate and validate any
+   further shared changes; integration of the current checkpoint is done.
 3. **Deliver priority 4's bounded Lean simplification.** After decision checks
    for the assertion and its negation, attempt bounded simplification. Require
    a complete kernel proof, retain axiom inventories and the command deadline,
@@ -75,6 +78,11 @@ This is integration evidence for the dependency checkpoint; remaining priority
 
 None of the four priorities is complete. Moving the smaller simplification
 delivery earlier changes scheduling, not the required contextual capability.
+Moving the active failing case experiment first does not authorize postponing
+the small selection-mode closure until after general recursive synthesis.
+All test results above are inspected prior receipts, not tests rerun for this
+documentation update. The dependency's linked execution report reflects its
+pinned checkpoint; this companion records the newer canonical-worktree triage.
 
 ## Why these boundaries matter in Leant
 
@@ -100,6 +108,10 @@ provider. Shared subgoal graphs, persistent caches, internal cooperative
 search, dependent/indexed refinement, and induction remain behind the current
 capability work. Native tactic integration and isolated-worker production
 routing are separate product/integration milestones with their own acceptance.
+Keep failure diagnostics and reproducible capability receipts within the
+current deliveries: distinguish graph absence, compiler rejection, behavioral
+falsehood, inconclusive checking, and search exhaustion, and retain settings,
+source revisions, exact emitted-source replay, and negative controls.
 
 The older future-directions reports remain design references; their claims
 about missing typed graphs must be reconciled with the current implementation
