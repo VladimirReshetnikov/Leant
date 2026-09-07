@@ -49,7 +49,7 @@ import Data.IORef
   , newIORef
   , readIORef
   )
-import Data.List (intercalate, isInfixOf, isPrefixOf, permutations, sortOn, tails)
+import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, permutations, sortOn, tails)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -680,10 +680,13 @@ import Language.Haskell.Synthesis.Behavioral
   )
 import Leant.Synth.Behavioral
   ( BehavioralVerdict (..)
+  , BehavioralProofMethod (..)
   , behavioralSyntaxProgram
   , behavioralPreflightProgram
   , behavioralDecisionProgram
+  , behavioralProofProgram
   , decideBehavioralBy
+  , proveBehavioralBy
   )
 import Leant.Session.Replay (itCounterAfterHistory, replayHistoryWith)
 import Leant.Session.Snapshot
@@ -2697,6 +2700,71 @@ hostBehavioralTests = testGroup "host behavioral synthesis"
         if negative then error "transport failure reused the backend"
           else pure (Left "request deadline")
       verdict @?= BehavioralInconclusive "request deadline"
+  , testCase "decided truth and falsity never demand simplification" $ do
+      forM_ [False, True] $ \expectedNegative -> do
+        attempts <- newIORef []
+        verdict <- proveBehavioralBy $ \method negative -> do
+          modifyIORef' attempts (++ [(method, negative)])
+          case method of
+            BehavioralSimp -> error "decided assertion demanded simplification"
+            BehavioralDecide -> pure $ Right $ negative == expectedNegative
+        verdict @?= if expectedNegative then BehavioralFalsified else BehavioralSatisfied
+        readIORef attempts >>= (@?= [(BehavioralDecide, negative)
+          | negative <- if expectedNegative then [False, True] else [False]])
+  , testCase "both decisions precede a positive simplification proof" $ do
+      attempts <- newIORef []
+      verdict <- proveBehavioralBy $ \method negative -> do
+        modifyIORef' attempts (++ [(method, negative)])
+        if method == BehavioralSimp && negative
+          then error "positive simplification demanded its negation"
+          else pure $ Right $ method == BehavioralSimp
+      verdict @?= BehavioralSatisfied
+      readIORef attempts >>= (@?=
+        [(BehavioralDecide, False), (BehavioralDecide, True), (BehavioralSimp, False)])
+  , testCase "only a completed negative simplification establishes falsity" $ do
+      attempts <- newIORef []
+      verdict <- proveBehavioralBy $ \method negative -> do
+        modifyIORef' attempts (++ [(method, negative)])
+        pure $ Right $ method == BehavioralSimp && negative
+      verdict @?= BehavioralFalsified
+      readIORef attempts >>= (@?=
+        [(BehavioralDecide, False), (BehavioralDecide, True),
+         (BehavioralSimp, False), (BehavioralSimp, True)])
+      unknown <- proveBehavioralBy $ \_ _ -> pure $ Right False
+      assertBool "incomplete simplification became a counterexample" $ case unknown of
+        BehavioralInconclusive _ -> True
+        _ -> False
+  , testCase "transport failure at every proof stage aborts later attempts" $ do
+      let stages = [(BehavioralDecide, False), (BehavioralDecide, True),
+                    (BehavioralSimp, False), (BehavioralSimp, True)]
+      forM_ [0 .. length stages - 1] $ \failureIndex -> do
+        attempts <- newIORef []
+        verdict <- proveBehavioralBy $ \method negative -> do
+          before <- readIORef attempts
+          assertBool "failure reused the backend" $ length before <= failureIndex
+          modifyIORef' attempts (++ [(method, negative)])
+          pure $ if length before == failureIndex
+            then Left "shared command deadline expired"
+            else Right False
+        verdict @?= BehavioralInconclusive "shared command deadline expired"
+        readIORef attempts >>= (@?= take (failureIndex + 1) stages)
+  , testCase "simplification preserves the exact candidate and requires a closed bounded proof" $ do
+      let query = BehavioralQuery "f" "∀ A : Type, A → A -- exact type"
+            "∀ n : Nat, f Nat n = n -- exact assertion"
+          term = "fun A x => x -- exact candidate"
+      forM_ [False, True] $ \negative -> do
+        let decision = behavioralDecisionProgram negative query term
+            simplified = behavioralProofProgram BehavioralSimp negative query term
+        assertBool "proof method changed the lexical candidate or proposition"
+          $ take (length decision - length "by decide\n") decision
+              `isPrefixOf` simplified
+        assertBool "simplification accepted mere progress or lost its step bound"
+          $ "by\n  solve\n  | simp (config := { maxSteps := 10000 })\n"
+              `isSuffixOf` simplified
+        assertBool "simplification lost the heartbeat bound"
+          $ "set_option maxHeartbeats 200000 in" `isInfixOf` simplified
+        assertBool "simplification introduced unchecked or classical proof shortcuts"
+          $ not $ any (`isInfixOf` simplified) ["sorry", "native_decide", "classical"]
   , testCase "a later rendering can satisfy the assertion before the success cutoff" $ do
       attempts <- newIORef ([] :: [String])
       let verify term = modifyIORef' attempts (++ [term]) >> pure VariantAccepted

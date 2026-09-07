@@ -25,20 +25,24 @@ renderings of its already admitted candidate can still be tried.
 Lean first parses both complete source terms, then checks that the predicate has
 type `Prop` under a binder with the exact requested function type. This preflight
 happens before search and does not change the interactive environment or proof
-state. For each type-correct candidate, Leant asks Lean to kernel-check a proof of
-the assertion using `by decide`:
+state. For each type-correct candidate, Leant asks Lean to kernel-check proofs in
+this order: the assertion by `decide`, its negation by `decide`, the assertion by
+bounded `simp`, then its negation by bounded `simp`. Each attempt uses the same
+complete candidate, requested type, and lexical assertion:
 
 * A checked positive proof means **passed**.
-* If that attempt fails, a checked `by decide` proof of the negation means
-  **falsified**.
-* If neither proof succeeds, or a request times out or loses its backend, the
+* A checked proof of the negation means **falsified**.
+* If no proof succeeds, or a request times out or loses its backend, the
   check is **inconclusive**. Failure to prove an assertion is not a counterexample.
 
 For example, `choose Nat 11 29 = 29` checks that application. It does not claim
 that the implementation always returns its second argument. A conjunction of
 examples establishes that conjunction. A proposition with an infinite universal
-quantifier will generally not have an executable `Decidable` instance, so this
-decision procedure can report inconclusive even when a mathematical proof exists.
+quantifier will generally not have an executable `Decidable` instance. Bounded
+simplification can close some such propositions; for example, an identity
+implementation can satisfy `∀ n : Nat, f Nat n + 0 = n`. Simplification must
+close the whole goal. Partial simplification remains inconclusive, as does a
+proposition requiring a proof beyond these methods.
 All proofs are relative to the user's existing declarations and assumptions.
 
 No `sorry`, native evaluation proof shortcut, or behavioral/Length certificate is
@@ -60,16 +64,25 @@ setup and request-timeout boundaries as ordinary synthesis. Cold imports and
 initial session reconstruction therefore do not spend the assertion allowance.
 After successful preparation, it captures one `synth-timeout` deadline before
 preflight and shares it through search lanes and assertion checks. Each
-preflight, type check, or decision
+preflight, type check, or proof
 request also has a five-second maximum, reduced by a smaller `backend-timeout`
 setting and by the remaining command deadline. Requests require at least one
-remaining second. Decision and preflight programs allow 200,000 Lean heartbeats.
+remaining second. Proof and preflight programs allow 200,000 Lean heartbeats.
+Simplification additionally permits at most 10,000 steps. All four proof
+attempts share the command deadline; an interrupted backend ends the sequence.
 These are operational limits, not language rank or function-arity restrictions.
 Backend startup, session reconstruction, and existing translation/discovery
 operations keep their established recovery behavior; after they complete, the
 remaining deadline is rechecked before another behavioral request begins.
 A timed-out request retires the backend through the existing protocol recovery
 path, so an unfinished response cannot be reused by the next check.
+
+The [simplification acceptance runner](../test-behavioral/README.md) distinguishes
+completed quantified proofs, proved negations, opaque propositions, and partial
+simplification. It checks exact displayed terms independently and records the
+actual axiom inventories. Simplification proofs can use Lean's `propext` and
+`Quot.sound`; this does not change the candidate's own axiom inventory or imply
+that an arbitrary supplied assertion is axiom-free.
 
 This host-proposition form is separate from the existing leading Length syntax:
 

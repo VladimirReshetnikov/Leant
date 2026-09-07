@@ -3344,7 +3344,8 @@ data ExactFamilyPlan
   = StructuralFamily ParametricTemplate
   | RecursiveStructuralFamily ParametricTemplate
     -- ^ Both engines retain exact recursive data natively; Djinn exposes
-    -- bounded positive introduction and Exference one-layer elimination.
+    -- bounded positive introduction plus checked one-layer input cases;
+    -- Exference also supports one-layer elimination.
   | AbstractFamily Int Bool
     -- ^ arity and whether this fallback hid an exposed inductive schema (and
     -- must therefore forfeit Djinn refutation completeness)

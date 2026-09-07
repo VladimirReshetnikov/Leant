@@ -143,8 +143,8 @@ import Leant.Synth.Behavioral
   ( BehavioralVerdict (..)
   , behavioralSyntaxProgram
   , behavioralPreflightProgram
-  , behavioralDecisionProgram
-  , decideBehavioralBy
+  , behavioralProofProgram
+  , proveBehavioralBy
   )
 import Leant.Synth.Fragment
   ( Frag (..)
@@ -4139,16 +4139,20 @@ synthVerifyBehavioral active successQuota st goal groups = do
         | isNothing (respEnv response) -> VariantRejected BackendFatalResponse
         | otherwise -> VariantAccepted
 
-  assessVariant variant = decideBehavioralBy $ \negatePredicate -> do
+  assessVariant variant = proveBehavioralBy $ \method negatePredicate -> do
     let query = (behavioralRunQuery active) { behavioralType = goal }
     result <- runBehavioralCommand st active False
-      (behavioralDecisionProgram negatePredicate query
+      (behavioralProofProgram method negatePredicate query
         $ detailedVerificationVariantText variant)
     pure $ case result of
       Left failure -> Left failure
-      Right response -> Right $ case behavioralCheckedResponse response of
-        Right () -> True
-        Left _ -> False
+      Right response
+        | Just failure <- respFatal response -> Left failure
+        | hasErrors response -> Right False
+        | not (null $ respSorries response) -> Right False
+        | isNothing (respEnv response) ->
+            Left "Lean returned no checked command environment"
+        | otherwise -> Right True
 
 completionCandidates :: St -> String -> IO [String]
 completionCandidates st prefix = do

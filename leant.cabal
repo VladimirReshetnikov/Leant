@@ -21,6 +21,10 @@ Bug-Reports:   https://github.com/VladimirReshetnikov/Leant/issues
 Category:      Development
 Build-Type:    Simple
 Extra-Source-Files:
+  test-behavioral/*.py
+  test-behavioral/README.md
+  test-recursive/*.py
+  test-recursive/README.md
   test-church/check-provider-discovery.hs
   test-church/*.py
   test-church/README.md

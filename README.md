@@ -495,9 +495,17 @@ with exact displayed-term replay and sixteen empty axiom inventories. Its
 [Exference/Both companion run](test-recursive/receipts/other-engines-incomplete.json)
 is incomplete; it performed no independent kernel replays. These newer
 recursive-data changes have not yet passed the complete integration gate.
+Canonical Djex's additional live repair tests now cover `first`, `best`, and
+`all` selection with exact displayed-source GHC replay; all 100 CLI tests pass.
+That acceptance does not extend the recorded Lean corpus or recursive-case
+coverage. [Bounded behavioral simplification](docs/reports/2026-09-07-bounded-behavioral-simplification.md)
+now follows both decision attempts. Its 16 isolated method controls, 15 live
+queries across all three engines, and six independent candidate replays pass.
+The full boundary run passed 619/620 tests; its one existing staged-search
+timeout passed an unchanged focused retry. Both receipts remain separate.
 The [implementation re-triage](docs/reports/2026-09-07-synthesis-retriage.md)
 tracks that boundary separately from forthcoming recursors, contextual
-dictionaries, bounded simplification, and broader Church coverage.
+dictionaries, and broader Church coverage.
 
 This checks the assertion as written: finite examples do not establish a
 universal algorithmic specification. The existing `--where List.length ... --`

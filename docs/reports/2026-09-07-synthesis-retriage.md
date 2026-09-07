@@ -10,8 +10,12 @@ are maintained in the pinned Djex dependency.
 
 Leant `aab110e99e3c3d96549a05d3975b26bea93dc6ef` pins Djex
 `6890bb5a8a56902c2baf137581e23c25a376fad0`. Integration of the Haskell
-elaboration checkpoint is accepted at the receipt boundaries below. First/best
-selection of a repaired candidate remains outstanding.
+elaboration checkpoint is accepted at the receipt boundaries below. Canonical
+Djex's subsequent live first/best regression now passes in expression and
+definition modes, with exact displayed-source GHC replay. All 100 Djex CLI tests
+passed in 142.44 seconds, retaining the all-selection and false controls.
+This closes that selection fixture; it does not enlarge this pinned Lean
+integration receipt or prove ranking among multiple successful repairs.
 
 The newer working integration pins Djex
 `3ce26cfd966ea4da2300028880c71ddaae50596d`. Djinn now passes all eight ordinary
@@ -42,12 +46,15 @@ backed complete-case evidence, including finite tuple fields, while retaining
 exact association, exhaustiveness, and lexical scope. Search improvements alone
 cannot close this evidence gap.
 
-The strict Leant build passed at the corrected dependency revision. A full
-post-correction boundary run remains required: the earlier run had 55 failures
-from missing fake-Z3 setup and two real positive-construction-bound failures.
-Djex `3ce26cfd` fixes the latter by enabling case plans only when recursive
-types occur negatively. The Djinn-only live receipt does not close the full
-integration gate.
+The strict Leant build passed at the corrected dependency revision. The new
+configured boundary run enumerated 620 tests and passed 619, correcting the
+earlier missing fake-Z3 setup and retaining `3ce26cfd`'s positive-construction
+bound fix. One existing staged polymorphic-search test exceeded its 30-second
+limit; an unchanged focused retry passed. The separate
+[full-run](../../test-behavioral/receipts/unit-incomplete.json) and
+[retry](../../test-behavioral/receipts/unit-focused-retry.json) receipts do not
+constitute an unfiltered 620-test pass. Complete integration acceptance remains
+open alongside the cross-engine case failures.
 
 The initial positive GHC repair fixture exercises a graph-rendered impredicative
 let. A subsequent public Exference query now demonstrates live repair under
@@ -87,34 +94,29 @@ This is integration evidence for the dependency checkpoint; remaining priority
    full boundary suite with its fake-Z3 helper configured. Preserve the existing
    positive-only constructor bounds. Check Both explicitly: a slow engine has
    already delayed an otherwise accepted Djinn result beyond the deadline.
-2. **Close priority 1's remaining acceptance.** Require live first/best
-   selection of a repaired candidate, exact checked/displayed text, retained
-   missing-authority and scope controls, and the original resource bounds.
-   Preserve the accepted all-selection fixture. Integrate and validate any
-   further shared changes; integration of the current checkpoint is done.
-3. **Deliver priority 4's bounded Lean simplification.** After decision checks
-   for the assertion and its negation, attempt bounded simplification. Require
-   a complete kernel proof, retain axiom inventories and the command deadline,
-   and keep false and inconclusive outcomes distinct.
-4. **Deliver priority 2's supplied folds/recursors.** Use generic recursion
+2. **Deliver priority 2's supplied folds/recursors.** Use generic recursion
    structure to target operations such as `map`, `append`, and `length`, with
    checked source evidence and termination guarantees. Add behavioral corpus
    cases alongside this work.
-5. **Implement priority 3's contextual evidence.** Start with forwarding and
+3. **Implement priority 3's contextual evidence.** Start with forwarding and
    dictionary-independent bodies under lexical givens, then methods,
    conditional providers, and superclasses. Retain identities and scoped
    obligations throughout Djinn's provider projection and graph checking.
-6. **Close priority 4's full behavioral corpus.** Finish naturals,
+4. **Close priority 4's full behavioral corpus.** Finish naturals,
    options/eithers, folds, conversions, and all 19 supplied-default cases.
    Begin this coverage during earlier deliveries; preserve explicit defaults
    or inhabitance assumptions and independent false controls.
 
 None of the four priorities is complete. Moving the smaller simplification
 delivery earlier changes scheduling, not the required contextual capability.
-Keeping the active cross-engine case failures first does not authorize postponing
-the small selection-mode closure until after general recursive synthesis.
-All test results above are inspected prior receipts, not tests rerun for this
-documentation update. The dependency's linked execution report reflects its
+The accepted first/best CLI fixture and bounded simplification remain regression
+gates for later shared integration changes. Simplification now passes its 16
+method controls, 15 live queries, and six independent candidate replays, with
+false and inconclusive outcomes preserved. See the
+[acceptance report](2026-09-07-bounded-behavioral-simplification.md) for exact
+proof axioms and the separate boundary-suite timing failure. These and the
+100-test CLI results are new runs; the older Church and recursive-case counts
+remain inspected prior receipts. The dependency's linked execution report reflects its
 pinned checkpoint; this companion records the newer canonical-worktree triage.
 
 ## Why these boundaries matter in Leant
@@ -125,9 +127,13 @@ The same module's `djinnRecursiveProjection` uses `EraseProviderContexts`.
 Context erasure remains a boundary to address explicitly; successful ordinary
 input cases do not establish contextual Djinn synthesis.
 
-[`Leant.Synth.Behavioral`](../../src/Leant/Synth/Behavioral.hs) currently uses
-`by decide` for the proposition and its negation. Simplification is proposed
-work. A failed tactic must never be converted into a false verdict or a proof.
+[`Leant.Synth.Behavioral`](../../src/Leant/Synth/Behavioral.hs) now has a working
+implementation of bounded `simp` after both `decide` attempts. Its
+[acceptance runner](../../test-behavioral/README.md) passed the complete live
+proof-fallback matrix and independent kernel replay. A failed tactic must never be converted
+into a false verdict or a proof. Successful simplification proofs can use
+`propext` and `Quot.sound`; their actual inventories must be recorded separately
+from the candidate's inventory and the existing axiom-free finite corpus.
 
 Native Windows Length support remains a separate platform milestone:
 [`Acquire.hs`](../../src/Leant/Synth/Length/File/Acquire.hs) deliberately returns

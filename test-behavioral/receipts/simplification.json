@@ -1,0 +1,665 @@
+{
+  "status": "passed",
+  "runner_sha256": "24949662008d707ac1b37fb73ad23c5035f7687b99422d06afa2feba6f66d00a",
+  "commands_sha256": "56662915f2f6a2614db29b86d3a67cbf1a9111bba76da4a23d6bcdc67d744653",
+  "cases": [
+    {
+      "engine": "djinn",
+      "operation": "quantified",
+      "name": "simp_djinn_quantified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "∀ n : Nat, {f} Nat n + 0 = n",
+      "command": ":synth simp_djinn_quantified : ∀ A : Type, A → A where ∀ n : Nat, simp_djinn_quantified Nat n + 0 = n",
+      "expected": "candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "falsified",
+      "name": "simp_djinn_falsified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "(∀ n : Nat, {f} Nat n + 0 = n) ∧ False",
+      "command": ":synth simp_djinn_falsified : ∀ A : Type, A → A where (∀ n : Nat, simp_djinn_falsified Nat n + 0 = n) ∧ False",
+      "expected": "no_candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "opaque",
+      "name": "simp_djinn_opaque",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending",
+      "command": ":synth simp_djinn_opaque : ∀ A : Type, A → A where BehavioralSimpFixture.pending",
+      "expected": "inconclusive"
+    },
+    {
+      "engine": "djinn",
+      "operation": "partial",
+      "name": "simp_djinn_partial",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending ∧ (∀ n : Nat, {f} Nat n + 0 = n)",
+      "command": ":synth simp_djinn_partial : ∀ A : Type, A → A where BehavioralSimpFixture.pending ∧ (∀ n : Nat, simp_djinn_partial Nat n + 0 = n)",
+      "expected": "inconclusive"
+    },
+    {
+      "engine": "djinn",
+      "operation": "recovery",
+      "name": "simp_djinn_recovery",
+      "type": "∀ A : Type, A → A",
+      "predicate": "{f} Nat 7 = 7",
+      "command": ":synth simp_djinn_recovery : ∀ A : Type, A → A where simp_djinn_recovery Nat 7 = 7",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "quantified",
+      "name": "simp_exference_quantified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "∀ n : Nat, {f} Nat n + 0 = n",
+      "command": ":synth simp_exference_quantified : ∀ A : Type, A → A where ∀ n : Nat, simp_exference_quantified Nat n + 0 = n",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "falsified",
+      "name": "simp_exference_falsified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "(∀ n : Nat, {f} Nat n + 0 = n) ∧ False",
+      "command": ":synth simp_exference_falsified : ∀ A : Type, A → A where (∀ n : Nat, simp_exference_falsified Nat n + 0 = n) ∧ False",
+      "expected": "no_candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "opaque",
+      "name": "simp_exference_opaque",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending",
+      "command": ":synth simp_exference_opaque : ∀ A : Type, A → A where BehavioralSimpFixture.pending",
+      "expected": "inconclusive"
+    },
+    {
+      "engine": "exference",
+      "operation": "partial",
+      "name": "simp_exference_partial",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending ∧ (∀ n : Nat, {f} Nat n + 0 = n)",
+      "command": ":synth simp_exference_partial : ∀ A : Type, A → A where BehavioralSimpFixture.pending ∧ (∀ n : Nat, simp_exference_partial Nat n + 0 = n)",
+      "expected": "inconclusive"
+    },
+    {
+      "engine": "exference",
+      "operation": "recovery",
+      "name": "simp_exference_recovery",
+      "type": "∀ A : Type, A → A",
+      "predicate": "{f} Nat 7 = 7",
+      "command": ":synth simp_exference_recovery : ∀ A : Type, A → A where simp_exference_recovery Nat 7 = 7",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "quantified",
+      "name": "simp_both_quantified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "∀ n : Nat, {f} Nat n + 0 = n",
+      "command": ":synth simp_both_quantified : ∀ A : Type, A → A where ∀ n : Nat, simp_both_quantified Nat n + 0 = n",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "falsified",
+      "name": "simp_both_falsified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "(∀ n : Nat, {f} Nat n + 0 = n) ∧ False",
+      "command": ":synth simp_both_falsified : ∀ A : Type, A → A where (∀ n : Nat, simp_both_falsified Nat n + 0 = n) ∧ False",
+      "expected": "no_candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "opaque",
+      "name": "simp_both_opaque",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending",
+      "command": ":synth simp_both_opaque : ∀ A : Type, A → A where BehavioralSimpFixture.pending",
+      "expected": "inconclusive"
+    },
+    {
+      "engine": "both",
+      "operation": "partial",
+      "name": "simp_both_partial",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending ∧ (∀ n : Nat, {f} Nat n + 0 = n)",
+      "command": ":synth simp_both_partial : ∀ A : Type, A → A where BehavioralSimpFixture.pending ∧ (∀ n : Nat, simp_both_partial Nat n + 0 = n)",
+      "expected": "inconclusive"
+    },
+    {
+      "engine": "both",
+      "operation": "recovery",
+      "name": "simp_both_recovery",
+      "type": "∀ A : Type, A → A",
+      "predicate": "{f} Nat 7 = 7",
+      "command": ":synth simp_both_recovery : ∀ A : Type, A → A where simp_both_recovery Nat 7 = 7",
+      "expected": "candidate"
+    }
+  ],
+  "controls": [
+    {
+      "name": "BehavioralSimpControl.quantified_decide_positive",
+      "operation": "quantified",
+      "method": "decide",
+      "negative": false,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control0.lean",
+      "source_sha256": "b8951993fd4cb5841b7e832c2de3bc68afbe78258cb8de125e39c52524e19050",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.quantified_decide_negative",
+      "operation": "quantified",
+      "method": "decide",
+      "negative": true,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control1.lean",
+      "source_sha256": "1446fc25c02d2883f1b5b51aba6faf608f683a5a070ce6c6e2a84fb3aaec0b6b",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.quantified_simp_positive",
+      "operation": "quantified",
+      "method": "simp",
+      "negative": false,
+      "expected": true,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control2.lean",
+      "source_sha256": "31c9f2d6bd4f8b028c848ef06108d423e9b099129e3fb078870b72222272bc88",
+      "status": "passed",
+      "axiom_inventory": [
+        "Quot.sound",
+        "propext"
+      ]
+    },
+    {
+      "name": "BehavioralSimpControl.quantified_simp_negative",
+      "operation": "quantified",
+      "method": "simp",
+      "negative": true,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control3.lean",
+      "source_sha256": "81409af4450504bd1aa2fdac4af22317d3a31ec9d6f5595ece79d311cd544dd5",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.falsified_decide_positive",
+      "operation": "falsified",
+      "method": "decide",
+      "negative": false,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control4.lean",
+      "source_sha256": "9a97620ac0acf5f412bdde55b42860705e720099a1eb46818399b232dacfd4bb",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.falsified_decide_negative",
+      "operation": "falsified",
+      "method": "decide",
+      "negative": true,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control5.lean",
+      "source_sha256": "2f0c7cc9036af0523becf76cb76174f994e1c43239ece042f0c5b8b9fbf29ba9",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.falsified_simp_positive",
+      "operation": "falsified",
+      "method": "simp",
+      "negative": false,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control6.lean",
+      "source_sha256": "da378f0bc2e9c66c0c77b1f8781d8f1434d871634ff1b3c113b62e128d92efce",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.falsified_simp_negative",
+      "operation": "falsified",
+      "method": "simp",
+      "negative": true,
+      "expected": true,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control7.lean",
+      "source_sha256": "03fa3ed79e4993508ac8f1f605aa0e468a531b9e64ae84da0dd80f505f73663d",
+      "status": "passed",
+      "axiom_inventory": [
+        "Quot.sound",
+        "propext"
+      ]
+    },
+    {
+      "name": "BehavioralSimpControl.opaque_decide_positive",
+      "operation": "opaque",
+      "method": "decide",
+      "negative": false,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control8.lean",
+      "source_sha256": "d8daafcc88376884262978e7b8a3d82fe2f8b21aa80b06612d9ce086d6343245",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.opaque_decide_negative",
+      "operation": "opaque",
+      "method": "decide",
+      "negative": true,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control9.lean",
+      "source_sha256": "97bbc1687335fcc2b6c1fbb9098606beca092c594466ee26e4d2c594964d68f3",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.opaque_simp_positive",
+      "operation": "opaque",
+      "method": "simp",
+      "negative": false,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control10.lean",
+      "source_sha256": "339bafe7ad975fa0abc1794bed309bac244df435b0a8f8d5591470920eb497d6",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.opaque_simp_negative",
+      "operation": "opaque",
+      "method": "simp",
+      "negative": true,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control11.lean",
+      "source_sha256": "6a523927750d935de4225777703614d3918d24c483e150557ba7e77d4f601c5d",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.partial_decide_positive",
+      "operation": "partial",
+      "method": "decide",
+      "negative": false,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control12.lean",
+      "source_sha256": "c6233d649e88574eeab0e878de75441974463472ddc92d83c9794130246cb383",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.partial_decide_negative",
+      "operation": "partial",
+      "method": "decide",
+      "negative": true,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control13.lean",
+      "source_sha256": "bec33e7df5171614d1bf2409bcf5a892242f141b3c2944eb62f6eb70cc5e8cd8",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.partial_simp_positive",
+      "operation": "partial",
+      "method": "simp",
+      "negative": false,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control14.lean",
+      "source_sha256": "4c97b8ee7bc754fa771ede6f2bc7a288158f95246bfc366ec959473091c6a6bd",
+      "status": "passed",
+      "axiom_inventory": null
+    },
+    {
+      "name": "BehavioralSimpControl.partial_simp_negative",
+      "operation": "partial",
+      "method": "simp",
+      "negative": true,
+      "expected": false,
+      "path": "C:\\Leant\\dist-newstyle\\simp-acceptance\\all-engines-v1\\Control15.lean",
+      "source_sha256": "0f948fcb3202d08c6891c94508660b9f6b4561dfd88095b313d0a00993641133",
+      "status": "passed",
+      "axiom_inventory": null
+    }
+  ],
+  "settings": {
+    "window": 32,
+    "steps": 4096,
+    "budget": 20000,
+    "timeout": 30,
+    "process_timeout": 600
+  },
+  "candidate_axiom_policy": "empty",
+  "proof_axiom_allowance": [
+    "Quot.sound",
+    "propext"
+  ],
+  "named_synthesis_providers": [],
+  "scope": "bounded proof fallback, false and inconclusive controls",
+  "source_hashes": {
+    "src/Main.hs": "d659096d8861bc0ef5c26ed69849cfbcefe928b53d96886448bd6ba8d0a90ba8",
+    "src/Leant/Synth/Behavioral.hs": "79faad0b7e5e0e6e24f50fb662c26dcc5ea4a37460a59c7aea40b8b4db489ea0",
+    "src/Leant/Synth/Engine.hs": "3fd680a78ef212e5ff6c6193df8ecd60e5bcc09a3fe81619ffe50f5bd4799f19"
+  },
+  "executable": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+  "executable_sha256": "9588516cca8bd11eef71c79c8de7dbad3b64bd90589f07aea58ccdd7b30f2113",
+  "results": [
+    {
+      "engine": "djinn",
+      "operation": "quantified",
+      "name": "simp_djinn_quantified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "∀ n : Nat, {f} Nat n + 0 = n",
+      "command": ":synth simp_djinn_quantified : ∀ A : Type, A → A where ∀ n : Nat, simp_djinn_quantified Nat n + 0 = n",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun _ x => x",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "simp_djinn_quantified : ∀ A : Type, A → A where ∀ n : Nat, simp_djinn_quantified Nat n + 0 = n\npreparing synthesis environment (session imports + Lean)...\n  it1  fun _ x => x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "falsified",
+      "name": "simp_djinn_falsified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "(∀ n : Nat, {f} Nat n + 0 = n) ∧ False",
+      "command": ":synth simp_djinn_falsified : ∀ A : Type, A → A where (∀ n : Nat, simp_djinn_falsified Nat n + 0 = n) ∧ False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "simp_djinn_falsified : ∀ A : Type, A → A where (∀ n : Nat, simp_djinn_falsified Nat n + 0 = n) ∧ False\nthe engine proposed 1 candidate(s) but none passed both Lean verification and the supplied assertion\nsupplied behavioral assertion: 0 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "opaque",
+      "name": "simp_djinn_opaque",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending",
+      "command": ":synth simp_djinn_opaque : ∀ A : Type, A → A where BehavioralSimpFixture.pending",
+      "expected": "inconclusive",
+      "status": "inconclusive",
+      "output": "simp_djinn_opaque : ∀ A : Type, A → A where BehavioralSimpFixture.pending\nthe engine proposed 1 candidate(s) but none passed both Lean verification and the supplied assertion\nsupplied behavioral assertion: 0 passed, 0 falsified, 1 inconclusive (checks concern only the supplied assertion)\nbehavioral check inconclusive: Lean could prove neither the assertion nor its negation by bounded decide or simp\n",
+      "observations": {
+        "passed": 0,
+        "falsified": 0,
+        "inconclusive": 1
+      }
+    },
+    {
+      "engine": "djinn",
+      "operation": "partial",
+      "name": "simp_djinn_partial",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending ∧ (∀ n : Nat, {f} Nat n + 0 = n)",
+      "command": ":synth simp_djinn_partial : ∀ A : Type, A → A where BehavioralSimpFixture.pending ∧ (∀ n : Nat, simp_djinn_partial Nat n + 0 = n)",
+      "expected": "inconclusive",
+      "status": "inconclusive",
+      "output": "simp_djinn_partial : ∀ A : Type, A → A where BehavioralSimpFixture.pending ∧ (∀ n : Nat, simp_djinn_partial Nat n + 0 = n)\nthe engine proposed 1 candidate(s) but none passed both Lean verification and the supplied assertion\nsupplied behavioral assertion: 0 passed, 0 falsified, 1 inconclusive (checks concern only the supplied assertion)\nbehavioral check inconclusive: Lean could prove neither the assertion nor its negation by bounded decide or simp\n",
+      "observations": {
+        "passed": 0,
+        "falsified": 0,
+        "inconclusive": 1
+      }
+    },
+    {
+      "engine": "djinn",
+      "operation": "recovery",
+      "name": "simp_djinn_recovery",
+      "type": "∀ A : Type, A → A",
+      "predicate": "{f} Nat 7 = 7",
+      "command": ":synth simp_djinn_recovery : ∀ A : Type, A → A where simp_djinn_recovery Nat 7 = 7",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun _ x => x",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "simp_djinn_recovery : ∀ A : Type, A → A where simp_djinn_recovery Nat 7 = 7\n  it1  fun _ x => x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    },
+    {
+      "engine": "exference",
+      "operation": "quantified",
+      "name": "simp_exference_quantified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "∀ n : Nat, {f} Nat n + 0 = n",
+      "command": ":synth simp_exference_quantified : ∀ A : Type, A → A where ∀ n : Nat, simp_exference_quantified Nat n + 0 = n",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun _ x => x",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "simp_exference_quantified : ∀ A : Type, A → A where ∀ n : Nat, simp_exference_quantified Nat n + 0 = n\n  it1  fun _ x => x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "falsified",
+      "name": "simp_exference_falsified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "(∀ n : Nat, {f} Nat n + 0 = n) ∧ False",
+      "command": ":synth simp_exference_falsified : ∀ A : Type, A → A where (∀ n : Nat, simp_exference_falsified Nat n + 0 = n) ∧ False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "simp_exference_falsified : ∀ A : Type, A → A where (∀ n : Nat, simp_exference_falsified Nat n + 0 = n) ∧ False\nthe engine proposed 2 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search truncated: step limit reached, queue limit pruned 22784\nsupplied behavioral assertion: 0 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "opaque",
+      "name": "simp_exference_opaque",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending",
+      "command": ":synth simp_exference_opaque : ∀ A : Type, A → A where BehavioralSimpFixture.pending",
+      "expected": "inconclusive",
+      "status": "inconclusive",
+      "output": "simp_exference_opaque : ∀ A : Type, A → A where BehavioralSimpFixture.pending\nthe engine proposed 2 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search truncated: step limit reached, queue limit pruned 22784\nsupplied behavioral assertion: 0 passed, 0 falsified, 1 inconclusive (checks concern only the supplied assertion)\nbehavioral check inconclusive: Lean could prove neither the assertion nor its negation by bounded decide or simp\n",
+      "observations": {
+        "passed": 0,
+        "falsified": 0,
+        "inconclusive": 1
+      }
+    },
+    {
+      "engine": "exference",
+      "operation": "partial",
+      "name": "simp_exference_partial",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending ∧ (∀ n : Nat, {f} Nat n + 0 = n)",
+      "command": ":synth simp_exference_partial : ∀ A : Type, A → A where BehavioralSimpFixture.pending ∧ (∀ n : Nat, simp_exference_partial Nat n + 0 = n)",
+      "expected": "inconclusive",
+      "status": "inconclusive",
+      "output": "simp_exference_partial : ∀ A : Type, A → A where BehavioralSimpFixture.pending ∧ (∀ n : Nat, simp_exference_partial Nat n + 0 = n)\nthe engine proposed 2 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search truncated: step limit reached, queue limit pruned 22784\nsupplied behavioral assertion: 0 passed, 0 falsified, 1 inconclusive (checks concern only the supplied assertion)\nbehavioral check inconclusive: Lean could prove neither the assertion nor its negation by bounded decide or simp\n",
+      "observations": {
+        "passed": 0,
+        "falsified": 0,
+        "inconclusive": 1
+      }
+    },
+    {
+      "engine": "exference",
+      "operation": "recovery",
+      "name": "simp_exference_recovery",
+      "type": "∀ A : Type, A → A",
+      "predicate": "{f} Nat 7 = 7",
+      "command": ":synth simp_exference_recovery : ∀ A : Type, A → A where simp_exference_recovery Nat 7 = 7",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun _ x => x",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "simp_exference_recovery : ∀ A : Type, A → A where simp_exference_recovery Nat 7 = 7\n  it1  fun _ x => x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    },
+    {
+      "engine": "both",
+      "operation": "quantified",
+      "name": "simp_both_quantified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "∀ n : Nat, {f} Nat n + 0 = n",
+      "command": ":synth simp_both_quantified : ∀ A : Type, A → A where ∀ n : Nat, simp_both_quantified Nat n + 0 = n",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun _ x => x",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "simp_both_quantified : ∀ A : Type, A → A where ∀ n : Nat, simp_both_quantified Nat n + 0 = n\n  it1  fun _ x => x\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "falsified",
+      "name": "simp_both_falsified",
+      "type": "∀ A : Type, A → A",
+      "predicate": "(∀ n : Nat, {f} Nat n + 0 = n) ∧ False",
+      "command": ":synth simp_both_falsified : ∀ A : Type, A → A where (∀ n : Nat, simp_both_falsified Nat n + 0 = n) ∧ False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "simp_both_falsified : ∀ A : Type, A → A where (∀ n : Nat, simp_both_falsified Nat n + 0 = n) ∧ False\nthe engine proposed 2 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: exference: search truncated: step limit reached, queue limit pruned 22784\nsupplied behavioral assertion: 0 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "opaque",
+      "name": "simp_both_opaque",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending",
+      "command": ":synth simp_both_opaque : ∀ A : Type, A → A where BehavioralSimpFixture.pending",
+      "expected": "inconclusive",
+      "status": "inconclusive",
+      "output": "simp_both_opaque : ∀ A : Type, A → A where BehavioralSimpFixture.pending\nthe engine proposed 2 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: exference: search truncated: step limit reached, queue limit pruned 22784\nsupplied behavioral assertion: 0 passed, 0 falsified, 1 inconclusive (checks concern only the supplied assertion)\nbehavioral check inconclusive: Lean could prove neither the assertion nor its negation by bounded decide or simp\n",
+      "observations": {
+        "passed": 0,
+        "falsified": 0,
+        "inconclusive": 1
+      }
+    },
+    {
+      "engine": "both",
+      "operation": "partial",
+      "name": "simp_both_partial",
+      "type": "∀ A : Type, A → A",
+      "predicate": "BehavioralSimpFixture.pending ∧ (∀ n : Nat, {f} Nat n + 0 = n)",
+      "command": ":synth simp_both_partial : ∀ A : Type, A → A where BehavioralSimpFixture.pending ∧ (∀ n : Nat, simp_both_partial Nat n + 0 = n)",
+      "expected": "inconclusive",
+      "status": "inconclusive",
+      "output": "simp_both_partial : ∀ A : Type, A → A where BehavioralSimpFixture.pending ∧ (∀ n : Nat, simp_both_partial Nat n + 0 = n)\nthe engine proposed 2 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: exference: search truncated: step limit reached, queue limit pruned 22784\nsupplied behavioral assertion: 0 passed, 0 falsified, 1 inconclusive (checks concern only the supplied assertion)\nbehavioral check inconclusive: Lean could prove neither the assertion nor its negation by bounded decide or simp\n",
+      "observations": {
+        "passed": 0,
+        "falsified": 0,
+        "inconclusive": 1
+      }
+    },
+    {
+      "engine": "both",
+      "operation": "recovery",
+      "name": "simp_both_recovery",
+      "type": "∀ A : Type, A → A",
+      "predicate": "{f} Nat 7 = 7",
+      "command": ":synth simp_both_recovery : ∀ A : Type, A → A where simp_both_recovery Nat 7 = 7",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun _ x => x",
+      "observations": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "output": "simp_both_recovery : ∀ A : Type, A → A where simp_both_recovery Nat 7 = 7\n  it1  fun _ x => x\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    }
+  ],
+  "kernel_replays": [
+    {
+      "case": "simp_djinn_quantified",
+      "source_sha256": "e8defd26a59cf1b392b9df3d8e3a7c377c3d5a9c5efa2d839a21d9143acdfb78",
+      "status": "passed",
+      "axiom_inventories": {
+        "BehavioralSimpReplay.accepted": [],
+        "BehavioralSimpReplay.accepted_passes": [
+          "Quot.sound",
+          "propext"
+        ]
+      }
+    },
+    {
+      "case": "simp_djinn_recovery",
+      "source_sha256": "e6b0828f65a15dd3bfbaaa2d96ab7f372229ac72851b6ab126c63602e2068872",
+      "status": "passed",
+      "axiom_inventories": {
+        "BehavioralSimpReplay.accepted": [],
+        "BehavioralSimpReplay.accepted_passes": []
+      }
+    },
+    {
+      "case": "simp_exference_quantified",
+      "source_sha256": "e8defd26a59cf1b392b9df3d8e3a7c377c3d5a9c5efa2d839a21d9143acdfb78",
+      "status": "passed",
+      "axiom_inventories": {
+        "BehavioralSimpReplay.accepted": [],
+        "BehavioralSimpReplay.accepted_passes": [
+          "Quot.sound",
+          "propext"
+        ]
+      }
+    },
+    {
+      "case": "simp_exference_recovery",
+      "source_sha256": "e6b0828f65a15dd3bfbaaa2d96ab7f372229ac72851b6ab126c63602e2068872",
+      "status": "passed",
+      "axiom_inventories": {
+        "BehavioralSimpReplay.accepted": [],
+        "BehavioralSimpReplay.accepted_passes": []
+      }
+    },
+    {
+      "case": "simp_both_quantified",
+      "source_sha256": "e8defd26a59cf1b392b9df3d8e3a7c377c3d5a9c5efa2d839a21d9143acdfb78",
+      "status": "passed",
+      "axiom_inventories": {
+        "BehavioralSimpReplay.accepted": [],
+        "BehavioralSimpReplay.accepted_passes": [
+          "Quot.sound",
+          "propext"
+        ]
+      }
+    },
+    {
+      "case": "simp_both_recovery",
+      "source_sha256": "e6b0828f65a15dd3bfbaaa2d96ab7f372229ac72851b6ab126c63602e2068872",
+      "status": "passed",
+      "axiom_inventories": {
+        "BehavioralSimpReplay.accepted": [],
+        "BehavioralSimpReplay.accepted_passes": []
+      }
+    }
+  ],
+  "candidate_count": 6,
+  "false_control_count": 3,
+  "inconclusive_control_count": 6,
+  "executable_unchanged": true,
+  "sources_unchanged": true
+}

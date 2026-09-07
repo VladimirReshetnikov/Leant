@@ -1,0 +1,31 @@
+{
+  "status": "passed_focused_retry",
+  "scope": "one unchanged timing-sensitive test, not a passing unfiltered suite",
+  "full_suite_receipt": "unit-incomplete.json",
+  "full_suite_receipt_sha256": "71112d7604223526c3e49064f0564c4f20a5eea7d08fdc522ed98c12eb5cf1a0",
+  "full_suite_observation": {
+    "inventory": 620,
+    "passed": 619,
+    "failed": 1
+  },
+  "test": "recover successive polymorphic layers without unrelated prelude constructors",
+  "command": [
+    "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+    "-j1",
+    "--timeout=400s",
+    "-p",
+    "/recover successive polymorphic layers without unrelated prelude constructors/"
+  ],
+  "original_internal_stage_timeout_seconds": 30,
+  "retry_passed_count": 1,
+  "retry_elapsed_seconds": 133.11,
+  "retry_log_path": "C:\\Leant\\dist-newstyle\\priority-simp-layered-focused.log",
+  "retry_log_sha256": "c87f49172780622a2bd14be43cf2a1c47ddfb6fe02d9467b2660f3d661d14e48",
+  "retry_log": "Leant synthesis boundary\r\n  Djinn rank-N frontiers\r\n    recover successive polymorphic layers without unrelated prelude constructors: OK (133.10s)\r\n\r\nAll 1 tests passed (133.11s)\r\n",
+  "source_hashes_match_full_suite": true,
+  "executable_hashes_match_full_suite": true,
+  "executable_hashes": {
+    "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe": "09e93456b77e99abf867d5b180919bd2f5b01c053d9950f99014dcee704e82b3",
+    "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\djex-2026.7.17\\x\\djex-fake-z3\\build\\djex-fake-z3\\djex-fake-z3.exe": "5f0886b05030bf9f4ee18cf1746da6e82063bdc14d612d6d9900f726e483e135"
+  }
+}
