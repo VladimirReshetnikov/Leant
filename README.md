@@ -467,7 +467,7 @@ queries retain their existing batch ranking. The
 the streaming and evidence boundaries.
 The [streaming acceptance report](lib/Djex/docs/reports/2026-09-06-djinn-behavioral-streaming.md)
 records all six behavioral operations in Djinn, Exference, and Both, independent
-kernel replay, 615 current Leant tests, and live quota and deadline-retention
+kernel replay, 615 Leant tests at that checkpoint, and live quota and deadline-retention
 controls. Its paired measurements distinguish query latency from cold startup.
 
 Explicit `synth-djinn-strategy interleave` adds reusable normal-form term
@@ -484,9 +484,20 @@ proofs and empty axiom inventories. The [current acceptance record](docs/behavio
 records the distinct engine budgets, rejection controls, and executable-pinned
 receipts; these finite checks do not establish universal behavioral equivalence.
 Together with the 12 Haskell cells, this closes the **30-cell behavioral corpus**.
-The current Leant unit suite also passed **615/615 tests** serially; the
+That Leant checkpoint also passed **615/615 tests** serially; the
 [paired validation receipt](lib/Djex/test-church/receipts/behavior-streaming-final.json)
 keeps that aggregate evidence separate from synthesis and kernel replay.
+
+The subsequent Haskell-elaboration integration retained all 615 boundary tests
+and the eighteen existing Lean behavioral cases. A newer working integration
+also has an [eight-case Djinn recursive-data receipt](test-recursive/receipts/djinn-cases.json),
+with exact displayed-term replay and sixteen empty axiom inventories. Its
+[Exference/Both companion run](test-recursive/receipts/other-engines-incomplete.json)
+is incomplete; it performed no independent kernel replays. These newer
+recursive-data changes have not yet passed the complete integration gate.
+The [implementation re-triage](docs/reports/2026-09-07-synthesis-retriage.md)
+tracks that boundary separately from forthcoming recursors, contextual
+dictionaries, bounded simplification, and broader Church coverage.
 
 This checks the assertion as written: finite examples do not establish a
 universal algorithmic specification. The existing `--where List.length ... --`
