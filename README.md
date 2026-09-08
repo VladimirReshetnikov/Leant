@@ -76,8 +76,8 @@ Companion documents:
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
 - **[Current synthesis re-triage](docs/reports/2026-09-07-synthesis-retriage.md)**
-  — elaboration acceptance and integration, recursive-data cases and recursors,
-  bounded Lean simplification, contextual evidence, and broader behavioral coverage;
+  — accepted case analysis across all engines, Lean fold acceptance, production
+  contextual evidence, and the remaining behavioral corpus;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -135,6 +135,18 @@ Companion documents:
   Rendering and Length consume the candidate's own graph and source inventory;
   `both` preserves each retained candidate's engine ownership. See the
   [implementation and validated coverage](docs/synth-internals.md#djinn-source-graphs-and-current-validation).
+- **Current synthesis progress.** The pinned Djex checkpoint adds checked
+  ordinary-data cases, supplied-fold composition, and lexical `Given` evidence.
+  All eight ordinary-data scenarios now pass in Djinn, Exference, and Both:
+  24 exact displayed terms pass independent Lean replay, with 48 empty axiom
+  inventories and three actual false controls. The isolated dictionary renderer
+  also passes seven full-signature replays with distinct dictionary payloads;
+  production contextual routing remains pending. The full configured 647-test
+  integration suite passes in 343.79 seconds with source and executable integrity
+  enforced. Next are Lean fold acceptance, production dictionary evidence,
+  and broader behavioral coverage; the 350-signature result above establishes
+  type inhabitation. See the [current re-triage and exact evidence
+  boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked
@@ -489,23 +501,42 @@ That Leant checkpoint also passed **615/615 tests** serially; the
 keeps that aggregate evidence separate from synthesis and kernel replay.
 
 The subsequent Haskell-elaboration integration retained all 615 boundary tests
-and the eighteen existing Lean behavioral cases. A newer working integration
-also has an [eight-case Djinn recursive-data receipt](test-recursive/receipts/djinn-cases.json),
-with exact displayed-term replay and sixteen empty axiom inventories. Its
-[Exference/Both companion run](test-recursive/receipts/other-engines-incomplete.json)
-is incomplete; it performed no independent kernel replays. These newer
-recursive-data changes have not yet passed the complete integration gate.
+and the eighteen existing Lean behavioral cases. The current integration of
+Djex `922c5558` now passes the [ordinary-data matrix](test-recursive/README.md)
+in all three engine modes: 24 positive cases, three false controls, 24 independent
+replays of the exact displayed terms, and 48 empty axiom inventories. Its live
+phase took 180.78 seconds with unchanged source and executable hashes. Named
+behavioral queries now admit unused-input candidates within the existing search
+bounds, and Both alternates observed engine slots independently of the requested
+success count. This closes the earlier [Djinn-only](test-recursive/receipts/djinn-cases.json)
+and [failed mixed-engine](test-recursive/receipts/other-engines-incomplete.json)
+case-stage boundary; those historical receipts retain their original scope.
+The [full configured integration run](test-recursive/receipts/unit.json) passes
+all **647 tests in 343.79 seconds**, with unchanged source, test-executable, and
+fake-Z3 helper hashes. The
+[previous run](test-recursive/receipts/unit-before-fixture-refresh.json) passed
+645/647 tests in 297.72 seconds. Its two stale expectations required a legacy
+fallback for a now-typed wildcard graph and a specific first Nat-case result.
+The corrected checks retain graph authority and the semantic case within the
+original search frontiers; both pass, with no budget increase.
 Canonical Djex's additional live repair tests now cover `first`, `best`, and
 `all` selection with exact displayed-source GHC replay; all 100 CLI tests pass.
 That acceptance does not extend the recorded Lean corpus or recursive-case
 coverage. [Bounded behavioral simplification](docs/reports/2026-09-07-bounded-behavioral-simplification.md)
 now follows both decision attempts. Its 16 isolated method controls, 15 live
 queries across all three engines, and six independent candidate replays pass.
-The full boundary run passed 619/620 tests; its one existing staged-search
-timeout passed an unchanged focused retry. Both receipts remain separate.
+That earlier full boundary run passed 619/620 tests; its one existing
+staged-search timeout passed an unchanged focused retry. Both historical
+receipts remain separate from the successful 647-test aggregate.
 The [implementation re-triage](docs/reports/2026-09-07-synthesis-retriage.md)
 tracks that boundary separately from forthcoming recursors, contextual
 dictionaries, and broader Church coverage.
+
+The [supplied-fold acceptance fixture](test-recursive/README.md#supplied-folds-and-rank-n-recursor-arguments)
+is included with an initial diagnostic receipt. A live native Djinn `map`
+candidate and false rejection were observed, but a settings-label check stopped
+independent kernel replay. The validator correction passes eighteen Python
+tests; fresh fold acceptance remains pending.
 
 This checks the assertion as written: finite examples do not establish a
 universal algorithmic specification. The existing `--where List.length ... --`
@@ -1109,11 +1140,14 @@ positive approximation because the serialized fields lack declaration-level
 parameter provenance. Every resulting term is re-elaborated by Lean, and the
 approximation supplies no negative evidence. Djinn may introduce one
 constructor layer from each of at most two independent recursive SCCs on a
-positive logical path, but it cannot eliminate recursive inputs; Exference may
-inspect one constructor layer, whose recursive fields become ordinary
-branch-local values and are not immediately split again. It first preserves
-the established all-inputs-used candidate prefix and tries the omission lane
-only after a miss. Partial inventories, unresolved repeated parameters,
+positive logical path. Its separate checked case plan can inspect one layer of
+a recursive input while retaining opaque recursive fields. Exference also
+supports bounded one-layer inspection; recursive fields become ordinary
+branch-local values and are not immediately split again. Ordinary type-only
+queries preserve the all-inputs-used prefix and try the omission lane after a
+miss; named behavioral queries admit unused inputs within the same bounded
+search lanes so a failing strict candidate cannot hide a matching program.
+Partial inventories, unresolved repeated parameters,
 structured templates that fail the closure/fitting checks, incompatible
 schemas, and nominal collisions all choose one shared abstract exact family;
 their occurrence constructors remain introduction premises, but no `match` is

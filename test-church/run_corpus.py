@@ -60,7 +60,10 @@ def validate_settings(output, source):
         raise ValueError("Leant setting commands do not match the requested transcript")
     for command, block in zip(expected, observed):
         _, setting, value = command.split(maxsplit=2)
-        label = setting.replace("-", " ", 1)
+        # The CLI prints this label with spaces, but preserves the second
+        # hyphen in other settings such as "synth djinn-strategy".
+        label = ("synth provider cap" if setting == "synth-provider-cap"
+                 else setting.replace("-", " ", 1))
         displayed_value = value
         if setting == "synth-timeout":
             displayed_value = "0 (wait indefinitely)" if value == "0" else value + "s"

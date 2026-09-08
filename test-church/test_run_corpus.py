@@ -41,6 +41,40 @@ class TranscriptSettingTests(unittest.TestCase):
         validate_settings("λ> :set synth-timeout 0\nsynth timeout: 0 (wait indefinitely)\n",
                           ":set synth-timeout 0\n")
 
+    def test_acknowledge_actual_provider_cap_label(self):
+        for value in (1, 2, 80):
+            with self.subTest(value=value):
+                validate_settings(
+                    f"λ> :set synth-provider-cap {value}\nsynth provider cap: {value}\n",
+                    f":set synth-provider-cap {value}\n")
+
+    def test_reject_altered_provider_cap_value_or_label(self):
+        source = ":set synth-provider-cap 80\n"
+        for acknowledgment in ("synth provider cap: 81", "synth provider-cap: 80",
+                               "synth-provider-cap: 80"):
+            with self.subTest(acknowledgment=acknowledgment), self.assertRaisesRegex(
+                    ValueError, "did not acknowledge"):
+                validate_settings("λ> :set synth-provider-cap 80\n" + acknowledgment + "\n", source)
+
+    def test_preserve_historical_djinn_strategy_label(self):
+        source = ":set synth-djinn-strategy interleave\n"
+        output = "λ> :set synth-djinn-strategy interleave\nsynth djinn-strategy: interleave\n"
+        validate_settings(output, source)
+        with self.assertRaisesRegex(ValueError, "did not acknowledge"):
+            validate_settings(output.replace("synth djinn-strategy:", "synth djinn strategy:"), source)
+
+    def test_bind_repeated_queries_to_their_provider_caps(self):
+        source = (":set synth-provider-cap 1\n:synth Unit\n"
+                  ":set synth-provider-cap 80\n:synth Unit\n")
+        one = "λ> :set synth-provider-cap 1\nsynth provider cap: 1\n"
+        eighty = "λ> :set synth-provider-cap 80\nsynth provider cap: 80\n"
+        query = "λ> :synth Unit\n  it1  ⟨⟩\n"
+        validate_settings(one + query + eighty + query, source)
+        # The setting and query subsequences still match independently, but
+        # moving the first query changes its actual discovery allowance.
+        with self.assertRaisesRegex(ValueError, "transcript order"):
+            validate_settings(one + eighty + query + query, source)
+
     def test_live_and_saved_transcript_modes_are_mutually_exclusive(self):
         with patch.object(sys, "argv", ["run_corpus.py", "--leant", "unused.exe",
                                        "--replay-output", "unused.txt"]):

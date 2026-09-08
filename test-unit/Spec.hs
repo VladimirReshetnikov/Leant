@@ -102,6 +102,8 @@ import System.Timeout (timeout)
 import Test.Tasty (TestTree, defaultMain, testGroup, withResource)
 import Test.Tasty.HUnit ((@?=), assertBool, assertEqual, assertFailure, testCase)
 
+import qualified ContextRenderSpec
+
 import qualified Language.Haskell.Djex as Djex
 import Language.Haskell.Djex
   ( Boxity (Boxed)
@@ -216,6 +218,7 @@ import Leant.Synth.Engine
   , detailedCandidateGroupSourceAuthority
   , detailedVerificationVariantSourceAuthority
   , candidateSourceAuthorityEngine
+  , candidateSourceAuthorityExference
   , candidateSourceAuthorityDjinn
   , djinnSourceCandidate
   , djinnSourcePreparation
@@ -256,6 +259,7 @@ import Leant.Synth.Engine
   , synthesizeWithProvidersSkippingDetailed
   , synthesizeWithProvidersSkippingDetailedWith
   , synthesizeBehavioralWithProvidersSkippingDetailedWith
+  , synthesizeBehavioralTunedDetailedWith
   , synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
   , synthesizeTunedDetailed
   , startDetailedSynthCursor
@@ -705,6 +709,9 @@ main :: IO ()
 main = do
   arguments <- getArgs
   case arguments of
+    ["--emit-context-replay"] -> either (fail . show)
+      (ByteString.putStr . TextEncoding.encodeUtf8 . Text.pack)
+      ContextRenderSpec.contextReplaySource
     ["env", mode]
       | mode == backendStderrFloodMode -> backendStderrFloodHelper
       | backendProcessTreeWrapperPrefix `isPrefixOf` mode ->
@@ -764,6 +771,7 @@ main = do
       , parametricFamilyEngineTests
       , rankNFrontierTests
       , visibleTypeApplicationTests
+      , ContextRenderSpec.tests
       ]
 
 commandLineTests :: TestTree
@@ -2834,7 +2842,52 @@ hostBehavioralTests = testGroup "host behavioral synthesis"
 
 behavioralStreamingTests :: TestTree
 behavioralStreamingTests = testGroup "named behavioral candidate streaming"
-  [ testCase "Djinn's first observed candidate leaves terminal evidence and failure untouched" $ do
+  [ testCase "real behavioral Exference cursor retains relaxed exact request authority" $ do
+      let token = FAtom False "Demo.BehavioralAuthorityToken"
+          extras = [("Demo.behavioralSeed", token)]
+          steps = 173
+          bounds = defaultSynthLimits
+            { synthLimitShown = 1
+            , synthLimitTried = 2
+            , synthLimitWindow = 9
+            , synthLimitQueue = 73
+            , synthLimitRanking = Djex.compactCandidateRankingPolicy
+            }
+      expected <- expectRight $ inspectExferencePreparation [] extras token token
+      outcome <- expectRight $ synthesizeBehavioralTunedDetailedWith
+        bounds EngineExference steps (9, Just 37) extras token token
+      (selected, _) <- expectDetailedCandidateBatch 1 $
+        startDetailedSynthCursor $ Right outcome
+      case detailedCandidateBatchGroups selected of
+        [group] -> do
+          detailedCandidateGroupRoute group @?= RouteTypedCandidate
+          fmap candidateSourceAuthorityEngine
+            (detailedCandidateGroupSourceAuthority group) @?= Just EngineExference
+          case detailedCandidateGroupSemanticSidecar group of
+            Nothing -> assertFailure "first behavioral candidate lost its typed request authority"
+            Just semantic -> do
+              let authority = typedCandidateSemanticAuthorityInspection semantic
+                  table = inspectedAuthorityNameTable authority
+                  convert variable = FlexibleVariable (table Map.! variable)
+                  request = inspectedAuthorityRequest authority
+                  options = requestOptions request
+              inspectedAuthorityPreparation authority @?= expected
+              inspectedAuthorityInventory authority @?= typedCandidateSemanticInventory semantic
+              inspectedAuthorityConvertedSourceGoal authority @?=
+                fmap convert (inspectedSourceGoal expected)
+              requestGoal request @?= fmap convert (inspectedSearchGoal expected)
+              assertBool "behavioral premise insertion collapsed the search goal to the source goal"
+                $ requestGoal request /= inspectedAuthorityConvertedSourceGoal authority
+              requestContexts request @?= []
+              exferenceAllowUnused options @?= True
+              exferenceMaximumSteps options @?= steps
+              exferenceMaximumQueueSize options @?= Just (synthLimitQueue bounds)
+              exferenceCandidateRanking options @?= synthLimitRanking bounds
+              exferenceProviderCosts options @?= Map.empty
+              exferenceMultiConstructorPatterns options @?= True
+              inspectedAuthorityProviderAssignments authority @?= []
+        groups -> assertFailure $ "expected the first real behavioral group only, got: " ++ show groups
+  , testCase "Djinn's first observed candidate leaves terminal evidence and failure untouched" $ do
       let first = cursorFixtureGroup 1
           outcome = streamDetailedQueryResultsWithEvidence 8 id
             (error "first Djinn candidate demanded terminal evidence")
@@ -2924,24 +2977,168 @@ behavioralStreamingTests = testGroup "named behavioral candidate streaming"
         Set.size (Set.fromList $ map detailedVerificationVariantText values) @?= 2
         forM_ values $ \variant -> do
           detailedVerificationVariantRoute variant @?= RouteTypedCandidate
-          fmap candidateSourceAuthorityEngine
-            (detailedVerificationVariantSourceAuthority variant) @?= Just EngineDjinn
-          case detailedVerificationVariantSourceAuthority variant >>= candidateSourceAuthorityDjinn of
-            Nothing -> assertFailure "streamed Djinn candidate lost its source owner"
-            Just authority -> do
+          retained <- case detailedVerificationVariantSourceAuthority variant of
+            Nothing -> assertFailure "streamed candidate lost its source owner"
+              >> error "unreachable"
+            Just authority -> pure authority
+          when (engine == EngineDjinn) $
+            candidateSourceAuthorityEngine retained @?= EngineDjinn
+          case (candidateSourceAuthorityDjinn retained, candidateSourceAuthorityExference retained) of
+            (Just authority, Nothing) -> do
               graph <- expectRight $ typedCandidateTermGraph $ djinnSourceCandidate authority
+              assertStreamGraphRoot (Djex.requestGoal $ djinnSourceRequest authority) graph
+              assertBool "Djinn candidate acquired an Exference sidecar"
+                $ isNothing $ detailedVerificationVariantSemanticSidecar variant
+            (Nothing, Just semantic) -> do
+              graph <- expectRight $ typedCandidateTermGraph $ typedCandidateSemanticCandidate semantic
+              let authority = typedCandidateSemanticAuthorityInspection semantic
+                  preparation = inspectedAuthorityPreparation authority
+                  table = inspectedAuthorityNameTable authority
+                  convert variable = FlexibleVariable (table Map.! variable)
+                  request = inspectedAuthorityRequest authority
+                  expected = requestGoal request
+              expected @?= fmap convert (inspectedSearchGoal preparation)
+              requestContexts request @?= []
               root <- case Djex.lookupTermNode (Djex.termGraphRoot graph) graph of
-                Nothing -> assertFailure "streamed Djinn graph has no root" >> error "unreachable"
+                Nothing -> assertFailure "streamed Exference graph has no root" >> error "unreachable"
                 Just node -> pure node
-              assertBool "streamed Djinn graph belongs to a different request"
+              let actual = Djex.termNodeType root
+                  sourceVariables = Set.toList $ Djex.freeVariables expected
+                  openedVariables = Set.toList $ Djex.freeVariables actual
+              -- This fixture has one context-free rank-1 source parameter.
+              -- Exference universally closes the request, then opens it to a
+              -- fresh rigid before checking the candidate. Compare the entire
+              -- types under that opening, never by arbitrary instantiation.
+              length sourceVariables @?= 1
+              length openedVariables @?= 1
+              assertBool ("request parameter lost its flexible source role: " ++ show expected)
+                $ all (\variable -> case variable of
+                    FlexibleVariable{} -> True
+                    _ -> False) sourceVariables
+              assertBool ("graph parameter was not opened rigidly: " ++ show actual)
+                $ all (\variable -> case variable of
+                    Djex.RigidVariable{} -> True
+                    _ -> False) openedVariables
+              assertBool ("opened Exference graph belongs to a different retained request; expected "
+                  ++ show expected ++ ", actual " ++ show actual)
                 $ Djex.alphaEquivalentClosedTypes
-                  (Djex.requestGoal $ djinnSourceRequest authority) (Djex.termNodeType root)
+                    (Djex.quantifyFreeVariables (const True) expected)
+                    (Djex.quantifyFreeVariables (const True) actual)
+              assertBool "Exference variant lost its own retained sidecar"
+                $ detailedVerificationVariantSemanticSidecar variant == Just semantic
+            _ -> assertFailure "streamed candidate has ambiguous source ownership"
           case detailedVerificationVariantExactTypedOrigin variant of
-            Nothing -> assertFailure "streamed Djinn variant lost its exact renderer origin"
+            Nothing -> assertFailure "streamed variant lost its exact renderer origin"
             Just origin -> do
               rendered <- expectRight $ renderExactTypedVariantOrigin origin
-              assertBool "streamed Djinn exact origin changed the accepted spelling"
+              assertBool "streamed exact origin changed the accepted spelling"
                 $ detailedVerificationVariantText variant `elem` rendered
+  , testCase "shown one and a large verification quota still select Djinn before Exference" $ do
+      let token = FAtom False "Demo.StreamFirstToken"
+          goal = FArr token token
+          bounds = defaultSynthLimits
+            { synthLimitShown = 1
+            , synthLimitTried = 1024
+            , synthLimitWindow = 1024
+            }
+      -- This value belongs only to the Exference request. Selecting Djinn's
+      -- first group must not construct or search that opposite request.
+      outcome <- expectRight $ synthesizeBehavioralTunedDetailedWith
+        bounds EngineBoth (error "first Djinn observation forced Exference steps")
+        (1024, Just 128) [] goal goal
+      (selected, _) <- expectDetailedCandidateBatch 1 $
+        startDetailedSynthCursor $ Right outcome
+      case detailedCandidateBatchGroups selected of
+        [group] -> do
+          detailedCandidateGroupRoute group @?= RouteTypedCandidate
+          fmap candidateSourceAuthorityEngine
+            (detailedCandidateGroupSourceAuthority group) @?= Just EngineDjinn
+          case detailedCandidateGroupSourceAuthority group >>= candidateSourceAuthorityDjinn of
+            Nothing -> assertFailure "first combined candidate lost its exact Djinn owner"
+            Just authority -> do
+              graph <- expectRight $ typedCandidateTermGraph $ djinnSourceCandidate authority
+              assertStreamGraphRoot (Djex.requestGoal $ djinnSourceRequest authority) graph
+        groups -> assertFailure $ "expected one first Djinn group, got: " ++ show groups
+  , testCase "combined observation alternates exact groups without forcing either next tail" $ do
+      let djinn = cursorFixtureGroup 1
+          exference = detailedCandidateGroup RouteUnobserved ["second", "second-alternate"]
+          source group = streamDetailedQueryResults 8 id
+            [batch Djex.Continuing $ Just group : error "alternation forced a future raw slot"]
+          outcome = mergeDetailedOutcomesSkipping Set.empty (source djinn) (source exference)
+      (first, rest) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right outcome
+      detailedCandidateBatchGroups first @?= [djinn]
+      (second, _) <- expectDetailedCandidateBatch 1 rest
+      detailedCandidateBatchGroups second @?= [exference]
+      map (map detailedVerificationVariantOrdinal . detailedCandidateGroupVerificationVariants)
+        (detailedCandidateBatchGroups second) @?= [[0, 1]]
+  , testCase "a missing rendering yields the next combined turn to the other engine" $ do
+      let first = cursorFixtureGroup 1
+          missing = streamDetailedQueryResults 8 id
+            [batch Djex.Continuing $ Nothing : error "missing rendering kept the Djinn turn"]
+          present = streamDetailedQueryResults 8 id
+            [batch Djex.Continuing $ Just first : error "accepted Exference group forced its tail"]
+          outcome = mergeDetailedOutcomesSkipping Set.empty missing present
+      (selected, _) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right outcome
+      detailedCandidateBatchGroups selected @?= [first]
+  , testCase "combined duplicate slots advance turns while both original raw caps remain charged" $ do
+      let first = cursorFixtureGroup 1
+          later = cursorFixtureGroup 2
+          oppositeLater = detailedCandidateGroup RouteUnobserved
+            (detailedCandidateGroupVariants later)
+          djinn = streamDetailedQueryResults 2 id
+            [batch Djex.Continuing $ [Just first, Just later]
+              ++ error "Djinn raw cap admitted replacement work"]
+          exference = streamDetailedQueryResults 2 id
+            [batch Djex.Continuing $ [Just first, Just oppositeLater]
+              ++ error "duplicate Exference slots were refilled"]
+          outcome = mergeDetailedOutcomesSkipping Set.empty djinn exference
+      (selected, rest) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right outcome
+      detailedCandidateBatchGroups selected @?= [first]
+      (second, ended) <- expectDetailedCandidateBatch 1 rest
+      detailedCandidateBatchGroups second @?= [later]
+      assertBool "the duplicate Exference slot was postponed past the second Djinn slot"
+        $ any (isInfixOf "exference: search reported more batches to come")
+          (detailedCandidateBatchNotes second)
+      terminalStep <- expectDetailedSynthCursorStep 1 ended
+      case terminalStep of
+        DetailedSynthCursorNaturallyExhausted notes -> do
+          assertBool "Djinn's original raw cap lost its diagnostic"
+            $ any (isInfixOf "candidate limit reached (2)") notes
+          assertBool "Exference's duplicate raw cap lost its diagnostic"
+            $ any (isInfixOf "exference: search truncated: candidate limit reached (2)") notes
+        other -> assertFailure $ "combined bounded miss changed taxonomy: " ++ detailedSynthCursorStepTag other
+  , testCase "combined terminal turns preserve refutation and selected failures" $ do
+      let first = cursorFixtureGroup 1
+          source = streamDetailedQueryResults 1 id
+            [batch Djex.Continuing $ Just first : error "terminal merge forced a capped tail"]
+          merge left right = mergeDetailedOutcomesSkipping Set.empty
+            (deferDetailedOutcome $ Right left) (deferDetailedOutcome $ Right right)
+      (selected, rest) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right $
+        merge (DetailedSynthRefuted True) source
+      detailedCandidateBatchGroups selected @?= [first]
+      terminalStep <- expectDetailedSynthCursorStep 1 rest
+      case terminalStep of
+        DetailedSynthCursorNaturallyExhausted _ -> pure ()
+        other -> assertFailure $ "observed candidate was replaced by refutation: " ++ detailedSynthCursorStepTag other
+      refuted <- expectDetailedSynthCursorStep 1 $ startDetailedSynthCursor $ Right $
+        merge (DetailedSynthRefuted True) (DetailedSynthNoTerm ["bounded Exference miss"])
+      case refuted of
+        DetailedSynthCursorRefuted True -> pure ()
+        other -> assertFailure $ "Djinn refutation was lost: " ++ detailedSynthCursorStepTag other
+      unsupported <- expectDetailedSynthCursorStep 1 $ startDetailedSynthCursor $ Right $
+        merge (DetailedSynthNoTerm ["bounded Djinn miss"]) (DetailedSynthRefuted True)
+      case unsupported of
+        DetailedSynthCursorNaturallyExhausted notes -> notes @?= ["bounded Djinn miss"]
+        other -> assertFailure $ "opposite engine donated refutation: " ++ detailedSynthCursorStepTag other
+      let failing = mergeDetailedOutcomesSkipping Set.empty
+            (streamDetailedQueryResults 8 id
+              [batch Djex.Continuing $ Just first : error "failure skipped its scheduled engine"])
+            (deferDetailedOutcome $ Left "selected Exference preparation failed")
+      (_, afterFirst) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right failing
+      failed <- expectDetailedSynthCursorStep 1 afterFirst
+      case failed of
+        DetailedSynthCursorEngineFailed failure -> failure @?= "selected Exference preparation failed"
+        other -> assertFailure $ "scheduled failure was hidden: " ++ detailedSynthCursorStepTag other
   , testCase "force the first group and observed notes without a future result" $ do
       let first = detailedCandidateGroup RouteLegacyCandidateFallback ["first", "alternate"]
           outcome = streamDetailedQueryResults 8 id
@@ -3053,7 +3250,14 @@ behavioralStreamingTests = testGroup "named behavioral candidate streaming"
         , "| streaming = zip outcomes dispositions"
         ]
   ]
- where
+  where
+  assertStreamGraphRoot expected graph = do
+    root <- case Djex.lookupTermNode (Djex.termGraphRoot graph) graph of
+      Nothing -> assertFailure "streamed graph has no root" >> error "unreachable"
+      Just node -> pure node
+    assertBool ("streamed graph belongs to a different retained request; expected "
+        ++ show expected ++ ", actual " ++ show (Djex.termNodeType root))
+      $ Djex.alphaEquivalentClosedTypes expected (Djex.termNodeType root)
   batch progress values = Djex.queryResultFromCandidates $ Djex.SearchBatch progress () values
   terminal evidence notes = case evidence of
     Djex.ProvedUninhabitable -> DetailedSynthRefuted True
@@ -3103,6 +3307,8 @@ verificationObservabilityTests = testGroup "verification observability"
         , "source-graph-absent.exference.nominal-constructor-pattern"
         , "source-graph-absent.exference.unsupported-structural-constructor-pattern"
         , "source-graph-absent.exference.unsupported-contextual-visible-application"
+        , "source-graph-absent.exference.unsupported-context-evidence"
+        , "source-graph-absent.exference.unsupported-contextual-certificate-graph"
         , "source-graph-absent.exference.evidence-mismatch"
         , "source-graph-absent.exference.construction-limit"
         , "source-graph-absent.exference.sealing-failure"
@@ -3124,6 +3330,8 @@ verificationObservabilityTests = testGroup "verification observability"
         , Djex.NominalConstructorPattern poison
         , Djex.UnsupportedStructuralConstructorPattern poison
         , Djex.UnsupportedContextualVisibleApplication poison poison poison
+        , Djex.UnsupportedContextEvidence poison
+        , Djex.UnsupportedContextualCertificateGraph
         , Djex.TermGraphEvidenceMismatch
         , Djex.TermGraphConstructionLimit poison
         , Djex.TermGraphSealingFailure poison
@@ -24548,10 +24756,11 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
         Right other -> assertFailure $
           "expected a fallback Exference candidate, got: " ++ show other
         Left err -> assertFailure err
-  , testCase "keep relaxed unused-binder candidates fail-closed" $ do
+  , testCase "retain exact typed authority for relaxed unused-binder candidates" $ do
       let left = FAtom False "Demo.RelaxedLeft"
           right = FAtom False "Demo.RelaxedRight"
           goal = FArr left (FArr right left)
+      expected <- expectRight $ inspectExferencePreparation [] [] goal goal
       case synthesizeWithProvidersSkippingDetailed
           EngineExference 128 Set.empty [] goal of
         Right (DetailedSynthCandidates groups _) -> do
@@ -24560,17 +24769,55 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             (any
               (any ("_" `isInfixOf`) . detailedCandidateGroupVariants)
               groups)
-          assertBool
-            "a relaxed compatibility projection claimed typed authority"
-            (all
-              (isNothing . detailedCandidateGroupSemanticSidecar)
-              groups)
-          assertBool
-            "a relaxed compatibility projection claimed the typed route"
-            (all
-              ((== RouteLegacyCandidateFallback)
-                . detailedCandidateGroupRoute)
-              groups)
+          forM_ groups $ \group -> do
+            detailedCandidateGroupRoute group @?= RouteTypedCandidate
+            semantic <- case detailedCandidateGroupSemanticSidecar group of
+              Just owned -> pure owned
+              Nothing -> assertFailure "relaxed candidate lost its own typed sidecar"
+                >> error "unreachable"
+            let candidate = typedCandidateSemanticCandidate semantic
+                authority = typedCandidateSemanticAuthorityInspection semantic
+                table = inspectedAuthorityNameTable authority
+                convert variable = FlexibleVariable (table Map.! variable)
+                request = inspectedAuthorityRequest authority
+            inspectedAuthorityPreparation authority @?= expected
+            inspectedAuthorityInventory authority @?= typedCandidateSemanticInventory semantic
+            requestGoal request @?= fmap convert (inspectedSearchGoal expected)
+            requestContexts request @?= []
+            exferenceAllowUnused (requestOptions request) @?= True
+            exferenceMaximumSteps (requestOptions request) @?= 128
+            inspectedAuthorityProviderAssignments authority @?= []
+            graph <- expectRight $ typedCandidateTermGraph candidate
+            root <- case Djex.lookupTermNode (Djex.termGraphRoot graph) graph of
+              Just node -> pure node
+              Nothing -> assertFailure "relaxed graph has no root" >> error "unreachable"
+            let actual = Djex.termNodeType root
+                variables = Djex.freeVariablesInFirstOccurrenceOrder actual
+                close source = ForallType (Djex.freeVariablesInFirstOccurrenceOrder source) [] source
+            length variables @?= 2
+            assertBool "relaxed graph parameters were not opened rigidly" $
+              all (\variable -> case variable of
+                Djex.RigidVariable{} -> True
+                _ -> False) variables
+            assertBool "relaxed graph belongs to a different complete request" $
+              Djex.alphaEquivalentClosedTypes (close $ requestGoal request) (close actual)
+            let clause = Djex.candidateOutput $ Djex.typedCandidateCompatibility candidate
+            -- Clause conversion groups the leading lambda spine; every
+            -- binder and the remaining body must still agree exactly.
+            Djex.functionClauseFromExpression (Djex.clauseName clause)
+              (eraseTermGraph graph) @?= clause
+            assertBool "relaxed graph lost its checked wildcard binder" $ or
+              [ Djex.typedPatternNode pattern' == Djex.TypedWildcard
+              | (_, Djex.TermNode _ (Djex.TypedLambda patterns _)) <- Djex.termGraphNodes graph
+              , pattern' <- patterns
+              ]
+            forM_ (detailedCandidateGroupVerificationVariants group) $ \variant -> do
+              assertBool "relaxed variant changed its own typed sidecar" $
+                detailedVerificationVariantSemanticSidecar variant == Just semantic
+              case detailedVerificationVariantExactTypedOrigin variant of
+                Just origin -> renderExactTypedVariantOrigin origin
+                  @?= Right (detailedCandidateGroupVariants group)
+                Nothing -> assertFailure "relaxed variant lost its exact typed renderer origin"
         Right other -> assertFailure $
           "expected a relaxed candidate, got: " ++ show other
         Left err -> assertFailure err
@@ -25072,12 +25319,75 @@ providerEngineTests = testGroup "foreign providers"
             ]
           goal = FArr result
             (FArr (FArr natural result) (FArr natural result))
-      firstGroup
-          (synthesizeWithProviders EngineExference 1024 [] goal)
-        @?=
-          [ "fun x f y => match y with | .zero => x | .succ z => f z"
-          , "fun x f y => match y with | Nat.zero => x | Nat.succ z => f z"
-          ]
+          expectedVariants =
+            [ "fun x f y => match y with | .zero => x | .succ z => f z"
+            , "fun x f y => match y with | Nat.zero => x | Nat.succ z => f z"
+            ]
+      expected <- expectRight $ inspectExferencePreparation [] [] goal goal
+      detailed <- expectRight $
+        synthesizeWithProvidersSkippingDetailed EngineExference 1024 Set.empty [] goal
+      group <- case detailed of
+        DetailedSynthCandidates groups _ -> case
+            filter ((== expectedVariants) . detailedCandidateGroupVariants) groups of
+          observed : _ -> pure observed
+          [] -> assertFailure
+            ("the unchanged bounded frontier lost the one-layer Nat case: "
+              ++ show (map detailedCandidateGroupVariants groups)) >> error "unreachable"
+        other -> assertFailure ("expected bounded Nat candidates, got: " ++ show other)
+          >> error "unreachable"
+      detailedCandidateGroupRoute group @?= RouteTypedCandidate
+      semantic <- case detailedCandidateGroupSemanticSidecar group of
+        Just owned -> pure owned
+        Nothing -> assertFailure "Nat eliminator lost its own typed sidecar" >> error "unreachable"
+      let candidate = typedCandidateSemanticCandidate semantic
+          authority = typedCandidateSemanticAuthorityInspection semantic
+          table = inspectedAuthorityNameTable authority
+          convert variable = FlexibleVariable (table Map.! variable)
+          request = inspectedAuthorityRequest authority
+      inspectedAuthorityPreparation authority @?= expected
+      requestGoal request @?= fmap convert (inspectedSearchGoal expected)
+      requestContexts request @?= []
+      exferenceMaximumSteps (requestOptions request) @?= 1024
+      inspectedAuthorityProviderAssignments authority @?= []
+      graph <- expectRight $ typedCandidateTermGraph candidate
+      root <- case Djex.lookupTermNode (Djex.termGraphRoot graph) graph of
+        Just node -> pure node
+        Nothing -> assertFailure "Nat eliminator graph has no root" >> error "unreachable"
+      let actual = Djex.termNodeType root
+          variables = Djex.freeVariablesInFirstOccurrenceOrder actual
+          close source = ForallType (Djex.freeVariablesInFirstOccurrenceOrder source) [] source
+      length variables @?= 1
+      assertBool "Nat result parameter was not opened rigidly" $
+        all (\variable -> case variable of
+          Djex.RigidVariable{} -> True
+          _ -> False) variables
+      assertBool "Nat eliminator graph changed its complete request" $
+        Djex.alphaEquivalentClosedTypes (close $ requestGoal request) (close actual)
+      let clause = Djex.candidateOutput $ Djex.typedCandidateCompatibility candidate
+      Djex.functionClauseFromExpression (Djex.clauseName clause)
+        (eraseTermGraph graph) @?= clause
+      case [branches | (_, Djex.TermNode _ (Djex.TypedCase _ branches)) <- Djex.termGraphNodes graph] of
+        [[(zeroPattern, _), (successorPattern, successorBody)]] ->
+          case (Djex.typedPatternNode zeroPattern, Djex.typedPatternNode successorPattern) of
+            (Djex.TypedConstructor zeroName [], Djex.TypedConstructor successorName [predecessor]) -> do
+              fmap ciLean (Map.lookup (renderCanonical zeroName) $ inspectedConstructorMap expected)
+                @?= Just "Nat.zero"
+              fmap ciLean (Map.lookup (renderCanonical successorName) $ inspectedConstructorMap expected)
+                @?= Just "Nat.succ"
+              case (Djex.typedPatternNode predecessor, Djex.lookupTermNode successorBody graph) of
+                (Djex.TypedBind bound, Just (Djex.TermNode _ (Djex.TypedApply _ argument _))) ->
+                  case Djex.lookupTermNode argument graph of
+                    Just (Djex.TermNode _ (Djex.TypedLocal _ used)) -> used @?= bound
+                    _ -> assertFailure "Nat successor branch did not pass its checked predecessor binder"
+                _ -> assertFailure "Nat successor branch lost its binder or application"
+            _ -> assertFailure "Nat case lost its exact zero/successor pattern shapes"
+        _ -> assertFailure "Nat eliminator did not retain exactly one checked case"
+      forM_ (detailedCandidateGroupVerificationVariants group) $ \variant -> do
+        assertBool "Nat case variant changed its own typed sidecar" $
+          detailedVerificationVariantSemanticSidecar variant == Just semantic
+        case detailedVerificationVariantExactTypedOrigin variant of
+          Just origin -> renderExactTypedVariantOrigin origin @?= Right expectedVariants
+          Nothing -> assertFailure "Nat case variant lost its exact typed renderer origin"
   , testCase "keep partial recursive inventories introduction-only" $ do
       let element = FVar "a"
           partial = FRec False "Demo.Partial a" [element]

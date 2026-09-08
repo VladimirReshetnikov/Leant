@@ -1953,19 +1953,25 @@ exferenceRun streaming limits multiConstructorPatterns steps prepared = do
             (synthLimitWindow limits) renderGroup results
           else if null groups then DetailedSynthNoTerm notes
             else DetailedSynthCandidates groups notes
-      runPatternLanes activeSession useMultiConstructorPatterns = do
-        strict <- runLane activeSession useMultiConstructorPatterns False
-        case strict of
-          DetailedSynthNoTerm strictNotes -> do
-            -- Exference normally prefers terms which use every introduced
-            -- binder. Retry without that preference only when the strict lane
-            -- produced no term, retaining established successful prefixes.
-            relaxed <- runLane activeSession useMultiConstructorPatterns True
-            pure $ case relaxed of
-              DetailedSynthNoTerm relaxedNotes ->
-                DetailedSynthNoTerm (nub $ strictNotes ++ relaxedNotes)
-              _ -> relaxed
-          _ -> pure strict
+      runPatternLanes activeSession useMultiConstructorPatterns
+        -- Named behavioral queries must admit implementations that ignore
+        -- inputs or constructor fields. A typed but behaviorally false strict
+        -- candidate cannot authorize withholding those other implementations.
+        -- Choose the permissive policy within each existing bounded lane.
+        | streaming = runLane activeSession useMultiConstructorPatterns True
+        | otherwise = do
+            strict <- runLane activeSession useMultiConstructorPatterns False
+            case strict of
+              DetailedSynthNoTerm strictNotes -> do
+                -- Exference normally prefers terms which use every introduced
+                -- binder. Retry without that preference only when the strict lane
+                -- produced no term, retaining established successful prefixes.
+                relaxed <- runLane activeSession useMultiConstructorPatterns True
+                pure $ case relaxed of
+                  DetailedSynthNoTerm relaxedNotes ->
+                    DetailedSynthNoTerm (nub $ strictNotes ++ relaxedNotes)
+                  _ -> relaxed
+              _ -> pure strict
       runSession activeSession = do
         primary <- runPatternLanes activeSession multiConstructorPatterns
         case primary of
@@ -2321,7 +2327,7 @@ mergeDetailedOutcomesSkippingWith
   -> DetailedSynthOutcome
 mergeDetailedOutcomesSkippingWith limits checked djinn0 exference0 =
   if isStreaming djinn0 || isStreaming exference0
-    then DetailedSynthStreaming $ mergeBehavioralStreams limits
+    then DetailedSynthStreaming $ mergeBehavioralStreams
       (outcomeStream $ withoutCheckedDetailedCandidates checked djinn0)
       (outcomeStream $ withoutCheckedDetailedCandidates checked exference0)
     else case (djinn, exference) of
@@ -2361,26 +2367,24 @@ mergeDetailedOutcomesSkippingWith limits checked djinn0 exference0 =
     DetailedSynthRefuted _ -> []
     DetailedSynthStreaming _ -> []
 
--- Same reserved group order as the ordinary combined frontier. Raw misses
--- remain charged in their source stream but do not spend a fresh-group turn.
+-- Behavioral success quotas do not determine engine scheduling. Alternate
+-- observed source slots, starting with Djinn, including rendering misses and
+-- duplicates. Each source retains its own raw window and search allowances.
 -- No origin is recovered from an unobserved opposite-engine tail: each
 -- displayed group keeps its own exact authority.
 mergeBehavioralStreams
-  :: SynthLimits -> DetailedCandidateStream -> DetailedCandidateStream
+  :: DetailedCandidateStream -> DetailedCandidateStream
   -> DetailedCandidateStream
-mergeBehavioralStreams limits left right =
+mergeBehavioralStreams left right =
   go schedule Set.empty False [] [] Nothing (Just left) (Just right)
  where
-  leading = max 0 $ synthLimitShown limits - 1
-  schedule = replicate leading True ++ replicate (synthLimitTried limits) False
-    ++ replicate (max 0 $ synthLimitTried limits - leading) True
-    ++ cycle [False, True]
+  schedule = cycle [True, False]
   combined a b = nub $ a ++ map ("exference: " ++) b
   go _ _ found leftNotes rightNotes refutation Nothing Nothing =
     case (found, refutation) of
       (False, Just sound) -> StreamRefuted sound
       _ -> StreamFinished $ combined leftNotes rightNotes
-  go turns@(chooseLeft : later) seen found leftNotes rightNotes refutation leftSide rightSide =
+  go (chooseLeft : later) seen found leftNotes rightNotes refutation leftSide rightSide =
     case if chooseLeft then leftSide else rightSide of
       Nothing -> go later seen found leftNotes rightNotes refutation leftSide rightSide
       Just stream -> case stream of
@@ -2390,9 +2394,8 @@ mergeBehavioralStreams limits left right =
               rightNotes' = if chooseLeft then rightNotes else notes
               leftSide' = if chooseLeft then Just rest else leftSide
               rightSide' = if chooseLeft then rightSide else Just rest
-              nextTurns = maybe turns (const later) fresh
           in StreamObserved fresh (combined leftNotes' rightNotes') $
-            go nextTurns seen' (found || maybe False (const True) fresh)
+            go later seen' (found || maybe False (const True) fresh)
               leftNotes' rightNotes' refutation leftSide' rightSide'
         StreamFinished notes ->
           go later seen found (if chooseLeft then notes else leftNotes)

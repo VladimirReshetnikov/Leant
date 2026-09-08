@@ -1,0 +1,454 @@
+{
+  "scope": "post-run classification of preserved live transcript; no new synthesis or independent kernel replay",
+  "original_receipt": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\all-engines-v2\\results.json",
+  "original_receipt_sha256": "ad4b15e6dc5b915605556a7107fa550338fc2d94fd397ec1e061042fb4819366",
+  "transcript_sha256": "81c3a6b1ed19918ac6de083cfdbe0ba8d067924da933a423e56274ac4ab29384",
+  "classification_runner_sha256": "825dcde3b4ff7e7582076e97bc9fa95b372a81875d01d86a008f04cd2d8be258",
+  "live_candidates": 20,
+  "actual_false_controls": 3,
+  "failed_cases": [
+    "recursive_exference_tailOr",
+    "recursive_exference_alias",
+    "recursive_exference_tupleField",
+    "recursive_both_tupleField"
+  ],
+  "independent_kernel_replays": 0,
+  "results": [
+    {
+      "engine": "djinn",
+      "operation": "null",
+      "name": "recursive_djinn_null",
+      "type": "{α : Type} → List α → Bool",
+      "predicate": "{f} ([] : List Nat) = true ∧ {f} [11] = false ∧ {f} [true, false] = false",
+      "command": ":synth recursive_djinn_null : {α : Type} → List α → Bool where recursive_djinn_null ([] : List Nat) = true ∧ recursive_djinn_null [11] = false ∧ recursive_djinn_null [true, false] = false",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x => (fun a => match a with | .nil => (.true) | .cons _ _ => (.false)) x",
+      "observations": {
+        "passed": 1,
+        "falsified": 6,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_null : {α : Type} → List α → Bool where recursive_djinn_null ([] : List Nat) = true ∧ recursive_djinn_null [11] = false ∧ recursive_djinn_null [true, false] = false\npreparing synthesis environment (session imports + Lean)...\n  it1  fun x => (fun a => match a with | .nil => (.true) | .cons _ _ => (.false)) x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 6 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "headOr",
+      "name": "recursive_djinn_headOr",
+      "type": "{α : Type} → α → List α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_djinn_headOr : {α : Type} → α → List α → α where recursive_djinn_headOr 91 ([] : List Nat) = 91 ∧ recursive_djinn_headOr 91 [11, 29] = 11 ∧ recursive_djinn_headOr false [true] = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .nil => x | .cons b _ => b) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_headOr : {α : Type} → α → List α → α where recursive_djinn_headOr 91 ([] : List Nat) = 91 ∧ recursive_djinn_headOr 91 [11, 29] = 11 ∧ recursive_djinn_headOr false [true] = true\n  it1  fun x y => (fun a => match a with | .nil => x | .cons b _ => b) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "tailOr",
+      "name": "recursive_djinn_tailOr",
+      "type": "{α : Type} → List α → List α → List α",
+      "predicate": "{f} [91] ([] : List Nat) = [91] ∧ {f} [91] [11] = [] ∧ {f} [91] [11, 29, 37] = [29, 37] ∧ {f} [false] [true, true] = [true]",
+      "command": ":synth recursive_djinn_tailOr : {α : Type} → List α → List α → List α where recursive_djinn_tailOr [91] ([] : List Nat) = [91] ∧ recursive_djinn_tailOr [91] [11] = [] ∧ recursive_djinn_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_djinn_tailOr [false] [true, true] = [true]",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .nil => x | .cons _ b => b) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 7,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_tailOr : {α : Type} → List α → List α → List α where recursive_djinn_tailOr [91] ([] : List Nat) = [91] ∧ recursive_djinn_tailOr [91] [11] = [] ∧ recursive_djinn_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_djinn_tailOr [false] [true, true] = [true]\n  it1  fun x y => (fun a => match a with | .nil => x | .cons _ b => b) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 7 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "tree",
+      "name": "recursive_djinn_tree",
+      "type": "{α : Type} → α → RecursiveCases.Tree α → α",
+      "predicate": "{f} 91 (.leaf 11) = 11 ∧ {f} 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ {f} false (.leaf true) = true",
+      "command": ":synth recursive_djinn_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_djinn_tree 91 (.leaf 11) = 11 ∧ recursive_djinn_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_djinn_tree false (.leaf true) = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .leaf b => b | .branch _ _ => x) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_djinn_tree 91 (.leaf 11) = 11 ∧ recursive_djinn_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_djinn_tree false (.leaf true) = true\n  it1  fun x y => (fun a => match a with | .leaf b => b | .branch _ _ => x) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "alias",
+      "name": "recursive_djinn_alias",
+      "type": "{α : Type} → α → RecursiveCases.Sequence α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_djinn_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_djinn_alias 91 ([] : List Nat) = 91 ∧ recursive_djinn_alias 91 [11, 29] = 11 ∧ recursive_djinn_alias false [true] = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .nil => x | .cons b _ => b) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_djinn_alias 91 ([] : List Nat) = 91 ∧ recursive_djinn_alias 91 [11, 29] = 11 ∧ recursive_djinn_alias false [true] = true\n  it1  fun x y => (fun a => match a with | .nil => x | .cons b _ => b) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "unconsOr",
+      "name": "recursive_djinn_unconsOr",
+      "type": "{α : Type} → α → List α → α × List α",
+      "predicate": "{f} 91 ([] : List Nat) = (91, []) ∧ {f} 91 [11, 29] = (11, [29]) ∧ {f} false [true, false] = (true, [false])",
+      "command": ":synth recursive_djinn_unconsOr : {α : Type} → α → List α → α × List α where recursive_djinn_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_djinn_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_djinn_unconsOr false [true, false] = (true, [false])",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => ⟨(fun a => match a with | .nil => x | .cons b _ => b) y, (fun c => match c with | .nil => y | .cons _ d => d) y⟩",
+      "observations": {
+        "passed": 1,
+        "falsified": 14,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_unconsOr : {α : Type} → α → List α → α × List α where recursive_djinn_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_djinn_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_djinn_unconsOr false [true, false] = (true, [false])\n  it1  fun x y => ⟨(fun a => match a with | .nil => x | .cons b _ => b) y, (fun c => match c with | .nil => y | .cons _ d => d) y⟩\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 14 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "tupleField",
+      "name": "recursive_djinn_tupleField",
+      "type": "{α : Type} → α → RecursiveCases.Payload α → α",
+      "predicate": "{f} 91 (.pairLeaf (11, 29)) = 11 ∧ {f} 91 (.next (.pairLeaf (11, 29))) = 91 ∧ {f} false (.pairLeaf (true, false)) = true",
+      "command": ":synth recursive_djinn_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_djinn_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_djinn_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_djinn_tupleField false (.pairLeaf (true, false)) = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .pairLeaf ⟨b, _⟩ => b | .next _ => x) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_djinn_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_djinn_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_djinn_tupleField false (.pairLeaf (true, false)) = true\n  it1  fun x y => (fun a => match a with | .pairLeaf ⟨b, _⟩ => b | .next _ => x) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "independent",
+      "name": "recursive_djinn_independent",
+      "type": "{α β : Type} → α → β → List α → List β → α × β",
+      "predicate": "{f} 91 false ([] : List Nat) [] = (91, false) ∧ {f} 91 false [11, 29] [true] = (11, true) ∧ {f} 91 false [] [true] = (91, true)",
+      "command": ":synth recursive_djinn_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_djinn_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_djinn_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_djinn_independent 91 false [] [true] = (91, true)",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y z w => ⟨(fun a => match a with | .nil => x | .cons b _ => b) z, (fun c => match c with | .nil => y | .cons d _ => d) w⟩",
+      "observations": {
+        "passed": 1,
+        "falsified": 8,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_djinn_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_djinn_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_djinn_independent 91 false [] [true] = (91, true)\n  it1  fun x y z w => ⟨(fun a => match a with | .nil => x | .cons b _ => b) z, (fun c => match c with | .nil => y | .cons d _ => d) w⟩\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 8 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "reject_all",
+      "name": "recursive_djinn_reject_all",
+      "type": "Nat → Nat",
+      "predicate": "False",
+      "command": ":synth recursive_djinn_reject_all : Nat → Nat where False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 87,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_reject_all : Nat → Nat where False\nthe engine proposed 67 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search truncated: candidate limit reached (1024)\nsupplied behavioral assertion: 0 passed, 87 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    },
+    {
+      "engine": "exference",
+      "operation": "null",
+      "name": "recursive_exference_null",
+      "type": "{α : Type} → List α → Bool",
+      "predicate": "{f} ([] : List Nat) = true ∧ {f} [11] = false ∧ {f} [true, false] = false",
+      "command": ":synth recursive_exference_null : {α : Type} → List α → Bool where recursive_exference_null ([] : List Nat) = true ∧ recursive_exference_null [11] = false ∧ recursive_exference_null [true, false] = false",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x => match x with | .nil => (.true) | .cons _ _ => (.false)",
+      "observations": {
+        "passed": 1,
+        "falsified": 6,
+        "inconclusive": 0
+      },
+      "output": "recursive_exference_null : {α : Type} → List α → Bool where recursive_exference_null ([] : List Nat) = true ∧ recursive_exference_null [11] = false ∧ recursive_exference_null [true, false] = false\n  it1  fun x => match x with | .nil => (.true) | .cons _ _ => (.false)\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 6 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "headOr",
+      "name": "recursive_exference_headOr",
+      "type": "{α : Type} → α → List α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_exference_headOr : {α : Type} → α → List α → α where recursive_exference_headOr 91 ([] : List Nat) = 91 ∧ recursive_exference_headOr 91 [11, 29] = 11 ∧ recursive_exference_headOr false [true] = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => match y with | .nil => x | .cons z _ => z",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_exference_headOr : {α : Type} → α → List α → α where recursive_exference_headOr 91 ([] : List Nat) = 91 ∧ recursive_exference_headOr 91 [11, 29] = 11 ∧ recursive_exference_headOr false [true] = true\n  it1  fun x y => match y with | .nil => x | .cons z _ => z\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "tailOr",
+      "name": "recursive_exference_tailOr",
+      "type": "{α : Type} → List α → List α → List α",
+      "predicate": "{f} [91] ([] : List Nat) = [91] ∧ {f} [91] [11] = [] ∧ {f} [91] [11, 29, 37] = [29, 37] ∧ {f} [false] [true, true] = [true]",
+      "command": ":synth recursive_exference_tailOr : {α : Type} → List α → List α → List α where recursive_exference_tailOr [91] ([] : List Nat) = [91] ∧ recursive_exference_tailOr [91] [11] = [] ∧ recursive_exference_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_exference_tailOr [false] [true, true] = [true]",
+      "expected": "candidate",
+      "status": "failed",
+      "failure": "expected one behaviorally accepted output for recursive_exference_tailOr: []",
+      "output": "recursive_exference_tailOr : {α : Type} → List α → List α → List α where recursive_exference_tailOr [91] ([] : List Nat) = [91] ∧ recursive_exference_tailOr [91] [11] = [] ∧ recursive_exference_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_exference_tailOr [false] [true, true] = [true]\nthe engine proposed 32 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search truncated: step limit reached, queue limit pruned 690892\nsupplied behavioral assertion: 0 passed, 60 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "tree",
+      "name": "recursive_exference_tree",
+      "type": "{α : Type} → α → RecursiveCases.Tree α → α",
+      "predicate": "{f} 91 (.leaf 11) = 11 ∧ {f} 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ {f} false (.leaf true) = true",
+      "command": ":synth recursive_exference_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_exference_tree 91 (.leaf 11) = 11 ∧ recursive_exference_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_exference_tree false (.leaf true) = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => match y with | .leaf z => z | .branch _ _ => x",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_exference_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_exference_tree 91 (.leaf 11) = 11 ∧ recursive_exference_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_exference_tree false (.leaf true) = true\n  it1  fun x y => match y with | .leaf z => z | .branch _ _ => x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "alias",
+      "name": "recursive_exference_alias",
+      "type": "{α : Type} → α → RecursiveCases.Sequence α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_exference_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_exference_alias 91 ([] : List Nat) = 91 ∧ recursive_exference_alias 91 [11, 29] = 11 ∧ recursive_exference_alias false [true] = true",
+      "expected": "candidate",
+      "status": "failed",
+      "failure": "expected one behaviorally accepted output for recursive_exference_alias: []",
+      "output": "recursive_exference_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_exference_alias 91 ([] : List Nat) = 91 ∧ recursive_exference_alias 91 [11, 29] = 11 ∧ recursive_exference_alias false [true] = true\nthe engine did not finish within 90s — no answer, not a verdict\n(bounded hypothesis instantiation can widen the search a lot; :set synth-timeout N chooses another number of seconds, or 0 to wait indefinitely)\nsupplied behavioral assertion: 0 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "unconsOr",
+      "name": "recursive_exference_unconsOr",
+      "type": "{α : Type} → α → List α → α × List α",
+      "predicate": "{f} 91 ([] : List Nat) = (91, []) ∧ {f} 91 [11, 29] = (11, [29]) ∧ {f} false [true, false] = (true, [false])",
+      "command": ":synth recursive_exference_unconsOr : {α : Type} → α → List α → α × List α where recursive_exference_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_exference_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_exference_unconsOr false [true, false] = (true, [false])",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => match y with | .nil => ⟨x, y⟩ | .cons z w => ⟨z, w⟩",
+      "observations": {
+        "passed": 1,
+        "falsified": 5,
+        "inconclusive": 0
+      },
+      "output": "recursive_exference_unconsOr : {α : Type} → α → List α → α × List α where recursive_exference_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_exference_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_exference_unconsOr false [true, false] = (true, [false])\n  it1  fun x y => match y with | .nil => ⟨x, y⟩ | .cons z w => ⟨z, w⟩\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 5 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "tupleField",
+      "name": "recursive_exference_tupleField",
+      "type": "{α : Type} → α → RecursiveCases.Payload α → α",
+      "predicate": "{f} 91 (.pairLeaf (11, 29)) = 11 ∧ {f} 91 (.next (.pairLeaf (11, 29))) = 91 ∧ {f} false (.pairLeaf (true, false)) = true",
+      "command": ":synth recursive_exference_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_exference_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_exference_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_exference_tupleField false (.pairLeaf (true, false)) = true",
+      "expected": "candidate",
+      "status": "failed",
+      "failure": "expected one behaviorally accepted output for recursive_exference_tupleField: []",
+      "output": "recursive_exference_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_exference_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_exference_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_exference_tupleField false (.pairLeaf (true, false)) = true\nthe engine did not finish within 90s — no answer, not a verdict\n(bounded hypothesis instantiation can widen the search a lot; :set synth-timeout N chooses another number of seconds, or 0 to wait indefinitely)\nsupplied behavioral assertion: 0 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "independent",
+      "name": "recursive_exference_independent",
+      "type": "{α β : Type} → α → β → List α → List β → α × β",
+      "predicate": "{f} 91 false ([] : List Nat) [] = (91, false) ∧ {f} 91 false [11, 29] [true] = (11, true) ∧ {f} 91 false [] [true] = (91, true)",
+      "command": ":synth recursive_exference_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_exference_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_exference_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_exference_independent 91 false [] [true] = (91, true)",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y z w => match z with | .nil => (match w with | .nil => ⟨x, y⟩ | .cons x1 _ => ⟨x, x1⟩) | .cons x2 _ => (match w with | .nil => ⟨x2, y⟩ | .cons x3 _ => ⟨x2, x3⟩)",
+      "observations": {
+        "passed": 1,
+        "falsified": 7,
+        "inconclusive": 0
+      },
+      "output": "recursive_exference_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_exference_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_exference_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_exference_independent 91 false [] [true] = (91, true)\n  it1  fun x y z w => match z with | .nil => (match w with | .nil => ⟨x, y⟩ | .cons x1 _ => ⟨x, x1⟩) | .cons x2 _ => (match w with | .nil => ⟨x2, y⟩ | .cons x3 _ => ⟨x2, x3⟩)\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 7 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "exference",
+      "operation": "reject_all",
+      "name": "recursive_exference_reject_all",
+      "type": "Nat → Nat",
+      "predicate": "False",
+      "command": ":synth recursive_exference_reject_all : Nat → Nat where False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 113,
+        "inconclusive": 0
+      },
+      "output": "recursive_exference_reject_all : Nat → Nat where False\nthe engine proposed 87 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search truncated: step limit reached, queue limit pruned 1047481\nsupplied behavioral assertion: 0 passed, 113 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    },
+    {
+      "engine": "both",
+      "operation": "null",
+      "name": "recursive_both_null",
+      "type": "{α : Type} → List α → Bool",
+      "predicate": "{f} ([] : List Nat) = true ∧ {f} [11] = false ∧ {f} [true, false] = false",
+      "command": ":synth recursive_both_null : {α : Type} → List α → Bool where recursive_both_null ([] : List Nat) = true ∧ recursive_both_null [11] = false ∧ recursive_both_null [true, false] = false",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x => match x with | .nil => (.true) | .cons _ _ => (.false)",
+      "observations": {
+        "passed": 1,
+        "falsified": 6,
+        "inconclusive": 0
+      },
+      "output": "recursive_both_null : {α : Type} → List α → Bool where recursive_both_null ([] : List Nat) = true ∧ recursive_both_null [11] = false ∧ recursive_both_null [true, false] = false\n  it1  fun x => match x with | .nil => (.true) | .cons _ _ => (.false)\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 6 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "headOr",
+      "name": "recursive_both_headOr",
+      "type": "{α : Type} → α → List α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_both_headOr : {α : Type} → α → List α → α where recursive_both_headOr 91 ([] : List Nat) = 91 ∧ recursive_both_headOr 91 [11, 29] = 11 ∧ recursive_both_headOr false [true] = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => match y with | .nil => x | .cons z _ => z",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_both_headOr : {α : Type} → α → List α → α where recursive_both_headOr 91 ([] : List Nat) = 91 ∧ recursive_both_headOr 91 [11, 29] = 11 ∧ recursive_both_headOr false [true] = true\n  it1  fun x y => match y with | .nil => x | .cons z _ => z\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "tailOr",
+      "name": "recursive_both_tailOr",
+      "type": "{α : Type} → List α → List α → List α",
+      "predicate": "{f} [91] ([] : List Nat) = [91] ∧ {f} [91] [11] = [] ∧ {f} [91] [11, 29, 37] = [29, 37] ∧ {f} [false] [true, true] = [true]",
+      "command": ":synth recursive_both_tailOr : {α : Type} → List α → List α → List α where recursive_both_tailOr [91] ([] : List Nat) = [91] ∧ recursive_both_tailOr [91] [11] = [] ∧ recursive_both_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_both_tailOr [false] [true, true] = [true]",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .nil => x | .cons _ b => b) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 67,
+        "inconclusive": 0
+      },
+      "output": "recursive_both_tailOr : {α : Type} → List α → List α → List α where recursive_both_tailOr [91] ([] : List Nat) = [91] ∧ recursive_both_tailOr [91] [11] = [] ∧ recursive_both_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_both_tailOr [false] [true, true] = [true]\n  it1  fun x y => (fun a => match a with | .nil => x | .cons _ b => b) y\nnote: search reported more batches to come\nnote: exference: search truncated: step limit reached, queue limit pruned 690892\nsupplied behavioral assertion: 1 passed, 67 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "tree",
+      "name": "recursive_both_tree",
+      "type": "{α : Type} → α → RecursiveCases.Tree α → α",
+      "predicate": "{f} 91 (.leaf 11) = 11 ∧ {f} 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ {f} false (.leaf true) = true",
+      "command": ":synth recursive_both_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_both_tree 91 (.leaf 11) = 11 ∧ recursive_both_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_both_tree false (.leaf true) = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => match y with | .leaf z => z | .branch _ _ => x",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_both_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_both_tree 91 (.leaf 11) = 11 ∧ recursive_both_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_both_tree false (.leaf true) = true\n  it1  fun x y => match y with | .leaf z => z | .branch _ _ => x\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "alias",
+      "name": "recursive_both_alias",
+      "type": "{α : Type} → α → RecursiveCases.Sequence α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_both_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_both_alias 91 ([] : List Nat) = 91 ∧ recursive_both_alias 91 [11, 29] = 11 ∧ recursive_both_alias false [true] = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => match y with | .nil => x | .cons z _ => z",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_both_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_both_alias 91 ([] : List Nat) = 91 ∧ recursive_both_alias 91 [11, 29] = 11 ∧ recursive_both_alias false [true] = true\n  it1  fun x y => match y with | .nil => x | .cons z _ => z\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "unconsOr",
+      "name": "recursive_both_unconsOr",
+      "type": "{α : Type} → α → List α → α × List α",
+      "predicate": "{f} 91 ([] : List Nat) = (91, []) ∧ {f} 91 [11, 29] = (11, [29]) ∧ {f} false [true, false] = (true, [false])",
+      "command": ":synth recursive_both_unconsOr : {α : Type} → α → List α → α × List α where recursive_both_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_both_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_both_unconsOr false [true, false] = (true, [false])",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => match y with | .nil => ⟨x, y⟩ | .cons z w => ⟨z, w⟩",
+      "observations": {
+        "passed": 1,
+        "falsified": 5,
+        "inconclusive": 0
+      },
+      "output": "recursive_both_unconsOr : {α : Type} → α → List α → α × List α where recursive_both_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_both_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_both_unconsOr false [true, false] = (true, [false])\n  it1  fun x y => match y with | .nil => ⟨x, y⟩ | .cons z w => ⟨z, w⟩\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 5 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "tupleField",
+      "name": "recursive_both_tupleField",
+      "type": "{α : Type} → α → RecursiveCases.Payload α → α",
+      "predicate": "{f} 91 (.pairLeaf (11, 29)) = 11 ∧ {f} 91 (.next (.pairLeaf (11, 29))) = 91 ∧ {f} false (.pairLeaf (true, false)) = true",
+      "command": ":synth recursive_both_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_both_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_both_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_both_tupleField false (.pairLeaf (true, false)) = true",
+      "expected": "candidate",
+      "status": "failed",
+      "failure": "expected one behaviorally accepted output for recursive_both_tupleField: []",
+      "output": "recursive_both_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_both_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_both_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_both_tupleField false (.pairLeaf (true, false)) = true\nthe engine did not finish within 90s — no answer, not a verdict\n(bounded hypothesis instantiation can widen the search a lot; :set synth-timeout N chooses another number of seconds, or 0 to wait indefinitely)\nsupplied behavioral assertion: 0 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "independent",
+      "name": "recursive_both_independent",
+      "type": "{α β : Type} → α → β → List α → List β → α × β",
+      "predicate": "{f} 91 false ([] : List Nat) [] = (91, false) ∧ {f} 91 false [11, 29] [true] = (11, true) ∧ {f} 91 false [] [true] = (91, true)",
+      "command": ":synth recursive_both_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_both_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_both_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_both_independent 91 false [] [true] = (91, true)",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y z w => match z with | .nil => (match w with | .nil => ⟨x, y⟩ | .cons x1 _ => ⟨x, x1⟩) | .cons x2 _ => (match w with | .nil => ⟨x2, y⟩ | .cons x3 _ => ⟨x2, x3⟩)",
+      "observations": {
+        "passed": 1,
+        "falsified": 7,
+        "inconclusive": 0
+      },
+      "output": "recursive_both_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_both_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_both_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_both_independent 91 false [] [true] = (91, true)\n  it1  fun x y z w => match z with | .nil => (match w with | .nil => ⟨x, y⟩ | .cons x1 _ => ⟨x, x1⟩) | .cons x2 _ => (match w with | .nil => ⟨x2, y⟩ | .cons x3 _ => ⟨x2, x3⟩)\nnote: exference: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 7 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "both",
+      "operation": "reject_all",
+      "name": "recursive_both_reject_all",
+      "type": "Nat → Nat",
+      "predicate": "False",
+      "command": ":synth recursive_both_reject_all : Nat → Nat where False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 197,
+        "inconclusive": 0
+      },
+      "output": "recursive_both_reject_all : Nat → Nat where False\nthe engine proposed 152 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search truncated: candidate limit reached (1024)\nnote: exference: search truncated: step limit reached, queue limit pruned 1047481\nsupplied behavioral assertion: 0 passed, 197 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    }
+  ]
+}

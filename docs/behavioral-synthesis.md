@@ -59,6 +59,19 @@ are skipped; a spelling whose check failed can be retried if it occurs again in
 the admitted candidate groups. The command reports passed, falsified, and
 inconclusive assertion counts separately from Lean type-check diagnostics.
 
+Named behavioral queries let Exference propose implementations that ignore
+inputs or constructor fields. Finding some type-correct candidates that later
+fail the assertion cannot suppress that part of the search. Ordinary synthesis
+retains its established preference and fallback policy.
+
+For behavioral queries, `both` alternates observed engine slots, starting with
+Djinn. Rendering misses and duplicates also yield the next turn; each remains
+charged against its source window. The requested number of successes and the
+verification quota do not change this schedule. Each retained candidate keeps
+its own source authority, and a success leaves unobserved continuations alone.
+This is fairness between exposed stream slots, not preemption of an engine
+while it computes its next slot; the shared command deadline still applies.
+
 The command first prepares the synthesis environment, using the same backend
 setup and request-timeout boundaries as ordinary synthesis. Cold imports and
 initial session reconstruction therefore do not spend the assertion allowance.

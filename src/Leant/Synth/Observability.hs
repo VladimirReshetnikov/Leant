@@ -61,6 +61,8 @@ data SourceGraphAbsenceReason
   | ExferenceNominalConstructorPattern
   | ExferenceUnsupportedStructuralConstructorPattern
   | ExferenceUnsupportedContextualVisibleApplication
+  | ExferenceUnsupportedContextEvidence
+  | ExferenceUnsupportedContextualCertificateGraph
   | ExferenceEvidenceMismatch
   | ExferenceConstructionLimit
   | ExferenceSealingFailure
@@ -105,6 +107,8 @@ exferenceSourceGraphAbsenceReason absence = case absence of
   NominalConstructorPattern{} -> ExferenceNominalConstructorPattern
   UnsupportedStructuralConstructorPattern{} -> ExferenceUnsupportedStructuralConstructorPattern
   UnsupportedContextualVisibleApplication{} -> ExferenceUnsupportedContextualVisibleApplication
+  UnsupportedContextEvidence{} -> ExferenceUnsupportedContextEvidence
+  UnsupportedContextualCertificateGraph -> ExferenceUnsupportedContextualCertificateGraph
   TermGraphEvidenceMismatch -> ExferenceEvidenceMismatch
   TermGraphConstructionLimit{} -> ExferenceConstructionLimit
   TermGraphSealingFailure{} -> ExferenceSealingFailure
@@ -210,6 +214,8 @@ leantSynthesisMetricCode metric = case metric of
     ExferenceNominalConstructorPattern -> "exference.nominal-constructor-pattern"
     ExferenceUnsupportedStructuralConstructorPattern -> "exference.unsupported-structural-constructor-pattern"
     ExferenceUnsupportedContextualVisibleApplication -> "exference.unsupported-contextual-visible-application"
+    ExferenceUnsupportedContextEvidence -> "exference.unsupported-context-evidence"
+    ExferenceUnsupportedContextualCertificateGraph -> "exference.unsupported-contextual-certificate-graph"
     ExferenceEvidenceMismatch -> "exference.evidence-mismatch"
     ExferenceConstructionLimit -> "exference.construction-limit"
     ExferenceSealingFailure -> "exference.sealing-failure"

@@ -21,6 +21,8 @@ Bug-Reports:   https://github.com/VladimirReshetnikov/Leant/issues
 Category:      Development
 Build-Type:    Simple
 Extra-Source-Files:
+  test-context/*.py
+  test-context/README.md
   test-behavioral/*.py
   test-behavioral/README.md
   test-recursive/*.py
@@ -129,12 +131,14 @@ Test-Suite leant-synth-tests
   Hs-Source-Dirs:   test-unit, src
   Main-Is:          Spec.hs
   Other-Modules:
+    ContextRenderSpec
     Leant.Backend
     Leant.Backend.Isolated
     Leant.Options
     Leant.Synth.BehavioralSelection
     Leant.Synth.Behavioral
     Leant.Synth.BehavioralSelection.Internal
+    Leant.Synth.ContextRender
     Leant.Synth.Engine
     Leant.Synth.Engine.Parallel
     Leant.Synth.Fragment

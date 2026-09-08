@@ -9,13 +9,14 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "test-church"), str(ROOT / "lib/Djex/test-church")]
 
 import behavior_runtime as runtime
-from behavior_probe import parse_output
+from behavior_probe import latency_observer, parse_output
 from run_corpus import reported_axioms, validate_settings
 
 
@@ -83,6 +84,23 @@ def kernel_source(case):
     ]), [name, proof]
 
 
+def parse_case_results(transcript, cases):
+    """Validate the whole inventory, then retain every independent case result."""
+    blocks = re.split(r"(?m)^λ> :synth ", transcript)[1:]
+    if len(blocks) != len(cases):
+        raise ValueError("live synthesis command count differs from the prepared inventory")
+    results = []
+    for case, block in zip(cases, blocks):
+        block = block.split("\nλ> ", 1)[0]
+        if block.splitlines()[0] != case["command"].removeprefix(":synth "):
+            raise ValueError("named where command differs from its prepared case")
+        try:
+            results.extend(parse_output("λ> :synth " + block, [case]))
+        except ValueError as failure:
+            results.append(dict(case, status="failed", failure=str(failure), output=block))
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--leant", type=Path)
@@ -118,8 +136,12 @@ def main():
     report["source_hashes"] = {str(path.relative_to(ROOT)): runtime.sha256(path) for path in [
         ROOT / "src/Main.hs", ROOT / "src/Leant/Synth/Engine.hs",
         ROOT / "src/Leant/Synth/Behavioral.hs", ROOT / "lib/Djex/djinn/src-core/Djinn/Core.hs",
+        Path(__file__), ROOT / "test-church/behavior_probe.py", ROOT / "test-church/run_corpus.py",
+        ROOT / "lib/Djex/test-church/behavior_runtime.py",
         ROOT / "lib/Djex/djinn/src-core/Djinn/Internal/TypeFormula.hs",
         ROOT / "lib/Djex/djinn/src-core/Djinn/Internal/LJT.hs",
+        ROOT / "lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/Exference.hs",
+        ROOT / "lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/ExpressionCheck.hs",
     ]}
     runtime.write_json(output / "results.json", report)
     if args.prepare_only:
@@ -130,12 +152,13 @@ def main():
     processes = runtime.Processes(output, args.process_timeout)
     try:
         live = processes.run("live", [args.leant.resolve(), "--plain"], source=source, cwd=ROOT,
-                             env=dict(os.environ, LEANT_SYNTH_TIMEOUT=str(args.timeout)))
+                             env=dict(os.environ, LEANT_SYNTH_TIMEOUT=str(args.timeout)),
+                             observe=latency_observer(runtime, cases))
         if live.returncode:
             raise ValueError("live Leant exited unsuccessfully")
         transcript = live.stdout + live.stderr
         validate_settings(transcript, source)
-        results = parse_output(transcript, cases)
+        results = parse_case_results(transcript, cases)
         report["results"] = results
         report["kernel_replays"] = []
         for index, result in enumerate(row for row in results if row["status"] == "candidate"):
@@ -151,10 +174,12 @@ def main():
                 axiom_inventories={name: None if value is None else sorted(value)
                                   for name, value in inventories.items()}))
             runtime.write_json(output / "results.json", report)
-            if not passed:
-                raise ValueError("independent kernel replay failed: " + result["name"])
-        report.update(status="passed", candidate_count=sum(row["status"] == "candidate" for row in results),
-                      false_control_count=sum(row["status"] == "no_candidate" for row in results))
+        failures = [row["name"] for row in results if row["status"] == "failed"]
+        replay_failures = [row["case"] for row in report["kernel_replays"] if row["status"] != "passed"]
+        report.update(status="failed" if failures or replay_failures else "passed",
+                      candidate_count=sum(row["status"] == "candidate" for row in results),
+                      false_control_count=sum(row["status"] == "no_candidate" for row in results),
+                      failed_cases=failures, failed_kernel_replays=replay_failures)
     except Exception as failure:
         report.update(status="failed", failure=str(failure))
     finally:
