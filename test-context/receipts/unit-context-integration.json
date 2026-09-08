@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "scope": "Complete unfiltered Leant synthesis boundary unit suite after contextual integration source-assertion corrections.",
+  "original_result": {
+    "path": "dist-newstyle/priority-context-unit-owned-v4/results.json",
+    "sha256": "3b235b69986e002ee22d0407bcb42dc75267c8285566064dfeef6236831bc06b"
+  },
+  "acceptance": {
+    "expected_tests": 678,
+    "enumerated_tests": 678,
+    "unique_test_names": 678,
+    "observed_passing_rows": 678,
+    "observed_failing_rows": 0,
+    "passing_summary_tests": 678,
+    "tasty_elapsed_seconds": 283.51,
+    "test_threads": 1,
+    "suite_exit_code": 0,
+    "unfiltered_command": true,
+    "inventory_equal_to_previous_run": true
+  },
+  "inventory": {
+    "index": {
+      "path": "dist-newstyle/priority-context-unit-owned-v4/inventory.json",
+      "sha256": "db3f8a93e9942a16fe732fb7a354c3df49ee94fdf18388af59790d3177d0beac"
+    },
+    "test_names": {
+      "path": "dist-newstyle/priority-context-unit-owned-v4/test-names.txt",
+      "sha256": "126126474488463084d126c06ddf8009dc3ac8c50b0838533784bcfa46dcec0a"
+    },
+    "enumeration_stdout": {
+      "path": "dist-newstyle/priority-context-unit-owned-v4/list-tests.stdout.txt",
+      "sha256": "1754232dfd50b0bf242c0421a0973273e42f29d84350c27d33b27836b2a889e9"
+    },
+    "comparison": "All 678 exact fully qualified inventory names match the prior complete run; all are unique."
+  },
+  "unit_process": {
+    "command": [
+      "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+      "-j1"
+    ],
+    "process_timeout_seconds": 1200,
+    "cwd": "C:\\Leant",
+    "status": "completed",
+    "started_utc": "2026-09-08T04:16:29Z",
+    "finished_utc": "2026-09-08T04:21:13Z",
+    "owned_root_pid": 34060,
+    "exit_code": 0,
+    "timed_out": false,
+    "wall_seconds": 283.643739000021,
+    "stdout": {
+      "path": "dist-newstyle/priority-context-unit-owned-v4/unit.stdout.txt",
+      "sha256": "6a40947e24d69f6d4e400722b24bf23280254ed12b7898b4da011dc98c6fa113"
+    },
+    "stderr": {
+      "path": "dist-newstyle/priority-context-unit-owned-v4/unit.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "enumeration_process": {
+    "command": [
+      "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+      "--list-tests"
+    ],
+    "process_timeout_seconds": 30,
+    "cwd": "C:\\Leant",
+    "status": "completed",
+    "started_utc": "2026-09-08T04:16:29Z",
+    "finished_utc": "2026-09-08T04:16:29Z",
+    "owned_root_pid": 44704,
+    "exit_code": 0,
+    "timed_out": false,
+    "wall_seconds": 0.06121210003038868,
+    "stdout": {
+      "path": "dist-newstyle/priority-context-unit-owned-v4/list-tests.stdout.txt",
+      "sha256": "1754232dfd50b0bf242c0421a0973273e42f29d84350c27d33b27836b2a889e9"
+    },
+    "stderr": {
+      "path": "dist-newstyle/priority-context-unit-owned-v4/list-tests.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "integrity": {
+    "source_entries": 233,
+    "source_before_after_equal": true,
+    "executable_before_after_equal": true,
+    "all_recorded_capture_hashes_verified": true,
+    "source_manifest_sha256": "9dcf268fea9e0eae2714542a29c624cad5e7c3e806a7be9968899f485a16d95d",
+    "source_manifest_encoding": "UTF-8 JSON with sort_keys=True and separators=(comma,colon), no trailing newline; keys and values exactly as in original_result source_hashes_before.",
+    "source_pins": {
+      "C:\\Leant\\src\\Main.hs": "1774f806f7e469ae38e11e092e29d5e54500cf14b863f98bc9d362d1c4b07775",
+      "C:\\Leant\\src\\Leant\\Synth\\Engine.hs": "938ed002991edede9790e56a723c688dcaefa2c38668efeb01f3fd3ce3164667",
+      "C:\\Leant\\test-unit\\Spec.hs": "dc9f20844dd10952349cce65039cc59f9eed28a9189fee9331d709f391845787"
+    },
+    "executable_pins": {
+      "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe": "caec9b9ed159a6a75baddfcf432cbdf9939804243410eea32be679263d89f338",
+      "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\djex-2026.7.17\\x\\djex-fake-z3\\build\\djex-fake-z3\\djex-fake-z3.exe": "5f0886b05030bf9f4ee18cf1746da6e82063bdc14d612d6d9900f726e483e135"
+    }
+  },
+  "history": {
+    "prior_result": {
+      "path": "dist-newstyle/priority-context-unit-owned-v3/results.json",
+      "sha256": "0fcd9f97ddf65a9b6875774a62ef519111d6a3fd2aa91d3afc0e902ecffc18fc"
+    },
+    "prior_status": "failed",
+    "prior_expected_tests": 678,
+    "prior_passing_rows": 675,
+    "prior_failing_rows": 3,
+    "prior_summary": "3 out of 678 tests failed (284.40s)",
+    "prior_tasty_elapsed_seconds": 284.4,
+    "prior_unit_process": {
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+        "-j1"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T03:57:16Z",
+      "finished_utc": "2026-09-08T04:02:00Z",
+      "owned_root_pid": 43652,
+      "exit_code": 1,
+      "timed_out": false,
+      "wall_seconds": 284.54899929999374,
+      "stdout": {
+        "path": "dist-newstyle/priority-context-unit-owned-v3/unit.stdout.txt",
+        "sha256": "ee09218e63ff13adbce928718e22672798c846ef4af8f927dc69afb1c2403134"
+      },
+      "stderr": {
+        "path": "dist-newstyle/priority-context-unit-owned-v3/unit.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "prior_test_executable_sha256": "91295f58c14f3061eadfb6af91f2c78d045876f1843ac6db56171be68f145060",
+    "prior_integrity": {
+      "source_before_after_equal": true,
+      "executable_before_after_equal": true,
+      "all_recorded_capture_hashes_verified": true
+    },
+    "corrected_assertions": [
+      {
+        "test": "Leant synthesis boundary.checked Length behavioral ranking.explicit ranking policy.current bounded ranking configuration file.explicit Length assessment integration.continue providers and classical retries after every nonterminal lane",
+        "failure_kind": "stale source-text routing assertion",
+        "fixture_correction": "Update stale base-selection assertions to cover explicit context-source admission, preserve the ordinary/behavioral branch, and forbid contextual fallback to legacy library synthesis.",
+        "corrected_full_run": "passed"
+      },
+      {
+        "test": "Leant synthesis boundary.checked Length behavioral ranking.explicit ranking policy.current bounded ranking configuration file.explicit Length assessment integration.scope parallel work to default structural engine or library pairs",
+        "failure_kind": "stale source-text routing assertion",
+        "fixture_correction": "Update the contextual parallel-admission and EngineBoth preparation assertions to require prepareSynthesisWithContext with each engine projection, while preserving ordinary routes and prohibiting contextual legacy parallel work.",
+        "corrected_full_run": "passed"
+      },
+      {
+        "test": "Leant synthesis boundary.checked Length behavioral ranking.explicit ranking policy.current bounded ranking configuration file.explicit Length assessment integration.gate normal diagnostics after aggregate behavioral handling",
+        "failure_kind": "stale source-text routing assertion",
+        "fixture_correction": "Require the sound-refutation branch to exclude a supplied context before classical retry; preserve aggregate behavioral handling and ordinary diagnostics.",
+        "corrected_full_run": "passed"
+      }
+    ],
+    "changed_pinned_source_files": [
+      {
+        "path": "test-unit/Spec.hs",
+        "before_sha256": "4c5b5a25b32182274bcdc6e062bb71f6ba02e2de2fef9ad5e6f695372cc5fdb3",
+        "after_sha256": "dc9f20844dd10952349cce65039cc59f9eed28a9189fee9331d709f391845787"
+      }
+    ],
+    "other_232_pinned_source_entries_unchanged": true,
+    "production_source_changed_for_correction": false,
+    "search_or_timeout_bounds_increased": false
+  },
+  "boundaries": [
+    "This receipt establishes the complete unit-suite checkpoint, not the complete 39-cell public contextual production matrix.",
+    "The earlier failed aggregate remains recorded; correcting source-text assertions did not change production source, search allowances, or request deadlines."
+  ]
+}

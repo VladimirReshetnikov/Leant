@@ -2,33 +2,34 @@
 
 This 2026-09-07 update preserves the active goal to implement priorities 1–4
 from the [original roadmap](../../lib/Djex/docs/reports/2026-09-06-synthesis-next-priorities.md).
-The [completion register](../../lib/Djex/docs/reports/2026-09-07-synthesis-priorities-1-4.md)
+The [completion register](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/docs/reports/2026-09-07-synthesis-priorities-1-4.md)
 retains the full scope. The current canonical
 [Djex re-triage](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-07-synthesis-retriage.md)
 also covers working changes newer than this repository's pinned dependency.
 
 ## Current decision and next delivery gates
 
-**Canonical Djex's guarded contextual increment is accepted; validate its
-working integration and the bounded Lean route next.** Preserve Haskell failure samples
-across elaboration timeouts, diagnose actual fold verification, and execute
-Church behavior alongside integration. Full proof-selected dictionary
-reconstruction follows before the conservative overlap guards are relaxed.
+**Canonical Djex's supported-fragment Haskell elaboration completes priority 1.
+Its guarded contextual increment is accepted; validate the working integration
+and bounded Lean route next.** Diagnose actual fold verification and execute
+Church behavior alongside integration. Priorities 2–4 remain open. Full
+proof-selected dictionary reconstruction follows before the conservative
+overlap guards are relaxed.
 
 | Order | Delivery | Required acceptance |
 | --- | --- | --- |
-| 1 | Publish bounded production Lean contexts | Validate the working guarded Djex dependency at `38435709`. Strictly build the prepared provenance changes, run 52 focused tests and the expected full 678-test inventory, then execute 39 public cells across ordinary/named-`where` commands and Djinn/Exference/Both. Require 18 exact full-type/payload replays, three actual where-False controls, and 18 universe/global-metadata refusals. Associate each displayed term with its own typed graph, renderer alternative and engine; pin the directly invoked replay kernel and reconcile the actual full-suite inventory with its summary. |
-| 2 | Retain Haskell failure samples across elaboration timeouts | First/best/all repair selection already passes. Record the original compilation failure before retrying, preserving its observation identity, full type, exact expression/error and evidence when the shared deadline expires. Add a deterministic interrupted-retry control without another candidate slot or deadline, retain owned cleanup, and rerun affected CLI tests. |
-| 3 | Make already-found folds reliably verifiable | Trace actual native append/length synthesis under unchanged limits, identify and fix the failing request stage, and validate cancellation, command deadlines, owned cleanup, recovery with a context-dependent command, false controls and exact replay. Standalone timing and more search do not establish this result. |
-| 4 | Execute broader Church behavior continuously | Both partial oracle preflights pass. Run additional totals and all 19 supplied-default counterparts in both Haskell engines and all three Lean modes, with controlled providers, actual false controls, and exact full-signature replay. Keep each operation's success, timeout and inconclusive result separate; independent cells need not wait for fold repair. |
-| 5 | Preserve selected dictionary identity before extending contexts | Carry the proof-selected introduction and ordered slot through lowering and reconstruction. Require a forced equal-predicate outer/inner fixture with distinct payloads and Haskell/Lean replay before relaxing overlap guards. Then extend one missing provider scheme or evidence derivation at a time. Broaden supplied tree folds and accumulator programs after native verification is reliable. |
+| 1 | Publish bounded production Lean contexts | The guarded dependency's strict build, 52 focused tests, two own-variant Djinn identity ordinary/`where` full-type replays, and corrected [678-test complete suite](../../test-context/receipts/unit-context-integration.json) pass. Complete all 39 public cells: require 18 exact full-type/payload replays, three actual False controls, and 18 universe/global-metadata refusals across Djinn/Exference/Both. Correct the `constant_universe` fixture preflight and replay its affected cells. Preserve each accepted variant's own graph, renderer and engine, pin the directly invoked kernel, and reconcile inventory and summary counts. |
+| 2 | Make already-found folds reliably verifiable | Trace actual native append/length synthesis under unchanged limits, identify and fix the failing request stage, and validate cancellation, command deadlines, owned cleanup, recovery with a context-dependent command, false controls and exact replay. Standalone timing and more search do not establish this result. |
+| 3 | Execute broader Church behavior continuously | Both partial oracle preflights pass. Run additional totals and all 19 supplied-default counterparts in both Haskell engines and all three Lean modes, with controlled providers, actual false controls, and exact full-signature replay. Keep each operation's success, timeout and inconclusive result separate; independent cells need not wait for fold repair. |
+| 4 | Extend bounded context support and preserve selected dictionary identity | After bounded publication, admit one fully described global contextual provider in the existing `Type 0` fragment under the current non-overlap guard. In parallel or next, carry the proof-selected introduction and ordered slot through lowering and reconstruction. Before relaxing overlap guards, require a forced equal-predicate outer/inner fixture whose faithful scoped capture preserves distinct payload behavior in Haskell and Lean replay. |
 
-These are delivery steps, not replacement priority numbers. Steps 1 and 5
-advance original priority 3; step 2 advances priority 1; step 3 advances
-priority 2; step 4 advances priority 4. The small timeout repair and independent
-corpus cells can proceed alongside integration while heavy validation remains
-serialized. Full dictionary selection and fold-specific reliability work need
-not hold up the bounded contextual milestone.
+These are delivery steps, not replacement priority numbers. Steps 1 and 4
+advance original priority 3; step 2 advances priority 2; step 3 advances priority
+4. Priority 1 is complete in canonical Djex and remains a regression gate;
+this does not enlarge Leant's recorded dependency or runtime receipts.
+Independent corpus cells can proceed alongside integration while heavy
+validation remains serialized. Full dictionary selection and fold-specific
+reliability work need not hold up the bounded contextual milestone.
 
 ## Current evidence and its limits
 
@@ -38,11 +39,12 @@ guarded checkpoint below supersedes that audit's pending-guard status.
 Audited starting revisions for the earlier receipt are Djex `9f45bef8` and Leant
 `7f700f89`. Published Leant still pins Djex `922c5558`; the working dependency
 is now the clean guarded revision `38435709bf4e70c4b53c541c462b0bbd35837bf2`.
-The new strict build and runtime acceptance remain pending. This update
-publishes the re-triage and evidence summary, not the unaccepted implementation
-or an updated dependency gitlink.
+The new strict build, 52 focused tests, two Djinn identity ordinary/`where`
+full-type replays, and corrected 678-test complete integration suite pass.
+The 39-cell contextual matrix remains pending; these results do not update
+the published dependency or establish acceptance of the complete production route.
 
-**Production contexts have their first public-command acceptance.** The
+**The earlier production subset has public-command acceptance.** The
 recorded strict executable/unit build passes. The exact emitted synthesis
 serializer, with only an `import Lean` line prepended, compiles under the
 directly invoked, hashed Lean 4.32.0 kernel. The Djinn production run passes
@@ -58,18 +60,33 @@ between simultaneously equal dictionaries. Those are separate gates. The
 earlier 51 focused tests passed on their recorded sources; later strict-build
 and serializer results do not constitute a fresh full-suite run. The previous
 647-test integration receipt belongs to an older dependency. The new strict
-build, 52 focused tests, expected full 678-test inventory and 39 live contextual
-cells remain pending. The full run must reconcile its actual unfiltered
-inventory with its passing summary.
+build and 52 focused tests pass. Two Djinn identity
+ordinary/`where` full-type replays additionally retain the actual accepted
+variant's graph, renderer and engine. The corrected
+[complete unit receipt](../../test-context/receipts/unit-context-integration.json)
+records **678/678 passing tests in 283.51 seconds**, or 283.64 seconds for the
+owned process. All 678 enumerated names are unique and match the passing
+output; source and executable identities stayed unchanged during the run.
+The receipt preserves the earlier 675/678 result and three stale source-routing
+assertion corrections. Only the test source changed between runs; the other
+232 pinned source entries and the search and timeout bounds stayed unchanged.
+The 39-cell contextual matrix remains open. Its `constant_universe` class
+inferred `Prop` from its fields while the fixture required `Type`, so preflight
+failed before live execution. Explicitly declaring the fixture's result sort
+and replaying its affected cells are pending; this is a fixture failure, not an
+established production failure. A separate Exference ordinary forwarding cell
+reached its 45-second command timeout before emitting a candidate. That runtime
+outcome also remains unresolved; it is not excused by the fixture correction.
 
-The stronger acceptance path is implemented but still needs the Haskell and
-live gates above. The runner now resolves, directly invokes and hashes the
-actual kernel. Main retains each displayed verification Variant and reports
+The stronger acceptance path has the complete unit suite and focused live
+acceptance above; its full-matrix gate remains open. The runner now resolves,
+directly invokes and hashes the actual kernel. Main retains each displayed verification Variant and reports
 its own graph, renderer alternative and engine. Compatibility debug output
 does not force optional origin recovery from an unobserved opposing stream;
 a fully serialized poison-tail regression covers that boundary. All 14
 production-runner, 12 extended-corpus and six partial pure controls pass.
-Those harness results do not establish a new production synthesis result.
+Those pure harness results remain separate from the two fresh production
+identity replays and do not establish the full contextual matrix.
 
 The context packet preserves exact lexical identities and binder visibility
 within a local `Type 0` subset. It refuses richer sorts, unrecorded constant
@@ -88,8 +105,9 @@ explicit datatype/synonym parameter kinds. The
 [guarded increment report](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/docs/reports/2026-09-07-djinn-nested-givens.md)
 and [checkpoint receipt](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/test-integration/receipts/guarded-nested-givens-checkpoint.json)
 preserve both setup failures and corrected complete reruns. Leant's working
-dependency now contains this guard; its strict build and runtime validation
-remain pending. Equal active dictionaries and nested forall/Given
+dependency now contains this guard; its strict build, focused acceptance and
+complete 678-test integration suite pass, while the contextual matrix remains
+pending. Equal active dictionaries and nested forall/Given
 interaction remain explicitly unsupported.
 
 **Both partial Church oracle preflights pass.**
@@ -105,14 +123,23 @@ full types, provider isolation and explicit defaults preserved.
 Exactly four named `atKey` observer/proofs are permitted the standard
 `String.length` dependencies `propext`, `Classical.choice` and `Quot.sound`.
 The dependency was checked separately. All implementation declarations still
-require empty axiom inventories. Expanded live synthesis acceptance remains
-open; passing oracle results do not close it.
+require empty axiom inventories. Supplied-default `head` now passes live
+synthesis, exact GHC execution, and False controls in both Haskell engines.
+Most expanded live cells remain open; passing oracle results do not close them.
 
-**Haskell elaboration selection is already accepted.** The current complete
-100-test CLI suite includes first/best/all live repairs and exact GHC replay.
-The remaining concrete bug loses the original bounded failure sample when
-the shared candidate deadline interrupts an elaboration retry. Preserve that
-sample and its occurrence without increasing search or compiler allowances.
+**Priority 1 is complete in canonical Djex.** Its strict build and complete
+101-test CLI suite pass, retaining first/best/all live repairs and exact GHC
+replay. The new interrupted-retry control preserves the original compilation
+failure and observation identity, its own graph-guided alternative, and final
+timeout under the original shared candidate deadline. It consumes one observed
+slot without refill, then confirms recovery on the next query. Established
+missing-authority, skolem, lexical-scope, and source-identity controls remain
+regressions. See the [canonical completion register](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/docs/reports/2026-09-07-synthesis-priorities-1-4.md#haskell-elaboration-checkpoint).
+The [durable receipt](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/test-integration/receipts/elaboration-timeout-samples.json)
+records 101/101 tests in 124.17 seconds, the 33.53-second actual timeout case,
+and unchanged source, helper, and executable identities. This supported-fragment
+completion does not update the pinned Lean acceptance boundary or close
+priorities 2–4.
 
 **Fold verification remains unresolved.** Opt-in request tracing compiles and
 its focused tests pass. Raw startup and standalone request timings vary; some
@@ -127,8 +154,8 @@ fresh backend cannot silently lose the query's environment.
 
 | Idea | Disposition and promotion criterion |
 | --- | --- |
-| Exact accepted-candidate provenance and reproducible replay | Implemented; validate the prepared Haskell and live route. The 14 pure production-runner controls pass. Require own-Variant graph/renderer/engine observations, non-forcing compatibility diagnostics and the directly hashed kernel; defer a general tracing framework. |
-| Selected dictionary occurrence and complete context metadata | Next capability extension after bounded publication. First prove actual outer/inner ownership with differing payloads for equal predicates, then extend one missing provider scheme or evidence derivation. Equal dictionary types alone do not identify the selected value. |
+| Exact accepted-candidate provenance and reproducible replay | The strict build, 52 focused tests, complete 678-test suite and two Djinn identity ordinary/`where` full-type replays pass. Complete the 39-cell matrix. Preserve own-Variant graph/renderer/engine observations, non-forcing compatibility diagnostics and the directly hashed kernel; defer a general tracing framework. |
+| Selected dictionary occurrence and complete context metadata | After bounded publication, one fully described global contextual provider can extend the current `Type 0` route without relaxing the non-overlap guard; the current provider map is empty and rejects every typed global. Exact dictionary selection is separately required before relaxing that guard: demonstrate differing outer/inner payload behavior under faithful scoped capture, not only graph identities or successful GHC compilation. Extend further provider schemes or evidence derivations individually. |
 | Tree folds and accumulator programs | Next recursion extension after live verification is reliable. Promote individual missing corpus programs, with exact provider inventories and termination checking. General recursion is a separate design problem. |
 | Native Windows Length acquisition | Next independent platform milestone after current integration gates, or earlier for a concrete user workflow. Require bounded acquisition, actual solver execution and independent replay. Existing Length tests do not implement the missing native acquisition path. |
 | Search performance and scheduling | Profile rejected contextual slots, the expensive Exference fold-rejection case, duplicate checking and retained memory separately from backend startup. Change a measured bottleneck while preserving budgets, ownership and behavior. Do not increase defaults to hide verification failure. |
@@ -295,8 +322,9 @@ bounds, and the full 647-test integration suite now passes. The previous
 619/620 full run plus unchanged focused retry remains incomplete aggregate
 evidence. The 350-signature-per-engine corpus establishes type inhabitation
 at its recorded boundary; expanded
-behavioral coverage remains a separate requirement. None of priorities 1–4 is
-complete.
+behavioral coverage remains a separate requirement. At that historical
+checkpoint none of priorities 1–4 was complete; current priority-1 acceptance
+is recorded above, while priorities 2–4 remain open.
 
 ## Historical integration receipts
 
@@ -424,8 +452,10 @@ above supersedes it, and the case failures it describes are resolved.
    Begin this coverage during earlier deliveries; preserve explicit defaults
    or inhabitance assumptions and independent false controls.
 
-None of the four priorities is complete. Moving the smaller simplification
-delivery earlier changes scheduling, not the required contextual capability.
+At that historical checkpoint none of the four priorities was complete.
+The current priority-1 completion is recorded above. Moving the smaller
+simplification delivery earlier changed scheduling, not the required
+contextual capability.
 The accepted first/best CLI fixture and bounded simplification remain regression
 gates for later shared integration changes. Simplification now passes its 16
 method controls, 15 live queries, and six independent candidate replays, with

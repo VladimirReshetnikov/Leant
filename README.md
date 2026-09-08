@@ -143,16 +143,23 @@ Companion documents:
   also passes seven full-signature replays with distinct dictionary payloads;
   the bounded working production route now also passes three public Djinn
   behavioral queries, exact full-type replay with 24 empty inventories, and an
-  actual false control. Ordinary queries, Exference/Both, metadata refusals and
-  the final integration suite remain pending. The earlier configured 647-test
+  actual false control. The fresh strict build, 52 focused tests, and two Djinn
+  identity ordinary/`where` full-type replays pass with their own accepted-variant
+  provenance. The corrected [complete integration suite](test-context/receipts/unit-context-integration.json)
+  passes all 678 tests in 283.51 seconds (283.64 seconds for the owned process).
+  The 39-cell contextual matrix remains open. The earlier configured 647-test
   suite passes in 343.79 seconds on its recorded source revision. Native fold `map` now also passes live synthesis and exact replay;
   append and length produce correct candidates but encounter backend request failures
   before acceptance. Next, validate the working integration of the accepted
-  canonical nested-Given guard and bounded production contexts, preserve Haskell failure samples across
-  elaboration timeouts, and repair live fold verification. Both partial oracle
-  preflights pass: 20 Lean files with 491 inventories (487 empty, four allowlisted
-  observer/proofs), and 63 Haskell controls. Expanded live behavioral acceptance
-  for the additional totals and all 19 supplied-default cases remains open.
+  canonical nested-Given guard and bounded production contexts, and repair
+  live fold verification. Canonical Djex's supported-fragment Haskell elaboration
+  now completes priority 1: all 101 CLI tests pass, including retention of the
+  original failure sample across a retry timeout under the same deadline.
+  Priorities 2–4 remain open; this does not enlarge a pinned Lean receipt. Both
+  partial oracle preflights pass: 20 Lean files with 491 inventories (487 empty, four allowlisted
+  observer/proofs), and 63 Haskell controls. Supplied-default `head` now passes
+  live synthesis, exact GHC execution, and False controls in both Haskell engines.
+  Most expanded cells remain open, including their Lean synthesis acceptance.
   Preflight and the 350-signature inhabitation result remain separate from behavioral
   synthesis. Full proof-selected dictionary transport follows before overlap
   guards are relaxed. See the
@@ -169,13 +176,17 @@ Companion documents:
   is now accepted in canonical Djex: 106 private and 147 facade tests pass,
   including 24 contextual cases and GHC witnesses. Leant's working dependency
   is now `38435709bf4e70c4b53c541c462b0bbd35837bf2`; the published gitlink remains
-  `922c5558`, and validation of the new integration is pending. Its earlier working integration and exact emitted serializer
-  compile; the first Djinn public-command subset passes. The prepared stronger
-  acceptance path now pins the actual kernel and retains each displayed
-  candidate's own graph, renderer and engine. All 14 production-runner, 12
-  extended-corpus and six partial pure controls pass. The new strict build,
-  52 focused tests, expected full 678-test inventory and 39 ordinary/where live
-  contextual cells remain pending; none of those gates is closed by pure tests.
+  `922c5558`. The new strict build and 52 focused tests pass. Two Djinn identity
+  ordinary/`where` full-type replays retain each accepted variant's own graph,
+  renderer and engine, with the actual kernel pinned. The corrected complete
+  suite passes **678/678**; its [receipt](test-context/receipts/unit-context-integration.json)
+  preserves the earlier 675/678 result and the three stale source-routing
+  assertion corrections. Production sources and bounds stayed unchanged.
+  The 39-cell ordinary/`where` contextual matrix remains open: a
+  `constant_universe` fixture failed preflight before live execution and needs
+  correction and affected-cell replay; an Exference ordinary forwarding cell
+  also reached its command timeout before any candidate. These outcomes remain
+  separate from the passing unit suite and do not establish matrix acceptance.
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked
@@ -548,10 +559,14 @@ fake-Z3 helper hashes. The
 fallback for a now-typed wildcard graph and a specific first Nat-case result.
 The corrected checks retain graph authority and the semantic case within the
 original search frontiers; both pass, with no budget increase.
-Canonical Djex's additional live repair tests now cover `first`, `best`, and
-`all` selection with exact displayed-source GHC replay; all 100 CLI tests pass.
-That acceptance does not extend the recorded Lean corpus or recursive-case
-coverage. [Bounded behavioral simplification](docs/reports/2026-09-07-bounded-behavioral-simplification.md)
+Canonical Djex's supported-fragment Haskell elaboration is complete under
+original priority 1. Its complete 101-test CLI suite retains `first`, `best`,
+and `all` repairs with exact displayed-source GHC replay, and adds preservation
+of the original compilation-failure sample when a same-candidate retry times
+out. The [canonical receipt](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/test-integration/receipts/elaboration-timeout-samples.json)
+records all 101 tests passing in 124.17 seconds and the same-deadline recovery
+control. That acceptance does not extend the recorded Lean corpus or
+recursive-case coverage; priorities 2–4 remain open. [Bounded behavioral simplification](docs/reports/2026-09-07-bounded-behavioral-simplification.md)
 now follows both decision attempts. Its 16 isolated method controls, 15 live
 queries across all three engines, and six independent candidate replays pass.
 That earlier full boundary run passed 619/620 tests; its one existing
