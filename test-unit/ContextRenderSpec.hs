@@ -82,6 +82,20 @@ tests = testGroup "direct Lean lexical context rendering"
       contains "(fun (leantLocal1 : @" $ contextRenderedExpression value
       contains "=> @leantLocal1)" $ contextRenderedExpression value
       noEvidenceHoles value
+      let residual = arrow nat $ arrow nat nat
+          sourceType = qualified [classC nat] residual
+          source = Q.TermGraphSource (nid 0)
+            [ (nid 0, node sourceType $ intro 0 1 sourceType)
+            , (nid 1, node residual $ Q.TypedLambda
+                [Q.TypedPattern (oid 1) nat Q.TypedWildcard, bind 2 0 nat] (nid 2))
+            , (nid 2, node nat $ Q.TypedLocal (oid 3) 0)
+            ]
+      wildcard <- rendered $ fixture Map.empty [] [] source
+      contains "[leantGiven0x0 :" $ contextRenderedExpression wildcard
+      contains "(leantLocal1 :" $ contextRenderedExpression wildcard
+      contains "(leantLocal2 :" $ contextRenderedExpression wildcard
+      contains "=> @leantLocal2)" $ contextRenderedExpression wildcard
+      noEvidenceHoles wildcard
   , testCase "missing class authority fails before a poisoned provider map is forced" $ do
       let (environment, graph) = duplicateFixture 0
       renderLeanContextGraph environment
@@ -135,7 +149,8 @@ tests = testGroup "direct Lean lexical context rendering"
   , testCase "refuse unsupported patterns before reaching their body" $ do
       let source = Q.TermGraphSource (nid 0)
             [ (nid 0, node (arrow nat nat) $ Q.TypedLambda
-                [Q.TypedPattern (oid 0) nat Q.TypedWildcard] (nid 1))
+                [Q.TypedPattern (oid 0) nat $ Q.TypedAs 0 $
+                  Q.TypedPattern (oid 2) nat Q.TypedWildcard] (nid 1))
             , (nid 1, node nat $ Q.TypedGlobal (oid 1) providerName)
             ]
           (environment, graph) = fixture Map.empty [] [] source

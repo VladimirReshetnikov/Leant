@@ -10,7 +10,7 @@
 module Main (main) where
 
 import Control.Concurrent (getNumCapabilities)
-import Control.Exception (SomeException, evaluate, finally, try)
+import Control.Exception (SomeException, evaluate, finally, mask_, try)
 import Control.Monad (forM_, unless, void, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char
@@ -129,6 +129,7 @@ import Leant.Synth.Engine
   , synthesizeWithProvidersSkippingDetailedWith
   , synthesizeTunedDetailedWith
   , synthesizeBehavioralWithProvidersSkippingDetailedWith
+  , synthesizeContextualWithProvidersSkippingDetailedWith
   , synthesizeBehavioralTunedDetailedWith
   , prependBehavioralLibraryOutcome
   , deferDetailedOutcome
@@ -139,6 +140,7 @@ import Leant.Synth.Engine
   , synthVerificationWindowWith
   )
 import Leant.Synth.Engine.Parallel (runParallelEitherPairOrdered)
+import Leant.Synth.CandidateObservation (candidateAcceptanceObservation)
 import Leant.Synth.Behavioral
   ( BehavioralVerdict (..)
   , BehavioralProofMethod (..)
@@ -163,6 +165,7 @@ import Leant.Synth.Fragment
   , fragUnsafeAtoms
   , glivenkoSplit
   , parseUniqueGoalTranslation
+  , parsedGoalContextSource
   , parseProviderSexp
   , propAtoms
   , providerProgramWith
@@ -214,6 +217,7 @@ import Leant.Synth.Length.Presentation
   , LengthCandidateRejectionPresentation
   , lengthCandidatePresentationNote
   , lengthCandidatePresentationText
+  , lengthCandidatePresentationVariant
   , lengthCandidateRejectionPresentationNote
   , lengthCandidateRejectionPresentationText
   , presentLengthAssessment
@@ -321,6 +325,7 @@ enableVT = pure True
 
 data ReplState = ReplState
   { rsBackend :: Maybe Backend
+  , rsBackendTrace :: Maybe (FilePath, BackendTrace)
   , rsConfig :: BackendConfig
   , rsProjectDir :: Maybe FilePath
   , rsEnv :: Maybe Integer
@@ -709,12 +714,20 @@ ensureBackendProcess st = do
     Just backend -> pure (Right (backend, False))
     Nothing -> do
       emitLn st =<< cDim st "starting Lean backend..."
-      result <- try (spawnBackend (rsConfig state))
+      let spawn = case rsBackendTrace state of
+            Nothing -> spawnBackend
+            Just (_, trace) -> spawnBackendWithTrace trace
+      -- Publish process ownership before optional, interruptible diagnostic IO.
+      result <- mask_ $ do
+        observed <- try (spawn (rsConfig state))
+        case observed of
+          Right backend -> modifyIORef' st (\s -> s { rsBackend = Just backend })
+          Left (_ :: SomeException) -> pure ()
+        pure observed
+      snapshotBackendTrace st
       case (result :: Either SomeException Backend) of
         Left err -> pure (Left (show err))
-        Right backend -> do
-          modifyIORef' st (\s -> s { rsBackend = Just backend })
-          pure (Right (backend, True))
+        Right backend -> pure (Right (backend, True))
 
 abandonReplacementBackend :: St -> Bool -> IO ()
 abandonReplacementBackend st spawned = when spawned (backendDied st)
@@ -722,13 +735,38 @@ abandonReplacementBackend st spawned = when spawned (backendDied st)
 backendDied :: St -> IO ()
 backendDied st = do
   state <- readIORef st
-  forM_ (rsBackend state) killBackend
+  snapshotBackendTrace st
+  forM_ (rsBackend state) killBackend `finally` snapshotBackendTrace st
   -- Proof states and the last-sorry handle are backend-local too. Preserve
   -- the human-readable script, but never submit either token after respawn.
   proveEmergencyExit st "the Lean backend stopped; leaving prove mode"
   modifyIORef' st $ \current ->
     invalidateProviderWorld (invalidateDerivedEnvironments current
       { rsBackend = Nothing, rsLastSorry = Nothing })
+
+-- Opt-in transport metadata is exported only at command/lifecycle boundaries,
+-- outside Backend.request's timer. No source or response payload is retained.
+-- The bounded trace survives backend replacement so request ownership remains
+-- visible. Synchronous file failures cannot replace the command's outcome.
+snapshotBackendTrace :: St -> IO ()
+snapshotBackendTrace st = void $ tryIOError $ do
+  configured <- rsBackendTrace <$> readIORef st
+  forM_ configured $ \(path, trace) -> do
+    snapshot <- readBackendTrace trace
+    let eventJson event = JObj
+          [ ("monotonic_ns", JInt $ toInteger $ backendTraceMonotonicNanoseconds event)
+          , ("backend_id", JInt $ backendTraceBackendId event)
+          , ("request_id", maybe JNull JInt $ backendTraceRequestId event)
+          , ("stage", JStr $ show $ backendTraceStage event)
+          ]
+        payload = JObj
+          [ ("format", JStr "leant-backend-trace-v1")
+          , ("clock", JStr "monotonic nanoseconds; insertion order may differ across threads")
+          , ("capacity", JInt $ toInteger $ backendTraceCapacity snapshot)
+          , ("dropped_events", JInt $ backendTraceDroppedEvents snapshot)
+          , ("events", JArr $ map eventJson $ backendTraceEvents snapshot)
+          ]
+    void $ writeFileUtf8Atomic path (encodeJson payload ++ "\n")
 
 -- Run a command in an exact backend-local environment. Nothing env = fresh
 -- (imports allowed). Callers targeting the interactive session must use
@@ -805,7 +843,9 @@ runPayloadAfterBackend st makePayload = do
             ++ (if null (trim stderrText) then "" else ":\n" ++ stderrText)
             ++ "\nhint: check that the project is built (lake build) and that "
             ++ "enough memory is available; the session replays on the next command"))
-        Left (BadResponse err) -> pure (Left ("bad response: " ++ err))
+        Left (BadResponse err) -> do
+          snapshotBackendTrace st
+          pure (Left ("bad response: " ++ err))
 
 -- Response accessors --------------------------------------------------------
 
@@ -2466,7 +2506,9 @@ runBehavioralCommand st active synthesisEnvironment code = do
                     Left (ServerClosed stderrText) -> do
                       backendDied st
                       pure (Left $ "the Lean server died during the check: " ++ trim stderrText)
-                    Left (BadResponse failure) -> pure (Left $ "bad response: " ++ failure)
+                    Left (BadResponse failure) -> do
+                      snapshotBackendTrace st
+                      pure (Left $ "bad response: " ++ failure)
 
 behavioralRequestSeconds :: St -> BehavioralRun -> IO (Maybe Int)
 behavioralRequestSeconds st active = do
@@ -2807,6 +2849,7 @@ synthGo'
 synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
   state <- readIORef st
   let fragment = pgFrag parsed
+      contextSource = parsedGoalContextSource parsed
       engine = rsSynthEngine state
       refusal = fragRefusal fragment
       limits = rsSynthLimits state
@@ -2831,7 +2874,7 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
       -- verified provider candidate must still get a chance to win.  Atomic/
       -- provider-open refusals go straight to the provider lane because the
       -- baseline has no usable structure.
-      structuralFirst = isNothing refusal
+      structuralFirst = isJust contextSource || isNothing refusal
   debug <- synthDebugEnabled st
   when (structuralFirst && debug) $
     forM_ libraryPremises $ \(name, premise) ->
@@ -2844,11 +2887,17 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
         | limit <= 0 = Nothing
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
       runSynthesis includeLibrary checked laneEngine providers accumulation =
-        let base = case behavioral of
-              Nothing -> synthesizeWithProvidersSkippingDetailedWith limits
-                laneEngine (rsSynthSteps state) checked providers fragment
-              Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits
-                laneEngine (rsSynthSteps state) checked providers fragment
+        let base = case contextSource of
+              Just (Left failure) -> Left failure
+              Just (Right source) ->
+                synthesizeContextualWithProvidersSkippingDetailedWith
+                  (isJust behavioral) limits laneEngine (rsSynthSteps state)
+                  checked providers source fragment
+              Nothing -> case behavioral of
+                Nothing -> synthesizeWithProvidersSkippingDetailedWith limits
+                  laneEngine (rsSynthSteps state) checked providers fragment
+                Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits
+                  laneEngine (rsSynthSteps state) checked providers fragment
             -- Library premises are an isolated, deliberately budgeted
             -- extension of the structural lane.  Their candidates lead the
             -- unchanged base candidates, while only the base may contribute a
@@ -2857,15 +2906,19 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
             outcome
               | includeLibrary && not (null libraryPremises) =
                   mergeLibraryForCommand base
-                    (tunedForCommand limits laneEngine
-                      (rsSynthSteps state)
-                      (synthLimitWindow limits, Just 100000)
-                      [ (name, stripRecCtors premise)
-                      | (name, premise) <- libraryPremises
-                      ]
-                      (stripRecCtors fragment) fragment)
+                    (if isJust contextSource
+                       then Right $ DetailedSynthNoTerm
+                         ["contextual library premises need exact source metadata; local contextual search remains available"]
+                       else tunedForCommand limits laneEngine
+                         (rsSynthSteps state)
+                         (synthLimitWindow limits, Just 100000)
+                         [ (name, stripRecCtors premise)
+                         | (name, premise) <- libraryPremises
+                         ]
+                         (stripRecCtors fragment) fragment)
               | otherwise = base
-        in runSynthLaneCursor behavioral assessmentContext
+        in runSynthLaneCursorWithCollection (isJust contextSource)
+          behavioral assessmentContext
           (ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits)
           deadline st goal id outcome accumulation
       tunedForCommand = case behavioral of
@@ -2894,12 +2947,14 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
           == defaultSynthLimits
       parallelStructuralBaselineStaticallyEligible =
         engine == EngineBoth
+          && isNothing contextSource
           && isNothing behavioral
           && defaultSearchBounds
           && null libraryPremises
           && not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)
       parallelLibraryBaselineStaticallyEligible =
         structuralFirst
+          && isNothing contextSource
           && isNothing behavioral
           && defaultSearchBounds
           && not (null libraryPremises)
@@ -3075,7 +3130,7 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
     disposition <- finalizeSynthLaneAccumulation st args goal
       (synthLaneRunAccumulation laneRun)
     limit <- synthTimeoutSeconds st
-    let partialSuccess = isJust behavioral && case disposition of
+    let partialSuccess = case disposition of
           SynthLaneSurvivors presentations _ -> not (null presentations)
           SynthLaneAssessmentPreserved presentations _ -> not (null presentations)
           _ -> False
@@ -3102,7 +3157,7 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
     emitLn st =<< cRed st ("synthesis engine error: " ++ err)
   report runDeadline laneRun@SynthLaneRun
       { synthLaneRunEnd = SynthLaneRunRefuted sound }
-    | sound = do
+    | sound && isNothing (parsedGoalContextSource parsed) = do
           wantClassical <- rsSynthClassical <$> readIORef st
           classicalAccumulation <-
             if wantClassical
@@ -3507,18 +3562,44 @@ runSynthLaneCursor
   -> Either String DetailedSynthOutcome
   -> SynthLaneAccumulation
   -> IO SynthLaneRun
-runSynthLaneCursor behavioral assessmentContext policy deadline st goal transform outcome
+runSynthLaneCursor = runSynthLaneCursorWithCollection False
+
+-- | The new exact-context route uses the existing incremental driver even
+-- without a named predicate. Ordinary Lean verification and the same
+-- Length assessment run on each observed group under the existing deadline.
+-- Presentation ranks only observed groups, never an unobserved full pool.
+runSynthLaneCursorWithCollection
+  :: Bool
+  -> Maybe BehavioralRun
+  -> LengthAssessmentContext command
+  -> SynthLaneCursorPolicy
+  -> Maybe UTCTime
+  -> St
+  -> String
+  -> (DetailedCandidateGroup -> DetailedCandidateGroup)
+  -> Either String DetailedSynthOutcome
+  -> SynthLaneAccumulation
+  -> IO SynthLaneRun
+runSynthLaneCursorWithCollection contextual behavioral assessmentContext policy deadline st goal transform outcome
     initialAccumulation =
   observe (1 :: Int) 0 [] [] (startDetailedSynthCursor outcome)
  where
+  incremental = contextual || isJust behavioral
+  -- Filtering keeps its existing allowance of two ordinary batches. The
+  -- hard window still bounds the total; no successor re-runs the search.
+  incrementalGroupLimit
+    | contextual && isNothing behavioral && synthLaneCursorAllowsFilterSuccessor policy =
+        fromInteger $ min (toInteger $ synthLaneCursorWindow policy)
+          (2 * toInteger (synthLaneCursorBatchSize policy))
+    | otherwise = synthLaneCursorBatchSize policy
   observe batchOrdinal groupCount reverseOutcomes runNotes cursor
-    | isJust behavioral && acceptedCount reverseOutcomes >= synthLaneCursorShown policy =
+    | incremental && acceptedCount reverseOutcomes >= synthLaneCursorShown policy =
         finish reverseOutcomes groupCount runNotes SynthLaneRunStoppedByDisposition
-    | isJust behavioral && groupCount >= synthLaneCursorBatchSize policy =
+    | incremental && groupCount >= incrementalGroupLimit =
         finish reverseOutcomes groupCount runNotes SynthLaneRunBatchPolicyReached
     | otherwise = do
       forced <- runDetailedSynthCursorBefore
-        (if isJust behavioral then 1 else synthLaneCursorBatchSize policy)
+        (if incremental then 1 else synthLaneCursorBatchSize policy)
         (synthLaneCursorWindow policy)
         deadline cursor
       case forced of
@@ -3534,11 +3615,11 @@ runSynthLaneCursor behavioral assessmentContext policy deadline st goal transfor
             when (synthLaneCursorRetainsRunNotes policy) $
               debugSynthLaneGroups st groupCount groups
             lane <- verifySynthLane behavioral assessmentContext
-              (if isJust behavioral then 1 else synthLaneCursorBatchSize policy) st goal [] groups
+              (if incremental then 1 else synthLaneCursorBatchSize policy) st goal [] groups
             let reverseOutcomes' = lane : reverseOutcomes
-            case behavioral of
-              Just _ -> observe (batchOrdinal + 1) nextCount reverseOutcomes' notes successor
-              Nothing -> case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
+            if incremental
+              then observe (batchOrdinal + 1) nextCount reverseOutcomes' notes successor
+              else case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
                 SynthLaneSurvivors _ _ ->
                   finish reverseOutcomes' nextCount notes
                     SynthLaneRunStoppedByDisposition
@@ -3568,9 +3649,11 @@ runSynthLaneCursor behavioral assessmentContext policy deadline st goal transfor
     SynthLaneAssessmentPreserved presentations _ -> length presentations
     _ -> 0
 
-  commandAccumulation = case behavioral of
-    Just _ -> behavioralSynthLaneAccumulation initialAccumulation
-    Nothing -> initialAccumulation
+  -- This existing accumulator combines exact verification receipts across
+  -- cursor steps; choosing it does not introduce a behavioral predicate.
+  commandAccumulation
+    | incremental = behavioralSynthLaneAccumulation initialAccumulation
+    | otherwise = initialAccumulation
 
   continueOrStop batchOrdinal groupCount reverseOutcomes notes successor
     | synthLaneCursorAllowsFilterSuccessor policy && batchOrdinal < 2 =
@@ -4003,6 +4086,9 @@ finalizeSynthLanePresentations st args goal presentations rejections = do
     emitLn st ("  " ++ label ++ "  " ++ term)
     forM_ (lengthCandidatePresentationNote presentation) $ \note ->
       emitLn st ("       " ++ note)
+    debug <- synthDebugEnabled st
+    when debug $ emitLn st $ "debug accepted-candidate: " ++ encodeJson
+      (candidateAcceptanceObservation i $ lengthCandidatePresentationVariant presentation)
   reportLengthAssessmentRejections st rejections
 
 reportSynthLaneNotes :: St -> [String] -> IO ()
@@ -5625,7 +5711,7 @@ replLoop :: St -> InputT IO ()
 replLoop st = do
   step <- handleInterrupt onInterrupt $ withInterrupt $ do
     input <- readLogicalInput st
-    case input of
+    continue <- case input of
       Nothing -> do
         liftIO (emitLn st =<< cDim st "goodbye")
         pure False
@@ -5639,6 +5725,8 @@ replLoop st = do
             | otherwise -> do
                 evalWithRetry text
                 pure True
+    liftIO $ snapshotBackendTrace st
+    pure continue
   when step (replLoop st)
  where
   onInterrupt = do
@@ -5815,8 +5903,16 @@ run opts = do
       ratings <- loadRatings
       synthTimeout <- initialSynthTimeoutSeconds
       synthDebug <- isJust <$> lookupEnv "LEANT_SYNTH_DEBUG"
+      tracePath <- lookupEnv "LEANT_BACKEND_TRACE"
+      backendTrace <- case tracePath of
+        Just path | not (null path) -> do
+          absolute <- makeAbsolute path
+          trace <- newBackendTrace 16384
+          pure $ Just (absolute, trace)
+        _ -> pure Nothing
       st <- newIORef ReplState
         { rsBackend = Nothing
+        , rsBackendTrace = backendTrace
         , rsConfig = config
         , rsProjectDir = project
         , rsEnv = Nothing
@@ -5873,6 +5969,7 @@ run opts = do
       -- startup probe (spawns the backend and surfaces setup problems early)
       started <- getCurrentTime
       probe <- runCmd st Nothing "#eval (0 : Nat)"
+      snapshotBackendTrace st
       case probe of
         Left err -> do
           emitLn st =<< cRed st "the Lean backend failed to start:"
@@ -5951,4 +6048,5 @@ run opts = do
       state <- readIORef st
       when (isJust (rsTranscript state)) (transcriptStop st)
       forM_ (rsBackend state) killBackend
+      snapshotBackendTrace st
       forM_ (rsSnapshotBase state) cleanupSnapshotBase

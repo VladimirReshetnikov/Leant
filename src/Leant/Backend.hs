@@ -14,6 +14,13 @@ module Leant.Backend
   , findProject
   , isBuiltProject
   , spawnBackend
+  , BackendTrace
+  , BackendTraceEvent (..)
+  , BackendTraceStage (..)
+  , BackendTraceSnapshot (..)
+  , newBackendTrace
+  , readBackendTrace
+  , spawnBackendWithTrace
   , killBackend
   , request
   , RequestError (..)
@@ -48,8 +55,13 @@ import Control.Exception
 import Control.Monad (filterM, forM)
 import qualified Data.ByteString as ByteString
 import Data.List (sortOn)
+import Data.Foldable (toList)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.Maybe (catMaybes, listToMaybe)
 import Data.Ord (Down (..))
+import qualified Data.Sequence as Seq
+import Data.Word (Word64)
+import GHC.Clock (getMonotonicTimeNSec)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TextEncoding
 import Data.Text.Encoding.Error (lenientDecode)
@@ -84,6 +96,7 @@ import System.Process
   , ProcessHandle
   , StdStream (..)
   , createProcess
+  , getPid
   , proc
   , terminateProcess
   )
@@ -94,9 +107,7 @@ import System.Process (waitForProcess)
 #else
 import Control.Concurrent (threadDelay)
 import Control.Exception (uninterruptibleMask_)
-import Data.Word (Word64)
-import GHC.Clock (getMonotonicTimeNSec)
-import System.Process (Pid, getPid, getProcessExitCode)
+import System.Process (Pid, getProcessExitCode)
 #endif
 
 #ifndef mingw32_HOST_OS
@@ -136,6 +147,7 @@ data Backend = Backend
   , beErrDone :: MVar ()
   , beErrThread :: ThreadId
   , beCleanupState :: MVar BackendCleanupState
+  , beTrace :: Maybe BackendTraceLink
   }
 
 data BackendCleanupState
@@ -153,6 +165,120 @@ data RequestError
   | RequestTimeout
   | BadResponse String
   deriving (Show)
+
+-- | Optional transport observation. No source text, JSON payloads, file IO,
+-- or additional threads are retained. A caller may export snapshots outside
+-- the request path. Capacity is clamped to 0..16384; older events are dropped
+-- with an explicit count. Diagnostic clocks and bookkeeping add small overhead
+-- when enabled and do not move the existing response-read timeout boundary.
+newtype BackendTrace = BackendTrace (IORef BackendTraceState)
+
+data BackendTraceState = BackendTraceState
+  { traceCapacity :: !Int
+  , traceDropped :: !Integer
+  , traceNextBackend :: !Integer
+  , traceNextRequest :: !Integer
+  , traceEvents :: !(Seq.Seq BackendTraceEvent)
+  }
+
+data BackendTraceLink = BackendTraceLink !BackendTrace !Integer
+
+data BackendTraceEvent = BackendTraceEvent
+  { backendTraceMonotonicNanoseconds :: !Word64
+  , backendTraceBackendId :: !Integer
+  , backendTraceRequestId :: !(Maybe Integer)
+  , backendTraceStage :: !BackendTraceStage
+  }
+  deriving (Eq, Show)
+
+-- | Stdout capture events belong to the backend, not an inferred request:
+-- its read can start before a request is sent or finish after cancellation.
+-- ProcessCreated reports only the public process API's owned wrapper PID.
+-- In particular Windows Job handles may report Nothing; this is not a PID
+-- for an inferred lake/repl descendant. An external owned-process census can
+-- supply those identities without changing transport ownership.
+data BackendTraceStage
+  = TraceSpawnStarted
+  | TraceProcessCreated !(Maybe Integer)
+  | TracePipesReady
+  | TraceSpawnFailed
+  | TraceRequestStarted !(Maybe Int)
+  | TraceWriteStarted
+  | TraceWriteCompleted
+  | TraceFlushCompleted
+  | TraceSendFailed
+  | TraceResponseReadStarted
+  | TraceResponseFirstLine
+  | TraceResponseDelimiter
+  | TraceResponseReadCompleted
+  | TraceRequestTimedOut
+  | TraceResponseTransportFailed
+  | TraceResponseParsed
+  | TraceResponseInvalidJson
+  | TraceRequestInterrupted
+  | TraceStdoutReadStarted
+  | TraceStdoutLineRead !Bool -- ^ True for an empty delimiter line.
+  | TraceStdoutReadFailed
+  | TraceStdoutQueued
+  | TraceCleanupStarted
+  | TraceCleanupCompleted
+  | TraceCleanupFailed
+  deriving (Eq, Show)
+
+data BackendTraceSnapshot = BackendTraceSnapshot
+  { backendTraceCapacity :: !Int
+  , backendTraceDroppedEvents :: !Integer
+  , backendTraceEvents :: [BackendTraceEvent]
+  }
+  deriving (Eq, Show)
+
+newBackendTrace :: Int -> IO BackendTrace
+newBackendTrace capacity = BackendTrace <$> newIORef BackendTraceState
+  { traceCapacity = max 0 (min 16384 capacity)
+  , traceDropped = 0
+  , traceNextBackend = 1
+  , traceNextRequest = 1
+  , traceEvents = Seq.empty
+  }
+
+-- | In insertion order. Concurrent capture/request timestamps need not be
+-- sorted: an event can be preempted between reading the clock and insertion.
+-- Reading a snapshot does not clear or otherwise change the trace.
+readBackendTrace :: BackendTrace -> IO BackendTraceSnapshot
+readBackendTrace (BackendTrace reference) = do
+  state <- readIORef reference
+  pure BackendTraceSnapshot
+    { backendTraceCapacity = traceCapacity state
+    , backendTraceDroppedEvents = traceDropped state
+    , backendTraceEvents = toList $ traceEvents state
+    }
+
+newTraceLink :: Maybe BackendTrace -> IO (Maybe BackendTraceLink)
+newTraceLink Nothing = pure Nothing
+newTraceLink (Just trace@(BackendTrace reference)) = do
+  identifier <- atomicModifyIORef' reference $ \state ->
+    (state { traceNextBackend = traceNextBackend state + 1 }, traceNextBackend state)
+  pure $ Just $ BackendTraceLink trace identifier
+
+newTraceRequest :: Maybe BackendTraceLink -> IO (Maybe Integer)
+newTraceRequest Nothing = pure Nothing
+newTraceRequest (Just (BackendTraceLink (BackendTrace reference) _)) =
+  Just <$> atomicModifyIORef' reference (\state ->
+    (state { traceNextRequest = traceNextRequest state + 1 }, traceNextRequest state))
+
+recordTrace :: Maybe BackendTraceLink -> Maybe Integer -> BackendTraceStage -> IO ()
+recordTrace Nothing _ _ = pure ()
+recordTrace (Just (BackendTraceLink (BackendTrace reference) identifier)) requestId stage = do
+  observed <- getMonotonicTimeNSec
+  let event = BackendTraceEvent observed identifier requestId stage
+  atomicModifyIORef' reference $ \state ->
+    let full = Seq.length (traceEvents state) >= traceCapacity state
+        retained
+          | traceCapacity state == 0 = Seq.empty
+          | full = Seq.drop 1 (traceEvents state) Seq.|> event
+          | otherwise = traceEvents state Seq.|> event
+    in (state { traceEvents = retained
+              , traceDropped = traceDropped state + if full then 1 else 0 }, ())
 
 -- Discovery -----------------------------------------------------------------
 
@@ -254,7 +380,17 @@ isBuiltProject dir =
 -- a dedicated stderr-capture thread.  Exceptions during startup tear the
 -- partially created process down before propagating.
 spawnBackend :: BackendConfig -> IO Backend
-spawnBackend config = mask $ \restore -> do
+spawnBackend = spawnBackendObserved Nothing
+
+spawnBackendWithTrace :: BackendTrace -> BackendConfig -> IO Backend
+spawnBackendWithTrace trace config = do
+  link <- newTraceLink (Just trace)
+  recordTrace link Nothing TraceSpawnStarted
+  spawnBackendObserved link config
+    `onException` recordTrace link Nothing TraceSpawnFailed
+
+spawnBackendObserved :: Maybe BackendTraceLink -> BackendConfig -> IO Backend
+spawnBackendObserved trace config = mask $ \restore -> do
   created <- createProcess
     (proc (bcLakePath config) ["env", bcReplExe config])
       { cwd = Just (bcWorkingDir config)
@@ -283,6 +419,16 @@ spawnBackend config = mask $ \restore -> do
         ioError $ userError "backend process did not create all three pipes"
  where
   finish restore hIn hOut hErr ph processGroupIdentifier = do
+    -- This optional observation is inside the same owned cleanup boundary as
+    -- handle preparation: a diagnostic failure cannot abandon the created Job.
+    case trace of
+      Nothing -> pure ()
+      Just _ -> do
+        identifier <- tryIOError $ getPid ph
+        let available = case identifier of
+              Right (Just pid) -> Just $ toInteger pid
+              _ -> Nothing
+        recordTrace trace Nothing $ TraceProcessCreated available
     _ <- restore $ do
       mapM_ prepareText [hIn, hOut]
       hSetBinaryMode hErr True
@@ -292,10 +438,11 @@ spawnBackend config = mask $ \restore -> do
     outputDone <- newEmptyMVar
     done <- newEmptyMVar
     cleanupState <- newMVar BackendCleanupNotStarted
+    recordTrace trace Nothing TracePipesReady
     drainThread <- forkIOWithUnmask $ \unmask ->
       unmask (captureStderr hErr capture) `finally` putMVar done ()
     outputThread <- forkIOWithUnmask $ \unmask ->
-      unmask (captureStdout hOut outputLines)
+      unmask (captureStdout trace hOut outputLines)
         `finally` putMVar outputDone ()
     pure Backend
       { beIn = hIn
@@ -310,6 +457,7 @@ spawnBackend config = mask $ \restore -> do
       , beErrDone = done
       , beErrThread = drainThread
       , beCleanupState = cleanupState
+      , beTrace = trace
       }
 
   prepareText h = do
@@ -539,6 +687,7 @@ closeQuietly handle = do
 -- the remaining handles.
 killBackend :: Backend -> IO ()
 killBackend backend = mask_ $ do
+  recordTrace (beTrace backend) Nothing TraceCleanupStarted
   completion <- modifyMVar (beCleanupState backend) $ \state -> case state of
     BackendCleanupNotStarted -> do
       done <- newEmptyMVar
@@ -551,7 +700,9 @@ killBackend backend = mask_ $ do
         putMVar done attempted
       pure (BackendCleanupRunning done, done)
     BackendCleanupRunning done -> pure (state, done)
-  readMVar completion >>= either throwIO pure
+  (readMVar completion >>= either throwIO pure)
+    `onException` recordTrace (beTrace backend) Nothing TraceCleanupFailed
+  recordTrace (beTrace backend) Nothing TraceCleanupCompleted
 
 cleanupBackend :: Backend -> IO ()
 cleanupBackend backend = mask_ $
@@ -616,46 +767,78 @@ runCleanupPreservingPrimaryFailure primaryAction cleanupAction =
 request :: Backend -> Maybe Int {-^ timeout, seconds -} -> JValue
         -> IO (Either RequestError JValue)
 request backend timeoutSecs payload = do
-  sendResult <- try $ do
-    hPutStr (beIn backend) (encodeJson payload ++ "\n\n")
-    hFlush (beIn backend)
-  case (sendResult :: Either IOException ()) of
-    Left _ -> Left . ServerClosed <$> drainStderr backend
-    Right () -> do
-      response <- withTimeout (readResponse backend)
-      case response of
-        Nothing -> pure (Left RequestTimeout)
-        Just (Left err) -> pure (Left err)
-        Just (Right text) -> case parseJson text of
-          Left err -> pure (Left (BadResponse (err ++ "\nin: " ++ text)))
-          Right v -> pure (Right v)
+  identifier <- newTraceRequest $ beTrace backend
+  let observe = recordTrace (beTrace backend) identifier
+      perform = do
+        observe $ TraceRequestStarted timeoutSecs
+        sendResult <- try $ do
+          observe TraceWriteStarted
+          hPutStr (beIn backend) (encodeJson payload ++ "\n\n")
+          observe TraceWriteCompleted
+          hFlush (beIn backend)
+          observe TraceFlushCompleted
+        case (sendResult :: Either IOException ()) of
+          Left _ -> do
+            observe TraceSendFailed
+            Left . ServerClosed <$> drainStderr backend
+          Right () -> do
+            observe TraceResponseReadStarted
+            response <- withTimeout (readResponse backend identifier)
+            case response of
+              Nothing -> do
+                observe TraceRequestTimedOut
+                pure (Left RequestTimeout)
+              Just (Left err) -> do
+                observe TraceResponseTransportFailed
+                pure (Left err)
+              Just (Right text) -> do
+                observe TraceResponseReadCompleted
+                case parseJson text of
+                  Left err -> do
+                    observe TraceResponseInvalidJson
+                    pure (Left (BadResponse (err ++ "\nin: " ++ text)))
+                  Right v -> do
+                    observe TraceResponseParsed
+                    pure (Right v)
+  perform `onException` observe TraceRequestInterrupted
  where
   withTimeout action = case timeoutSecs of
     Nothing -> Just <$> action
     Just secs -> timeout (secs * 1000000) action
 
-readResponse :: Backend -> IO (Either RequestError String)
-readResponse backend = go []
+readResponse :: Backend -> Maybe Integer -> IO (Either RequestError String)
+readResponse backend identifier = go []
  where
   go acc = do
     line <- takeBackendOutputLine backend
     case (line :: Either IOException String) of
       Left _ -> Left . ServerClosed <$> drainStderr backend
       Right l
-        | null l && not (null acc) -> pure (Right (unlines (reverse acc)))
+        | null l && not (null acc) -> do
+            recordTrace (beTrace backend) identifier TraceResponseDelimiter
+            pure (Right (unlines (reverse acc)))
         | null l -> go acc  -- leading blank line; keep waiting
-        | otherwise -> go (l : acc)
+        | otherwise -> do
+            if null acc
+              then recordTrace (beTrace backend) identifier TraceResponseFirstLine
+              else pure ()
+            go (l : acc)
 
 -- Windows process pipes use a blocking read that cannot be interrupted by
 -- System.Timeout. Keep that read in its owned capture thread and let requests
 -- wait on an interruptible MVar instead. One pending line provides backpressure
 -- without retaining an unbounded stream while a request is cancelled.
-captureStdout :: Handle -> MVar (Either IOException String) -> IO ()
-captureStdout handle outputLines = go
+captureStdout :: Maybe BackendTraceLink -> Handle -> MVar (Either IOException String) -> IO ()
+captureStdout trace handle outputLines = go
  where
   go = do
+    recordTrace trace Nothing TraceStdoutReadStarted
     observed <- try $ hGetLine handle
+    recordTrace trace Nothing $ case observed of
+      Left _ -> TraceStdoutReadFailed
+      Right line -> TraceStdoutLineRead $ null line
     putMVar outputLines observed
+    recordTrace trace Nothing TraceStdoutQueued
     case observed of
       Left _ -> pure ()
       Right _ -> go

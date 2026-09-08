@@ -161,6 +161,31 @@ The [direct stdout](receipts/native-direct-5s.stdout.txt) and
 the startup durations and exact timeout responses; their bytes match the
 process hashes in the diagnostic receipt.
 
+The later [owned request-trace comparison](receipts/native-request-traces.json)
+records a passing native Djinn length query (17.744 seconds) and exact kernel
+replay. Its False control passes with fourteen falsifications and no behavioral
+inconclusives, although two separate transport/type-verification timeouts still
+occur. Append remains unaccepted: its positive query records ten falsifications
+and two inconclusives, while its False control also fails the acceptance gate.
+These are focused diagnostic results under the original search and timeout
+bounds, not a completed native or cross-engine fold matrix.
+
+All four traces retain complete bounded event inventories with zero drops.
+Append's first timed-out request receives its first subsequent producer stdout
+line about 466 milliseconds after the five-second timeout. Trace v1 records
+backend/request ownership and transport stages but no request payload or purpose;
+mapping that request to the candidate's negative-decision check is explicitly
+an inference from sequential execution. The next diagnostic must correlate
+actual request payloads and verification roles before choosing a fix. This
+evidence does not establish a transport defect or justify increasing deadlines.
+
+For local timing diagnostics, set `LEANT_BACKEND_TRACE` to a fresh JSON file
+path before starting Leant. The opt-in trace retains at most 16,384 events,
+reports dropped events, and is written at command and backend lifecycle
+boundaries. It includes monotonic timestamps and process/request identities,
+but no source or response payloads. Concurrent event insertion order can differ
+from timestamp order; stdout-capture events have no inferred request identity.
+
 The supplied family declares fresh FoldFixture.Seq, Tree, and Count datatypes,
 their equality instances, and two structurally recursive fold definitions.
 Automatic SizeOf generation is disabled on these datatype declarations so

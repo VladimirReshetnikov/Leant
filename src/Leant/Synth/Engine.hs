@@ -114,6 +114,7 @@ module Leant.Synth.Engine
   , synthVerificationWindowWith
   , synthesizeTunedDetailedWith
   , synthesizeWithProvidersSkippingDetailedWith
+  , synthesizeContextualWithProvidersSkippingDetailedWith
   , synthesizeBehavioralWithProvidersSkippingDetailedWith
   , synthesizeBehavioralTunedDetailedWith
   , advanceDetailedSynthCursorWith
@@ -131,10 +132,11 @@ module Leant.Synth.Engine
   , leanNonStrictConstructorArities
   ) where
 
+import Control.Monad (unless, when, void)
 import Data.Foldable (toList)
 import Data.List (intercalate, isPrefixOf, nub, nubBy, sortOn)
 import Data.Bifunctor (first, second)
-import Data.Maybe (catMaybes, isNothing, mapMaybe)
+import Data.Maybe (catMaybes, isJust, isNothing, mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Void (Void)
@@ -237,6 +239,9 @@ import Language.Haskell.Djex
   , typedCandidateCompatibility
   , typedCandidateTermGraph
   , TermGraph
+  , TermNodeForm (TypedContextIntroduction, TypedContextApplication)
+  , termNodeForm
+  , termGraphNodes
   , exferenceSessionInventory
   , exferenceRequestQuery
   )
@@ -258,6 +263,7 @@ import Leant.Synth.Observability
 
 import Leant.Synth.Fragment
   ( AppHead (..)
+  , contextSourceFragment
   , ExactContextArgument (..)
   , Frag (..)
   , fragChildren
@@ -279,6 +285,10 @@ import Leant.Synth.Fragment
   , maximumProviderArgumentKindArity
   , maximumProviderExactForallDomains
   , renameFragBinder
+  )
+import Leant.Synth.ContextSource
+  ( ContextSource, PreparedContextSource, prepareContextSource
+  , renderPreparedContextGraph
   )
 import Leant.Synth.Render
   ( CtorInfo (..)
@@ -789,14 +799,24 @@ renderExactTypedVariantOrigin
     $ renderOriginTermGraph id origin graph
 
 renderOriginTermGraph
-  :: (local -> String) -> PreparedSemanticOrigin -> TermGraph ty local
+  :: (Ord variable, Ord local)
+  => (local -> String) -> PreparedSemanticOrigin -> TermGraph (Type variable) local
   -> Either String [String]
-renderOriginTermGraph localName origin = renderLeanTermGraphProjection localName
-  (semanticOriginConstructorMap origin)
-  (providerMapFromBindings $ semanticOriginProviderBindings origin)
-  (semanticOriginTypeMap origin)
-  (premiseLayoutForRenderer $ semanticOriginPremiseLayout origin)
-  (semanticOriginFitFragment origin)
+renderOriginTermGraph localName origin graph = case semanticOriginContextSource origin of
+  Just source -> renderPreparedContextGraph source graph
+  Nothing
+    | any (contextNode . termNodeForm . snd) (termGraphNodes graph) ->
+        Left "context-source: checked lexical-Given graph has no exact source metadata"
+    | otherwise -> renderLeanTermGraphProjection localName
+        (semanticOriginConstructorMap origin)
+        (providerMapFromBindings $ semanticOriginProviderBindings origin)
+        (semanticOriginTypeMap origin)
+        (premiseLayoutForRenderer $ semanticOriginPremiseLayout origin)
+        (semanticOriginFitFragment origin) graph
+ where
+  contextNode TypedContextIntroduction{} = True
+  contextNode TypedContextApplication{} = True
+  contextNode _ = False
 
 indexDetailedCandidateVariants :: [String] -> [DetailedCandidateVariant]
 indexDetailedCandidateVariants = zipWith
@@ -899,6 +919,43 @@ streamDetailedQueryResultsWithEvidence window render finish =
               else (Just rendered, Set.insert key seen)
     in StreamObserved group observedNotes $
       candidates (remaining - 1) seen' observedNotes rest progress evidence results
+
+-- The exact contextual lane must report a missing graph or unsupported
+-- metadata projection at its observed position. Its raw window is charged
+-- before duplicate filtering, and no unobserved continuation is preflighted.
+streamContextualQueryResults
+  :: Int
+  -> (candidate -> Either String DetailedCandidateGroup)
+  -> (QueryEvidence -> [String] -> DetailedSynthOutcome)
+  -> [Either String (QueryResult metadata candidate)]
+  -> DetailedSynthOutcome
+streamContextualQueryResults window render finish =
+  DetailedSynthStreaming . batches (max 0 window) Set.empty []
+ where
+  capped notes = nub $ notes ++
+    ["search truncated: candidate limit reached (" ++ show window ++ ")"]
+  batches 0 _ notes _ = StreamFinished $ capped notes
+  batches _ _ notes [] = StreamFinished notes
+  batches _ _ _ (Left failure : _) = StreamFailed failure
+  batches remaining seen _ (Right result : rest) =
+    let batch = resultSearch result
+        progress = batchProgress batch
+        notes = progressNotesWith window progress
+    in candidates remaining seen notes (batchCandidates batch) progress
+      (resultEvidence result) rest
+  candidates 0 _ notes _ _ _ _ = StreamFinished $ capped notes
+  candidates remaining seen notes [] progress evidence results = case progress of
+    Continuing -> batches remaining seen notes results
+    Completed _ -> outcomeStream $ finish evidence notes
+  candidates remaining seen notes (candidate : rest) progress evidence results =
+    case render candidate of
+      Left failure -> StreamFailed failure
+      Right rendered ->
+        let key = detailedCandidateGroupVariants rendered
+            group = if Set.member key seen then Nothing else Just rendered
+            observedNotes = if remaining == 1 then capped notes else notes
+        in StreamObserved group observedNotes $
+          candidates (remaining - 1) (Set.insert key seen) observedNotes rest progress evidence results
 
 outcomeStream :: DetailedSynthOutcome -> DetailedCandidateStream
 outcomeStream outcome = case outcome of
@@ -1439,6 +1496,24 @@ synthesizeWithProvidersSkippingDetailedWith limits engine steps checked
     (synthLimitWindow limits, synthLimitBudget limits)
     checked providers [] frag frag
 
+-- | Production lexical-Given route. The exact packet owns the complete source
+-- fragment; ambient providers without equivalent complete packets are refused.
+-- Ordinary and behavioral callers share preparation and exact-origin replay.
+synthesizeContextualWithProvidersSkippingDetailedWith
+  :: Bool -> SynthLimits -> SynthEngine -> Int -> Set.Set String
+  -> [ProviderFrag] -> ContextSource -> Frag -> Either String DetailedSynthOutcome
+synthesizeContextualWithProvidersSkippingDetailedWith streaming limits engine steps checked
+    providers source frag = do
+  unless (null providers) $
+    Left "context-source: global provider inventory requires complete source metadata"
+  unless (frag == contextSourceFragment source) $
+    Left "context-source: packet does not own the supplied search fragment"
+  let run = runTunedSynthesisWithContext (Just source) streaming limits True engine steps
+        (synthLimitWindow limits, synthLimitBudget limits) checked [] [] frag frag
+  -- Exact-context collection is incremental in both command modes. The
+  -- Boolean still owns behavioral search policy, including unused inputs.
+  Right $ deferDetailedOutcome run
+
 -- | Named behavioral queries consume the same bounded backend trace as it
 -- arrives, rather than waiting to rank a complete frontend candidate pool.
 synthesizeBehavioralWithProvidersSkippingDetailedWith
@@ -1531,41 +1606,51 @@ runTunedSynthesisWithCollection
   -> SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
   -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
   -> Either String DetailedSynthOutcome
-runTunedSynthesisWithCollection streaming limits
+runTunedSynthesisWithCollection = runTunedSynthesisWithContext Nothing
+
+runTunedSynthesisWithContext
+  :: Maybe ContextSource -> Bool -> SynthLimits -> Bool
+  -> SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
+  -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
+  -> Either String DetailedSynthOutcome
+runTunedSynthesisWithContext contextSource streaming limits
     multiConstructorPatterns engine steps djinnLimits checked providers extras
     engineFrag fitFrag
-  | streaming && engine == EngineBoth = Right $
+  | incrementalCollection && engine == EngineBoth = Right $
       mergeDetailedOutcomesSkippingWith limits checked
         (deferDetailedOutcome $ single EngineDjinn)
         (deferDetailedOutcome $ single EngineExference)
   | otherwise = case engine of
     EngineDjinn -> do
-      prepared <- prepareSynthesis djinnRecursiveProjection
+      prepared <- prepareSynthesisWithContext contextSource djinnRecursiveProjection
         providers extras engineFrag fitFrag
-      outcome <- djinnRun streaming limits djinnLimits prepared
+      outcome <- djinnRun incrementalCollection limits djinnLimits prepared
       pure
         (withoutCheckedDetailedCandidates checked
           (asCollection outcome))
     EngineExference -> do
-      prepared <- prepareSynthesis exferenceRecursiveProjection
+      prepared <- prepareSynthesisWithContext contextSource exferenceRecursiveProjection
         providers extras engineFrag fitFrag
-      outcome <- exferenceRun streaming limits multiConstructorPatterns steps prepared
+      outcome <- exferenceRun incrementalCollection streaming limits multiConstructorPatterns steps prepared
       pure (withoutCheckedDetailedCandidates checked outcome)
     EngineBoth -> do
-      djinnPrepared <- prepareSynthesis djinnRecursiveProjection
+      djinnPrepared <- prepareSynthesisWithContext contextSource djinnRecursiveProjection
         providers extras engineFrag fitFrag
-      djinn <- djinnRun streaming limits djinnLimits djinnPrepared
-      exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
+      djinn <- djinnRun incrementalCollection limits djinnLimits djinnPrepared
+      exferencePrepared <- prepareSynthesisWithContext contextSource exferenceRecursiveProjection
         providers extras engineFrag fitFrag
-      exference <- exferenceRun streaming limits multiConstructorPatterns steps
+      exference <- exferenceRun incrementalCollection streaming limits multiConstructorPatterns steps
         exferencePrepared
       pure (mergeDetailedOutcomesSkippingWith limits checked (asCollection djinn) exference)
  where
-  single selected = runTunedSynthesisWithCollection True limits
+  -- Collection does not authorize behavioral policy or change a request's
+  -- unused-input setting. Ordinary context-free lanes retain their pool.
+  incrementalCollection = streaming || isJust contextSource
+  single selected = runTunedSynthesisWithContext contextSource streaming limits
     multiConstructorPatterns selected steps djinnLimits Set.empty providers extras
     engineFrag fitFrag
   asCollection outcome
-    | streaming = DetailedSynthStreaming $ outcomeStream outcome
+    | incrementalCollection = DetailedSynthStreaming $ outcomeStream outcome
     | otherwise = outcome
 
 -- | Prepare one engine-specific translation without erasing which goal came
@@ -1581,7 +1666,15 @@ prepareSynthesis
   -> Frag
   -> Frag
   -> Either String PreparedSynthesis
-prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag = do
+prepareSynthesis = prepareSynthesisWithContext Nothing
+
+prepareSynthesisWithContext
+  :: Maybe ContextSource -> RecursiveProjection -> [ProviderFrag]
+  -> [(String, Frag)] -> Frag -> Frag -> Either String PreparedSynthesis
+prepareSynthesisWithContext contextSource recursiveProjection activeProviders extras engineFrag fitFrag = do
+  when (contextSource /= Nothing) $ do
+    unless (null activeProviders && null extras && engineFrag == fitFrag) $
+      Left "context-source: provider, premise or changed fitting target lacks exact metadata"
   translation <- prepareProviderGroundFactTranslation
     recursiveProjection activeProviders extras engineFrag
   let sourceGoal = translationSourceGoal translation
@@ -1608,6 +1701,11 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
           ForallType variables constraints (insertOuter body)
         body -> antecedents constructorPremises (insertInner body)
       searchGoal = insertOuter sourceGoal
+  contextual <- traverse (\source -> do
+    unless (null constructorPremises && null callerPremises) $
+      Left "context-source: constructor or caller premises require source metadata"
+    prepareContextSource (translationContextClasses translation)
+      (translationContextNominals translation) sourceGoal source) contextSource
   (providerBindings, providerDeclarations) <-
     providerDeclarationsFromBindings
       (translationDeclarations translation) draftProviderBindings
@@ -1628,11 +1726,13 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
         , semanticOriginPremiseLayout = premiseLayout
         , semanticOriginProjectionCompleteness =
             translationProjectionCompleteness translation
+        , semanticOriginContextSource = contextual
         }
       renderPremiseLayout = premiseLayoutForRenderer
         $ semanticOriginPremiseLayout semanticOrigin
-      render expr =
-        renderLeanTerm
+      render expr = case contextual of
+        Just _ -> Left "context-source: compatibility erasure cannot render lexical Given evidence"
+        Nothing -> renderLeanTerm
           (semanticOriginConstructorMap semanticOrigin)
           providerMap
           (semanticOriginTypeMap semanticOrigin)
@@ -1641,13 +1741,7 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
       renderGraph
         :: TermGraph ExferenceType ExferenceLocal
         -> Either String [String]
-      renderGraph graph =
-        renderLeanTermGraphProjection (("x" ++) . show)
-          (semanticOriginConstructorMap semanticOrigin)
-          providerMap
-          (semanticOriginTypeMap semanticOrigin)
-          renderPremiseLayout
-          (semanticOriginFitFragment semanticOrigin) graph
+      renderGraph = renderOriginTermGraph (("x" ++) . show) semanticOrigin
   pure PreparedSynthesis
     { preparedSemanticOrigin = semanticOrigin
     , preparedRenderExpression = render
@@ -1722,7 +1816,9 @@ djinnRun streaming limits laneBounds@(cutoff, budget) prepared = do
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
   session <-
-    if null decls
+    if semanticOriginContextSource origin /= Nothing
+      then viaShow (mkEnvironment decls) >>= viaDiagnostic . mkDjinnSession
+    else if null decls
       then Right standard
       else do
         environment <- viaShow $ mkEnvironment
@@ -1782,17 +1878,28 @@ djinnRun streaming limits laneBounds@(cutoff, budget) prepared = do
           ("only a recursive reference to the definition itself would inhabit \
            \this type" : notes)
         NoEvidence -> DetailedSynthNoTerm notes
+      checkedContextCandidate candidate = do
+        graph <- either (Left . ("context-source: missing Djinn graph: " ++) . show) Right $
+          typedCandidateTermGraph candidate
+        _ <- renderOriginTermGraph id origin graph
+        maybe (Left "context-source: checked Djinn projection lost its source group") (Right . snd) $
+          renderCandidate candidate
   if streaming
     then do
       results <- viaDiagnostic
         (runDjinnTypedQueryStreamWithKindedInstantiationAssignments
           session instantiations request)
-      pure $ streamDetailedQueryResultsWithEvidence (min cutoff window)
-        (fmap snd . renderCandidate) terminal (map (first renderDiagnostic) results)
+      pure $ case semanticOriginContextSource origin of
+        Just _ -> streamContextualQueryResults (min cutoff window)
+          checkedContextCandidate terminal (map (first renderDiagnostic) results)
+        Nothing -> streamDetailedQueryResultsWithEvidence (min cutoff window)
+          (fmap snd . renderCandidate) terminal (map (first renderDiagnostic) results)
     else do
       result <- viaDiagnostic
         (runDjinnTypedQueryWithKindedInstantiationAssignments
           session instantiations request)
+      when (semanticOriginContextSource origin /= Nothing) $
+        mapM_ (void . checkedContextCandidate) $ take cutoff $ batchCandidates $ resultSearch result
       let batch = resultSearch result
           notes = progressNotesWith window (batchProgress batch)
           rendered = mapMaybe renderCandidate $ take cutoff $ batchCandidates batch
@@ -1811,12 +1918,15 @@ djinnRun streaming limits laneBounds@(cutoff, budget) prepared = do
 -- Exference's own ranking; there is never negative evidence.
 exferenceRun
   :: Bool
+    -- ^ incremental collection, independently of behavioral verification
+  -> Bool
+    -- ^ behavioral search policy: admit unused inputs immediately
   -> SynthLimits
   -> Bool
   -> Int
   -> PreparedSynthesis
   -> Either String DetailedSynthOutcome
-exferenceRun streaming limits multiConstructorPatterns steps prepared = do
+exferenceRun streaming behavioral limits multiConstructorPatterns steps prepared = do
   standard <- viaDiagnostic standardDjinnSession
   let semanticOrigin = preparedSemanticOrigin prepared
       render = preparedRenderExpression prepared
@@ -1828,7 +1938,9 @@ exferenceRun streaming limits multiConstructorPatterns steps prepared = do
         [ (providerBindingPrivateSpelling binding, providerBindingRenderInfo binding)
         | binding <- semanticOriginProviderBindings semanticOrigin
         ]
-      standardDecls = environmentDeclarations (djinnSessionEnvironment standard)
+      standardDecls
+        | semanticOriginContextSource semanticOrigin /= Nothing = []
+        | otherwise = environmentDeclarations (djinnSessionEnvironment standard)
       allDecls = standardDecls ++ decls
       requiredTypes = goal :
         [ argument
@@ -1948,17 +2060,34 @@ exferenceRun streaming limits multiConstructorPatterns steps prepared = do
                     (candidateGraphObservation exferenceSourceGraphAbsenceReason availability reconstructed)
             notes = maybe [] (progressNotesWith (synthLimitWindow limits))
               (selectionProgress selection)
-        pure $ if streaming
-          then normalizeStreamingOutcome $ streamDetailedQueryResults
-            (synthLimitWindow limits) renderGroup results
-          else if null groups then DetailedSynthNoTerm notes
-            else DetailedSynthCandidates groups notes
+            checkedContextGroup candidate = do
+              graph <- either (Left . ("context-source: missing Exference graph: " ++) . show) Right $
+                typedCandidateTermGraph candidate
+              _ <- renderGraph graph
+              maybe (Left "context-source: checked Exference projection lost its source group") Right $
+                renderGroup candidate
+        case semanticOriginContextSource semanticOrigin of
+          Just _ | streaming -> pure $ normalizeStreamingOutcome $
+            streamContextualQueryResults (synthLimitWindow limits) checkedContextGroup
+              (\_ -> DetailedSynthNoTerm) (map Right results)
+          Just _ -> do
+            exactGroups <- traverse checkedContextGroup $
+              take (synthLimitWindow limits) $ selectionCandidates selection
+            let distinct = takeDistinctOn detailedCandidateGroupVariants
+                  (synthLimitWindow limits) exactGroups
+            pure $ if null distinct then DetailedSynthNoTerm notes
+              else DetailedSynthCandidates distinct notes
+          Nothing -> pure $ if streaming
+            then normalizeStreamingOutcome $ streamDetailedQueryResults
+              (synthLimitWindow limits) renderGroup results
+            else if null groups then DetailedSynthNoTerm notes
+              else DetailedSynthCandidates groups notes
       runPatternLanes activeSession useMultiConstructorPatterns
         -- Named behavioral queries must admit implementations that ignore
         -- inputs or constructor fields. A typed but behaviorally false strict
         -- candidate cannot authorize withholding those other implementations.
         -- Choose the permissive policy within each existing bounded lane.
-        | streaming = runLane activeSession useMultiConstructorPatterns True
+        | behavioral = runLane activeSession useMultiConstructorPatterns True
         | otherwise = do
             strict <- runLane activeSession useMultiConstructorPatterns False
             case strict of
@@ -2767,6 +2896,8 @@ data SynthesisTranslation = SynthesisTranslation
   , translationCallerPremises :: [TranslatedPremise]
   , translationConstructorPremises :: [TranslatedPremise]
   , translationProjectionCompleteness :: ProjectionCompleteness
+  , translationContextClasses :: Map.Map String (Name, [Int])
+  , translationContextNominals :: Map.Map String (Name, Int)
   }
 
 -- | Values produced inside the translation state before its declaration and
@@ -2829,6 +2960,7 @@ data PreparedSemanticOrigin = PreparedSemanticOrigin
   , semanticOriginTypeMap :: TypeMap
   , semanticOriginPremiseLayout :: PremiseLayout
   , semanticOriginProjectionCompleteness :: ProjectionCompleteness
+  , semanticOriginContextSource :: Maybe PreparedContextSource
   }
   deriving (Eq, Show)
 
@@ -3562,6 +3694,9 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
         translationProductCallerPremises translatedProduct
     , translationConstructorPremises = constructorPremises
     , translationProjectionCompleteness = projection
+    , translationContextClasses = tsContextClasses finalState
+    , translationContextNominals = Map.map
+        (\family -> (appTypeName family, appTypeArity family)) $ tsAppFamilies finalState
     }
  where
   -- The pure pre-translation pipeline: bound and filter provider

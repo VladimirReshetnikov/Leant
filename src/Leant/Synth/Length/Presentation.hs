@@ -15,6 +15,7 @@ module Leant.Synth.Length.Presentation
   , presentLengthSelectionResult
   , presentLengthSpinePairSelectionResult
   , lengthCandidatePresentationText
+  , lengthCandidatePresentationVariant
   , lengthCandidatePresentationNote
   , lengthCandidateRejectionPresentationText
   , lengthCandidateRejectionPresentationNote
@@ -170,7 +171,7 @@ import Leant.Synth.Verification
 -- exact callback receipt.  Both fields stay lazy so merely checking whether a
 -- result is empty preserves the established candidate-payload demand.
 data LengthCandidatePresentation = LengthCandidatePresentation
-  String
+  (Verified DetailedVerificationVariant)
   (Maybe String)
 
 -- | One omitted candidate and the exact independently replayed evidence
@@ -183,7 +184,15 @@ data LengthCandidateRejectionPresentation =
 lengthCandidatePresentationText
   :: LengthCandidatePresentation
   -> String
-lengthCandidatePresentationText (LengthCandidatePresentation text _) = text
+lengthCandidatePresentationText (LengthCandidatePresentation receipt _) = verifiedText receipt
+
+-- | The same callback-accepted variant retained through selection and ranking.
+-- Observers must use this receipt rather than finding evidence by text in an
+-- earlier candidate batch, where equal spellings can have different owners.
+lengthCandidatePresentationVariant
+  :: LengthCandidatePresentation -> DetailedVerificationVariant
+lengthCandidatePresentationVariant (LengthCandidatePresentation receipt _) =
+  verifiedCandidate receipt
 
 -- | The rendered Length note for this candidate, if its ranked assessment
 -- produced one (counterexample, simplification, bounded-positive, or
@@ -298,7 +307,7 @@ presentLengthSelectionCandidate
       DetailedVerificationVariant LengthSelectionRetention
   -> LengthCandidatePresentation
 presentLengthSelectionCandidate selected = LengthCandidatePresentation
-  (verifiedText $ behaviorallySelectedVerified selected)
+  (behaviorallySelectedVerified selected)
   $ presentLengthSelectionRetention
   $ behaviorallySelectedRetention selected
 
@@ -321,7 +330,7 @@ presentLengthSpinePairSelectionCandidate
       DetailedVerificationVariant LengthSpinePairSelectionRetention
   -> LengthCandidatePresentation
 presentLengthSpinePairSelectionCandidate selected = LengthCandidatePresentation
-  (verifiedText $ behaviorallySelectedVerified selected)
+  (behaviorallySelectedVerified selected)
   $ presentLengthSpinePairSelectionRetention
   $ behaviorallySelectedRetention selected
 
@@ -386,7 +395,7 @@ presentRankedCandidate
   :: RankedLengthCandidate
   -> LengthCandidatePresentation
 presentRankedCandidate ranked = LengthCandidatePresentation
-  (verifiedText $ rankedLengthCandidateVerified ranked)
+  (rankedLengthCandidateVerified ranked)
   $ case rankedLengthCandidateAssessment ranked of
       Counterexample receipt -> Just $ case
           rankedLengthCandidateCounterexampleSimplification ranked of
@@ -410,7 +419,7 @@ presentRankedLengthSpinePairCandidate
   :: RankedLengthSpinePairCandidate
   -> LengthCandidatePresentation
 presentRankedLengthSpinePairCandidate ranked = LengthCandidatePresentation
-  (verifiedText $ rankedLengthSpinePairCandidateVerified ranked)
+  (rankedLengthSpinePairCandidateVerified ranked)
   $ case rankedLengthSpinePairCandidateAssessment ranked of
       LengthSpinePairCounterexample receipt -> Just
         $ case rankedLengthSpinePairCandidateCounterexampleSimplification
@@ -430,7 +439,7 @@ presentUnassessedCandidate
   :: Verified DetailedVerificationVariant
   -> LengthCandidatePresentation
 presentUnassessedCandidate receipt =
-  LengthCandidatePresentation (verifiedText receipt) Nothing
+  LengthCandidatePresentation receipt Nothing
 
 verifiedText
   :: Verified DetailedVerificationVariant

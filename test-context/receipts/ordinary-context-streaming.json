@@ -1,0 +1,2367 @@
+{
+  "schema_version": 1,
+  "status": "ordinary_context_increment_accepted",
+  "scope": "Ordinary exact-context collection increment: consume bounded groups before demanding a full ordinary candidate pool, preserving exact owned request/graph observations. Accepted evidence includes the original 54 focused tests and four repaired public cells, the later corrected complete 680-test serial suite, and a fresh complete 39-cell public matrix with 18 exact independently replayed outputs, three actual False controls and 18 expected metadata refusals. Historical failures and source/executable pins remain recorded separately.",
+  "previous_checkpoint": {
+    "path": "test-context/receipts/production-context-initial.json",
+    "sha256": "971161be23e66593bb5cfd74f5c92c187560b7e7ee7616ef9d31204c5818091b"
+  },
+  "patch": {
+    "manifest": {
+      "path": "dist-newstyle/context-ordinary-stream-patch-v1/v4/manifest.json",
+      "sha256": "e6c2ae8a8a65dec12cb58dd88b479de82c0b13bd711963ac34242af054bfaa55"
+    },
+    "manifest_status_note": "Preparation manifest says prepared only; applied bytes independently matched both original acceptance source manifests and files at initial receipt creation. The subsequent Spec-only correction is recorded separately without rewriting the original pins.",
+    "changed_files": [
+      {
+        "path": "src/Leant/Synth/Engine.hs",
+        "before_sha256": "938ed002991edede9790e56a723c688dcaefa2c38668efeb01f3fd3ce3164667",
+        "applied_sha256": "400bf73433a2bd181e6a11eb6bb729509f27c3930c75f2f71838604b0222e256",
+        "role": "production"
+      },
+      {
+        "path": "src/Main.hs",
+        "before_sha256": "1774f806f7e469ae38e11e092e29d5e54500cf14b863f98bc9d362d1c4b07775",
+        "applied_sha256": "477b077281055303de859db0ae3bb6c65f8a42564bdb0b09fefb6d3997eaf0b5",
+        "role": "production"
+      },
+      {
+        "path": "test-unit/Spec.hs",
+        "before_sha256": "dc9f20844dd10952349cce65039cc59f9eed28a9189fee9331d709f391845787",
+        "applied_sha256": "6c34e82383700f3f3046808d31987c7bc27b96b3f581ac3d6d4a658c8a8d1c47",
+        "role": "test"
+      },
+      {
+        "path": "test-unit/ContextSourceSpec.hs",
+        "before_sha256": "f8c4d123e19ecf8196bcf7ec20580a719471317252d968388fe74749641e742c",
+        "applied_sha256": "d094e9cfbb666423b84a0ce1d502d85712bddbebdb94c51da655cac46c721a0d",
+        "role": "test"
+      }
+    ]
+  },
+  "strict_build": {
+    "status": "passed",
+    "log": {
+      "path": "dist-newstyle/context-ordinary-incremental-build-v1.log",
+      "sha256": "38ed82455fcb4f33aa0554a3883350e61337d7b936144073fa8d6fa6e54ace8c"
+    },
+    "targets": [
+      "exe:leant",
+      "test:leant-synth-tests"
+    ],
+    "exit_code": 0,
+    "completion_evidence": "Coordinator-observed strict build, tool session67586 exit0. Log independently contains successful links for both targets."
+  },
+  "focused": {
+    "result": {
+      "path": "dist-newstyle/context-ordinary-focused-v1/results.json",
+      "sha256": "d4a375812001f579a6cf90aa1101ad2b22b41b31fa4b6e829d0e64b3e0200d48"
+    },
+    "status": "passed",
+    "expected": 54,
+    "enumerated_unique": 54,
+    "observed_passing_rows": 54,
+    "failing_rows": 0,
+    "tasty_seconds": 2.38,
+    "pattern": "/Production lexical Given source metadata/ || /direct Lean lexical context rendering/ || /opt-in backend transport trace/",
+    "inventory_sha256": "0108c8806d050841bade6009364183a59ab5cc3987c1510aa73de94245723df9",
+    "inventory_digest_format": "Exact ordered names, UTF-8 without BOM, LF, final LF included.",
+    "inventory_capture": {
+      "path": "dist-newstyle/context-ordinary-focused-v1/inventory.stdout.txt",
+      "sha256": "68889cb9f2e0b869ffcd29a0ef2afc014b58bc5071dbe58bee7757b033da8125"
+    },
+    "test_executable": {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+      "sha256": "6cb4d2e87b324f5ab4dd0684f084c910b0c40352766041ed1f302feee64a9277"
+    },
+    "command": [
+      "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+      "-j1",
+      "--timeout=180s",
+      "-p",
+      "/Production lexical Given source metadata/ || /direct Lean lexical context rendering/ || /opt-in backend transport trace/"
+    ],
+    "process": {
+      "label": "focused",
+      "exit_code": 0,
+      "wall_seconds": 2.4593719999538735,
+      "stdout": {
+        "path": "dist-newstyle/context-ordinary-focused-v1/focused.stdout.txt",
+        "sha256": "e3e0ad1fc4b9de873d19db3d685678d0acb1668577e8dcf4ef9d023df342d47f"
+      },
+      "stderr": {
+        "path": "dist-newstyle/context-ordinary-focused-v1/focused.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "sources_unchanged": true,
+    "executable_unchanged": true,
+    "source_manifest_sha256": "6e99857dd7b32a68360a5232680ece68701290268ffff6e80276365baabc48cd"
+  },
+  "public_repair": {
+    "result": {
+      "path": "dist-newstyle/context-production-ordinary-repair-v1/results.json",
+      "sha256": "2d80ee5f5fa03771bc3c0ab53fe31bacde04678a51e91b5f58e99cd62cc28681"
+    },
+    "status": "passed",
+    "cell_count": 4,
+    "exact_outputs_replayed": 4,
+    "finite_payload_observations": 16,
+    "candidate_replay_empty_axiom_inventories": 32,
+    "settings": {
+      "window": 32,
+      "verify": 32,
+      "steps": 20000,
+      "budget": 20000,
+      "timeout": 45,
+      "process_timeout": 120,
+      "provider_cap": 80,
+      "strategy": "interleave",
+      "shown": 1,
+      "ranking": "balanced",
+      "debug": true,
+      "library": false,
+      "classical": false,
+      "providers": "off except explicit global_metadata refusal control"
+    },
+    "executable": {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+      "sha256": "a6a767110cf489f8e2571c748a30a0cb2899b691fbba4916120d9fb433dce613"
+    },
+    "kernel": {
+      "path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+      "sha256_before": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+      "invocation": "direct absolute kernel executable; no PATH lookup or elan proxy",
+      "sha256_after": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810"
+    },
+    "integrity": {
+      "sources_unchanged": true,
+      "executable_unchanged": true,
+      "kernel_executable_unchanged": true,
+      "commands_unchanged": true,
+      "kernel_sources_unchanged": true
+    },
+    "source_manifest_entries": 234,
+    "source_manifest_sha256": "c6b672c6647e2cd7578bc07169051079426217cf078055af15eaeee25549a5f4",
+    "preflights": [
+      {
+        "label": "forwarding-syntax",
+        "status": "passed",
+        "source": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/forwarding-syntax.lean",
+          "sha256": "3817d6c3cf835b0820f3b2048b6784ef376c7ea7f2ebfc2f058b40767e186bd9"
+        },
+        "empty_axiom_inventory_count": 8,
+        "process": {
+          "label": "forwarding-syntax",
+          "exit_code": 0,
+          "wall_seconds": 1.7801280000130646,
+          "stdout": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/forwarding-syntax.stdout.txt",
+            "sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546"
+          },
+          "stderr": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/forwarding-syntax.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "label": "forwarding-oracle",
+        "status": "passed",
+        "source": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/forwarding-oracle.lean",
+          "sha256": "88604bb6bb1ce302788608e826c954609129cd74b4b001aae0b7ff40b6e8a4b0"
+        },
+        "empty_axiom_inventory_count": 10,
+        "process": {
+          "label": "forwarding-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.8353541999822482,
+          "stdout": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/forwarding-oracle.stdout.txt",
+            "sha256": "eaa3b2267765d71f7de3fa6ca6db0f64c5b22c8dde61facf0a0ed8e484e61a51"
+          },
+          "stderr": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/forwarding-oracle.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "label": "local_given-syntax",
+        "status": "passed",
+        "source": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/local_given-syntax.lean",
+          "sha256": "93cba25cdd3f885dfc33094cc91fa7279fb1df69b1928733589e8d2c94007f6e"
+        },
+        "empty_axiom_inventory_count": 8,
+        "process": {
+          "label": "local_given-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.9188269000151195,
+          "stdout": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/local_given-syntax.stdout.txt",
+            "sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546"
+          },
+          "stderr": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/local_given-syntax.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "label": "local_given-oracle",
+        "status": "passed",
+        "source": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/local_given-oracle.lean",
+          "sha256": "bec9b95dad2cf7ffa764cad41ba8ced73ca86a0637206c406fefc11ae1253fdd"
+        },
+        "empty_axiom_inventory_count": 10,
+        "process": {
+          "label": "local_given-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.9069041999755427,
+          "stdout": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/local_given-oracle.stdout.txt",
+            "sha256": "6d30dad8717bf33a5a6e6ac51363d41377087172429c82e7d86b51232ea9ee0b"
+          },
+          "stderr": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/local_given-oracle.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      }
+    ],
+    "cells": [
+      {
+        "name": "context_exference_ordinary_forwarding",
+        "status": "passed",
+        "source_type": "(∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token) → (∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token)",
+        "candidate": "((fun (leantLocal21 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal21) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "e51a8dc2d96f3b250e9916f98f5589b6641fc2910dd5e5a9c581300af8ca2e97",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "commands": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_forwarding.commands.txt",
+          "sha256": "b45b00e68165ebd597a06d9030c50368d560c61b368e1ed3521770b0140921f1"
+        },
+        "input": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_forwarding-live.input.txt",
+          "sha256": "c3153784b3edd2dffc21a42cb5930c7f4504a462b51c3361c08d2f724e5eb39d"
+        },
+        "live": {
+          "label": "context_exference_ordinary_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 20.59880019997945,
+          "stdout": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_forwarding-live.stdout.txt",
+            "sha256": "947a21647777ce222f130e85515e1b6cb3674ffd3e84ac674558dfb6da5a3c32"
+          },
+          "stderr": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_forwarding-live.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "replay": {
+          "source": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_forwarding-replay.lean",
+            "sha256": "6ad26fe0c707273476667e9c17b9acd89478a6887d2e239e07e6837d6250ac09"
+          },
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observations": 4,
+          "process": {
+            "label": "context_exference_ordinary_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.7973331999965012,
+            "stdout": {
+              "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_forwarding-replay.stdout.txt",
+              "sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d"
+            },
+            "stderr": {
+              "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_forwarding-replay.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      },
+      {
+        "name": "context_exference_ordinary_local_given",
+        "status": "passed",
+        "source_type": "∀ (α : Type), [ContextProduction.Dictionary α] → (∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token) → α → ContextProduction.Token",
+        "candidate": "((fun (leantType55 : Type) => (fun [leantGiven67x0 : @_root_.«ContextProduction».«Dictionary» (leantType55)] => (fun (leantLocal80 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @(let leantHead94 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType55)], (leantType55 → @_root_.«ContextProduction».«Token»)) := @(let leantHead109 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal80; @leantHead109 (leantType55)); @leantHead94 leantGiven67x0)))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "982672f22e9cd2f04fc7ebe9c94cc4d42cd9a015bfbc504e5997f95e26869478",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 6,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "commands": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_local_given.commands.txt",
+          "sha256": "a54e8cf0e776655d170d7e6183eb39b9d451c63561d49f8cfdfe39cf146d36ea"
+        },
+        "input": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_local_given-live.input.txt",
+          "sha256": "539d9cf783407a6c5f051df5fc3053f1b37914eb0b117cbdce90f08fef21b2f5"
+        },
+        "live": {
+          "label": "context_exference_ordinary_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 7.504657800018322,
+          "stdout": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_local_given-live.stdout.txt",
+            "sha256": "c5d54af0b015b8757e33b5c89685bbe99cbee6da8b8a90ac69e55f9f9d09fcb8"
+          },
+          "stderr": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_local_given-live.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "replay": {
+          "source": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_local_given-replay.lean",
+            "sha256": "2155640d6b12c547b4a2c3a455229fc1239a2f8672c9f976c6a701893e401d19"
+          },
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observations": 4,
+          "process": {
+            "label": "context_exference_ordinary_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6899044000310823,
+            "stdout": {
+              "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_local_given-replay.stdout.txt",
+              "sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d"
+            },
+            "stderr": {
+              "path": "dist-newstyle/context-production-ordinary-repair-v1/context_exference_ordinary_local_given-replay.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      },
+      {
+        "name": "context_both_ordinary_forwarding",
+        "status": "passed",
+        "source_type": "(∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token) → (∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token)",
+        "candidate": "((fun (leantLocal0 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal0) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "2f1f1769e5f69cce907b88ce02d29703163ff1c3fc2deb49aee7ab1a78a5abc0",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "commands": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_forwarding.commands.txt",
+          "sha256": "3656ddcf6b728d8129c02d55d6058f4261372fbc9cd2049d4555c495614981d2"
+        },
+        "input": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_forwarding-live.input.txt",
+          "sha256": "0b3b69516a545a78984ad33b79dc24a7b1bbafa5e01145c4aa1d35721c121045"
+        },
+        "live": {
+          "label": "context_both_ordinary_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 6.77451179997297,
+          "stdout": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_forwarding-live.stdout.txt",
+            "sha256": "72fa4d18dd0803d13d6c8653ddea04a65a1c491c48deb3bb62854b28fa034b56"
+          },
+          "stderr": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_forwarding-live.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "replay": {
+          "source": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_forwarding-replay.lean",
+            "sha256": "c17665573b524a4c7f6ed6b78db52357aa0f52a4f357621643e7de4f203eb0c4"
+          },
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observations": 4,
+          "process": {
+            "label": "context_both_ordinary_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6798555999994278,
+            "stdout": {
+              "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_forwarding-replay.stdout.txt",
+              "sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d"
+            },
+            "stderr": {
+              "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_forwarding-replay.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      },
+      {
+        "name": "context_both_ordinary_local_given",
+        "status": "passed",
+        "source_type": "∀ (α : Type), [ContextProduction.Dictionary α] → (∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token) → α → ContextProduction.Token",
+        "candidate": "((fun (leantType170 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType170)] => (fun (leantLocal5 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) (leantLocal9 : leantType170) => @(let leantHead104 : (leantType170 → @_root_.«ContextProduction».«Token») := @(let leantHead90 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType170)], (leantType170 → @_root_.«ContextProduction».«Token»)) := @(let leantHead65 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal5; @leantHead65 (leantType170)); @leantHead90 leantGiven2x0); @leantHead104 (@leantLocal9 : leantType170))))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "fc7b1a406846602281829937e9e3fdf3104667634c4cf6145339a52cc7e16538",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 8,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "commands": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_local_given.commands.txt",
+          "sha256": "92f4a8cd12229ddc97d72b320caf0e6ba77cac04fe51d898b55aea41db8c94b9"
+        },
+        "input": {
+          "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_local_given-live.input.txt",
+          "sha256": "63b3c373f36e954a64b474dfa61e6e09991c9d37a42812283493a4847ca0c2f8"
+        },
+        "live": {
+          "label": "context_both_ordinary_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 6.5861572999856435,
+          "stdout": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_local_given-live.stdout.txt",
+            "sha256": "1c293ae97f0b8568ab12a8ab7a3782a8405b0da7c30da240e0614d8ce0bf7e2c"
+          },
+          "stderr": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_local_given-live.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "replay": {
+          "source": {
+            "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_local_given-replay.lean",
+            "sha256": "f5c859bb4a923c7beb65ea05d1da558153153c6bf25e80198ad10b4fa9de4748"
+          },
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observations": 4,
+          "process": {
+            "label": "context_both_ordinary_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6955370999639854,
+            "stdout": {
+              "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_local_given-replay.stdout.txt",
+              "sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d"
+            },
+            "stderr": {
+              "path": "dist-newstyle/context-production-ordinary-repair-v1/context_both_ordinary_local_given-replay.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "manifest_digest_format": "UTF-8 without BOM; each original SHA256, two spaces, repo-relative path normalized to forward slashes, LF; complete lines sorted ordinal, final LF included.",
+  "review": {
+    "mode": "Read/hash-only inspection and receipt construction; no compiler, kernel, synthesis or tests executed.",
+    "captures_rehashed": 28,
+    "command_and_input_files_rehashed": 8,
+    "kernel_sources_rehashed": 8,
+    "exact_candidate_observation_hashes_checked": 4,
+    "command_input_relation": "Prepared LF commands and captured Windows CRLF stdin retain independent raw hashes and equal text after only CRLF-to-LF normalization."
+  },
+  "pending": [
+    "No claim of support for the 18 explicitly refused global-provider or universe-metadata cells.",
+    "No inference that this contextual checkpoint establishes native recursor behavioral acceptance."
+  ],
+  "full_suite_initial_attempt": {
+    "status": "failed",
+    "result": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v1/results.json",
+      "sha256": "a859e118568e02f35ccdcc1b597320c5d48299bcee8e9946395cecf864050c3a"
+    },
+    "expected": 680,
+    "enumerated_unique": 680,
+    "passed": 677,
+    "failed": 3,
+    "tasty_seconds": 269.87,
+    "process_seconds": 269.977841200016,
+    "suite_exit_code": 1,
+    "command": [
+      "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+      "-j1"
+    ],
+    "stdout": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v1/unit.stdout.txt",
+      "sha256": "508f0f8936b8e71e9c6652c78ada23b1d1461e1bcd3bb46a9cfa71d40be986a8"
+    },
+    "stderr": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v1/unit.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v1/inventory.json",
+      "sha256": "f9eb1b9cb6fb5eabe0d10d1a8eb770bc941b566d80dc3240e6bf54e98c086886"
+    },
+    "test_names": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v1/test-names.txt",
+      "sha256": "43f03085c04cc726e85a4480df7f8875fc5754c8711c90b2bd56dd2c4d851d98"
+    },
+    "test_executable": {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+      "sha256": "6cb4d2e87b324f5ab4dd0684f084c910b0c40352766041ed1f302feee64a9277"
+    },
+    "integrity": {
+      "sources_unchanged": true,
+      "executables_unchanged": true
+    },
+    "failures": [
+      "Leant synthesis boundary.checked Length behavioral ranking.explicit ranking policy.current bounded ranking configuration file.explicit Length assessment integration.scope one nominal context per established or inline command",
+      "Leant synthesis boundary.checked Length behavioral ranking.explicit ranking policy.current bounded ranking configuration file.explicit Length assessment integration.continue providers and classical retries after every nonterminal lane",
+      "Leant synthesis boundary.checked Length behavioral ranking.explicit ranking policy.current bounded ranking configuration file.explicit Length assessment integration.scope parallel work to default structural engine or library pairs"
+    ],
+    "captured_failure_details": [
+      "Spec.hs:16790: expected nominal-context source count7, got8.",
+      "Spec.hs:17274: constructive scheduling lost its serial or two parallel cursors.",
+      "Spec.hs:17408: expected ordinary call-site count3, got2."
+    ],
+    "source_review": "Coordinator/source review identifies three stale source-text assertions after the separate serial contextual wrapper. This failed aggregate is preserved; the later Spec-only correction, successful three-test focused rerun, and successful complete 680-test rerun are recorded separately."
+  },
+  "source_structure_followup": {
+    "status": "strict rebuild, three corrected source-structure assertions, and complete 680-test rerun passed",
+    "scope": "Only test-unit/Spec.hs changed after the recorded 54 focused passes and four public repaired cells. Original source manifests and executable pins remain attached to those original runs.",
+    "source_change": {
+      "path": "test-unit/Spec.hs",
+      "before_sha256": "6c34e82383700f3f3046808d31987c7bc27b96b3f581ac3d6d4a658c8a8d1c47",
+      "after_sha256": "8798eb71fd1c3afe013e13da07ddc1e5070534cae4b7b8bb05097cf11e1200f6",
+      "reason": "Update the nominal-context count to eight and distinguish the new serial contextual wrapper from the two ordinary parallel call sites."
+    },
+    "unchanged_applied_files": [
+      {
+        "path": "src/Leant/Synth/Engine.hs",
+        "sha256": "400bf73433a2bd181e6a11eb6bb729509f27c3930c75f2f71838604b0222e256"
+      },
+      {
+        "path": "src/Main.hs",
+        "sha256": "477b077281055303de859db0ae3bb6c65f8a42564bdb0b09fefb6d3997eaf0b5"
+      },
+      {
+        "path": "test-unit/ContextSourceSpec.hs",
+        "sha256": "d094e9cfbb666423b84a0ce1d502d85712bddbebdb94c51da655cac46c721a0d"
+      }
+    ],
+    "strict_build": {
+      "log": {
+        "path": "dist-newstyle/context-ordinary-incremental-build-v2.log",
+        "sha256": "c4ffcdae86381ca9e5961c85f6e739bd59bf1407fb9ba8250adcd37f2cc4139d"
+      },
+      "result": "passed",
+      "exit_code": 0,
+      "process_session": "58113",
+      "evidence_boundary": "Coordinator observed strict build completion and exit zero; the retained log records rebuilding and linking the test executable from the changed Spec.hs."
+    },
+    "focused": {
+      "passed": 3,
+      "failed": 0,
+      "tasty_seconds": 0.18,
+      "log": {
+        "path": "dist-newstyle/context-ordinary-source-structure-v1.log",
+        "sha256": "5d8dcf34f98084990a1722c47bb8fc3dd480df424201d90603b5ecaa72bf4e8c"
+      },
+      "inventory": {
+        "path": "dist-newstyle/context-ordinary-source-structure-v1-inventory.txt",
+        "sha256": "bf920b401c28bf0ffee81738513f14a521f48227127e923e41ea804d805de2da"
+      },
+      "tests": [
+        "Leant synthesis boundary.checked Length behavioral ranking.explicit ranking policy.current bounded ranking configuration file.explicit Length assessment integration.scope one nominal context per established or inline command",
+        "Leant synthesis boundary.checked Length behavioral ranking.explicit ranking policy.current bounded ranking configuration file.explicit Length assessment integration.continue providers and classical retries after every nonterminal lane",
+        "Leant synthesis boundary.checked Length behavioral ranking.explicit ranking policy.current bounded ranking configuration file.explicit Length assessment integration.scope parallel work to default structural engine or library pairs"
+      ],
+      "evidence_boundary": "The exact three-name inventory equals the prior aggregate failure inventory; the captured log contains three OK rows and the complete success summary."
+    },
+    "complete_rerun": {
+      "status": "passed",
+      "result_path": "dist-newstyle/priority-context-unit-incremental-v2/results.json",
+      "summary_section": "full_suite_final",
+      "note": "Recorded separately with complete inventory, raw capture, source and executable identity checks."
+    }
+  },
+  "full_suite_final": {
+    "status": "passed",
+    "result": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v2/results.json",
+      "sha256": "936d7ad64360a0297191e6a0dc9ee94bd591d98a4087df7881bf87f9bb7ed0e8"
+    },
+    "scope": "Complete unfiltered serial suite on the later Spec-only correction; identical 680-name inventory to the preserved failed attempt.",
+    "expected": 680,
+    "enumerated_unique": 680,
+    "passed": 680,
+    "failed": 0,
+    "tasty_seconds": 293.73,
+    "process_seconds": 293.86290470004315,
+    "suite_exit_code": 0,
+    "command": [
+      "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+      "-j1"
+    ],
+    "started_utc": "2026-09-08T05:00:50Z",
+    "finished_utc": "2026-09-08T05:05:44Z",
+    "process_timeout_seconds": 1200,
+    "timed_out": false,
+    "stdout": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v2/unit.stdout.txt",
+      "sha256": "c0d9f97a4803d1b8dbdfc1ff1fa282fca77bba692c99d56cfce2c234d6bb3bf8"
+    },
+    "stderr": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v2/unit.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v2/inventory.json",
+      "sha256": "fbc29326f04f30b461ee0db50f3de1a3321468065df65dd683af71c1e071c29f"
+    },
+    "test_names": {
+      "path": "dist-newstyle/priority-context-unit-incremental-v2/test-names.txt",
+      "sha256": "43f03085c04cc726e85a4480df7f8875fc5754c8711c90b2bd56dd2c4d851d98"
+    },
+    "test_executable": {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+      "sha256": "88437a71c211ac2f23b652453c21e445bf8af4b12aa40c88c1228a924e362a41"
+    },
+    "fake_z3_executable": {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\djex-2026.7.17\\x\\djex-fake-z3\\build\\djex-fake-z3\\djex-fake-z3.exe",
+      "sha256": "5f0886b05030bf9f4ee18cf1746da6e82063bdc14d612d6d9900f726e483e135"
+    },
+    "integrity": {
+      "sources_unchanged": true,
+      "executables_unchanged": true,
+      "source_manifest_count": 233,
+      "source_manifest_sha256": "93621373aeafa3c12a824442e7393d20b2ce69979ff1893ffb8c8b2cac0d52f1",
+      "only_source_change_since_failed_full_run": "test-unit/Spec.hs",
+      "source_change_sha256": "8798eb71fd1c3afe013e13da07ddc1e5070534cae4b7b8bb05097cf11e1200f6",
+      "same_680_name_inventory": true
+    },
+    "independent_review": "Rehashed the result, both completed process captures, and both inventories; compared all before/after source and executable manifest entries, the sole Spec change from the failed attempt, all 680 unique names, 680 raw OK rows, and the complete Tasty success summary. No tests were rerun."
+  },
+  "public_matrix_final": {
+    "original_result": {
+      "path": "dist-newstyle/context-production-incremental-all-v1/results.json",
+      "sha256": "2937acf6827bf7671e1bc8d8ba1af4141f01be70324b541748534ddf7f34ec0e",
+      "status": "passed",
+      "runner_exit_code": 0,
+      "exit_code_provenance": "Coordinator observed terminal session29979 exit0; original passed receipt and all 71 completed zero-exit child processes independently checked.",
+      "runner_session": "29979"
+    },
+    "raw_artifact_directory": "dist-newstyle/context-production-incremental-all-v1",
+    "artifact_naming": "Process labels name .stdout.txt/.stderr.txt and optional .input.txt captures; cell names name .commands.txt; kernel process labels name .lean sources.",
+    "process_manifest": {
+      "path": "dist-newstyle/context-production-incremental-all-v1/processes.json",
+      "sha256": "fe9ed965cae1eeb0bf679d089a2cf74bb92b28a66c23e96a589f32e1c978eb79",
+      "process_count": 71,
+      "all_completed": true,
+      "process_guard_timeouts": 0
+    },
+    "summary": {
+      "payload_observations": 72,
+      "preflight_empty_axiom_inventories": 124,
+      "timeout": 0,
+      "live": 39,
+      "accepted": 18,
+      "false_inconclusive_decisions": 0,
+      "false_candidate_decisions": 4,
+      "replay_axioms": 144,
+      "fixture": 0,
+      "false": 3,
+      "refusal": 18
+    },
+    "settings": {
+      "window": 32,
+      "verify": 32,
+      "steps": 20000,
+      "budget": 20000,
+      "timeout": 45,
+      "process_timeout": 120,
+      "provider_cap": 80,
+      "strategy": "interleave",
+      "shown": 1,
+      "ranking": "balanced",
+      "debug": true,
+      "library": false,
+      "classical": false,
+      "providers": "off except explicit global_metadata refusal control"
+    },
+    "selected": {
+      "engines": [
+        "djinn",
+        "exference",
+        "both"
+      ],
+      "modes": [
+        "ordinary",
+        "where"
+      ],
+      "operations": [
+        "identity",
+        "forwarding",
+        "local_given",
+        "reject_all",
+        "higher_universe",
+        "constant_universe",
+        "global_metadata"
+      ]
+    },
+    "observed_process_time": {
+      "first_started_utc": "2026-09-08T05:06:05Z",
+      "last_finished_utc": "2026-09-08T05:11:37Z",
+      "summed_child_wall_seconds": 328.95571760012535,
+      "boundary": "Per-process wall times are actual measurements. UTC endpoints are retained at their original one-second resolution, not claimed as an outer runner duration."
+    },
+    "executable": {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+      "sha256": "a6a767110cf489f8e2571c748a30a0cb2899b691fbba4916120d9fb433dce613",
+      "live_command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain"
+      ]
+    },
+    "kernel": {
+      "path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+      "sha256_before": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+      "invocation": "direct absolute kernel executable; no PATH lookup or elan proxy",
+      "sha256_after": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810"
+    },
+    "integrity": {
+      "sources_unchanged": true,
+      "executable_unchanged": true,
+      "kernel_executable_unchanged": true,
+      "commands_unchanged": true,
+      "kernel_sources_unchanged": true
+    },
+    "source_manifest": {
+      "entries": 234,
+      "sha256": "98d2698d4292b00ae7b51a189b4536e0915619ceb3b5f8330960d21364785ea7",
+      "before_equals_after": true,
+      "digest_format": "UTF-8 without BOM; each original SHA256, two spaces, repo-relative path normalized to forward slashes, LF; complete lines sorted ordinal, final LF included."
+    },
+    "preflights": [
+      {
+        "label": "identity-syntax",
+        "status": "passed",
+        "source_sha256": "a1fa95d1aaa630373a4452f04b1183a0cb0689b3fff7c6990b7558ba7aa3abbb",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "identity-syntax",
+          "exit_code": 0,
+          "wall_seconds": 2.5115167000330985,
+          "started_utc": "2026-09-08T05:06:05Z",
+          "finished_utc": "2026-09-08T05:06:07Z",
+          "stdout_sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "identity-oracle",
+        "status": "passed",
+        "source_sha256": "61e092680b3f450e477c5497e53879bbe7cf37e3f4909f2937ba70122ca6757e",
+        "declared_inventory_count": 9,
+        "process": {
+          "label": "identity-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.6275741000426933,
+          "started_utc": "2026-09-08T05:06:07Z",
+          "finished_utc": "2026-09-08T05:06:08Z",
+          "stdout_sha256": "b99394867cc05008c3d6dba8d4f56253297ac1553ebc4237ffe8b784fb87e4c2",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "forwarding-syntax",
+        "status": "passed",
+        "source_sha256": "3817d6c3cf835b0820f3b2048b6784ef376c7ea7f2ebfc2f058b40767e186bd9",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "forwarding-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.6224821000359952,
+          "started_utc": "2026-09-08T05:06:08Z",
+          "finished_utc": "2026-09-08T05:06:08Z",
+          "stdout_sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "forwarding-oracle",
+        "status": "passed",
+        "source_sha256": "88604bb6bb1ce302788608e826c954609129cd74b4b001aae0b7ff40b6e8a4b0",
+        "declared_inventory_count": 10,
+        "process": {
+          "label": "forwarding-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.5952089000493288,
+          "started_utc": "2026-09-08T05:06:08Z",
+          "finished_utc": "2026-09-08T05:06:09Z",
+          "stdout_sha256": "1904714b0d6db56f47f23b404fb86d883d25eb49d2c733da0d40ea24f371ad59",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "local_given-syntax",
+        "status": "passed",
+        "source_sha256": "93cba25cdd3f885dfc33094cc91fa7279fb1df69b1928733589e8d2c94007f6e",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "local_given-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.5981517000473104,
+          "started_utc": "2026-09-08T05:06:09Z",
+          "finished_utc": "2026-09-08T05:06:10Z",
+          "stdout_sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "local_given-oracle",
+        "status": "passed",
+        "source_sha256": "bec9b95dad2cf7ffa764cad41ba8ced73ca86a0637206c406fefc11ae1253fdd",
+        "declared_inventory_count": 10,
+        "process": {
+          "label": "local_given-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.6388915999559686,
+          "started_utc": "2026-09-08T05:06:10Z",
+          "finished_utc": "2026-09-08T05:06:10Z",
+          "stdout_sha256": "bf65ee5e09aa1fe43f08c30736ad26248d7d5a29697e42fe818905836395072e",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "higher_universe-syntax",
+        "status": "passed",
+        "source_sha256": "41bcb86884267e3cafe5af1d54f52892ed2df3b1b7484e7101863080af0b07d3",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "higher_universe-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.588430299947504,
+          "started_utc": "2026-09-08T05:06:10Z",
+          "finished_utc": "2026-09-08T05:06:11Z",
+          "stdout_sha256": "5ffd229ed5c69286a56a92d82d757bf1c80bb23e8641e971b1a2eb27d096b833",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "higher_universe-oracle",
+        "status": "passed",
+        "source_sha256": "3cb34b44162cce50c837ff398f7293e0b745abc850d3fa3d8de2d34bb534b399",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "higher_universe-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.5901940000476316,
+          "started_utc": "2026-09-08T05:06:11Z",
+          "finished_utc": "2026-09-08T05:06:12Z",
+          "stdout_sha256": "717d64a0f87f8746c6f86c2d739ea81c9d511a955c8179e82956090151efcf59",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "constant_universe-syntax",
+        "status": "passed",
+        "source_sha256": "492d30cac940227f6bc5a66a626a42f7eccd4a759de5712a208bc829e9a2b80d",
+        "declared_inventory_count": 12,
+        "process": {
+          "label": "constant_universe-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.5701384999556467,
+          "started_utc": "2026-09-08T05:06:12Z",
+          "finished_utc": "2026-09-08T05:06:12Z",
+          "stdout_sha256": "5e826e9145862d93ebfb78e3f4eb3026cbb33d427bd9b0c572d9f60a834babba",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "constant_universe-oracle",
+        "status": "passed",
+        "source_sha256": "3e66d781064d9da79de4447954d6b771bf935b67ecffcc5c5488bcc691769719",
+        "declared_inventory_count": 11,
+        "process": {
+          "label": "constant_universe-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.6097223000251688,
+          "started_utc": "2026-09-08T05:06:12Z",
+          "finished_utc": "2026-09-08T05:06:13Z",
+          "stdout_sha256": "f235fef6d5463830e50fdc805e8ea562710dc7a8a46822bb8f0b0afb31ab0309",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "global_metadata-syntax",
+        "status": "passed",
+        "source_sha256": "48e326235f7f3995687eea19c8e96e6d2d2131362518d91f5fd81b856aba6d18",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "global_metadata-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.5701872000354342,
+          "started_utc": "2026-09-08T05:06:13Z",
+          "finished_utc": "2026-09-08T05:06:13Z",
+          "stdout_sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "global_metadata-oracle",
+        "status": "passed",
+        "source_sha256": "0e587f1e7e8a385445fd1202f1f38be8d9f2b97ae2325bd2980cf9d93275c018",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "global_metadata-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.6213108000229113,
+          "started_utc": "2026-09-08T05:06:13Z",
+          "finished_utc": "2026-09-08T05:06:14Z",
+          "stdout_sha256": "85f42182bfee883c133a9304658d8b7de8889f869ae0b129abe31fc86f621351",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "reject_all-syntax",
+        "status": "passed",
+        "source_sha256": "e035bbe85b70ac54815cd28945643aa3791df151bc942c244c9bc7f9e281a559",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "reject_all-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.6845961000071838,
+          "started_utc": "2026-09-08T05:06:14Z",
+          "finished_utc": "2026-09-08T05:06:15Z",
+          "stdout_sha256": "4bfe8baed165b9aa8f840251eeb4a9a10a53d99eee19315f82c5ad84cd974e16",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "reject_all-oracle",
+        "status": "passed",
+        "source_sha256": "b81ea1974ce483eb999861b460902208a632c3ec70a076c672b01241cae0388a",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "reject_all-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.6217662999988534,
+          "started_utc": "2026-09-08T05:06:15Z",
+          "finished_utc": "2026-09-08T05:06:15Z",
+          "stdout_sha256": "7d757bbd278b13fff43b1d93d747df9cdcc449f3d1ce6eac8d7cfda513d270bf",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "cells": [
+      {
+        "name": "context_djinn_ordinary_identity",
+        "status": "passed",
+        "commands_sha256": "340f63511c57c77b3d51139d9aa5610dcc610c89d168d668d57a5a0dbc2aafdc",
+        "live": {
+          "label": "context_djinn_ordinary_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 30.588463699968997,
+          "started_utc": "2026-09-08T05:06:15Z",
+          "finished_utc": "2026-09-08T05:06:46Z",
+          "stdout_sha256": "52792d91afb63a8c8b8cd3fea619d5dede2921bfe302fc50f060636c79879372",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "33c5a0273bf3308cbedc118ae7004ea0ac4f5e6d0967328664e0c17c04d0c1ba",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType44 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType44)] => (fun (leantLocal5 : leantType44) => @leantLocal5))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "5fc51a8bd8e556a8fcbf42bffaa7bf34582d083c6e5073b54e88691af9c3e51f",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f8ffe38e5081380301d44f29314a1ded48f1d45326f60f067548b2986ca30e3e",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_ordinary_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6976280999951996,
+            "started_utc": "2026-09-08T05:06:46Z",
+            "finished_utc": "2026-09-08T05:06:47Z",
+            "stdout_sha256": "7d6d440b25009d505bc738679372d54ae82229c14f8b50a8be940caa5c5c5333",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_djinn_ordinary_identity-replay.lean"
+        },
+        "engine": "djinn",
+        "mode": "ordinary",
+        "operation": "identity"
+      },
+      {
+        "name": "context_djinn_ordinary_forwarding",
+        "status": "passed",
+        "commands_sha256": "d590b497c5fefbea1b808ef488f4e143a247cce77ba00adf64290c89abaa1cbd",
+        "live": {
+          "label": "context_djinn_ordinary_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 7.45837260002736,
+          "started_utc": "2026-09-08T05:06:47Z",
+          "finished_utc": "2026-09-08T05:06:54Z",
+          "stdout_sha256": "5f37d7eab6506297fa2595d3e1b5220df4abdd5cd4bf517de17a7c2d5f1426f7",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "26b9b65b8d42f8443dfb65b3b96e99a081fd4ebe00ff4063062e453cd5a07e49",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal0 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal0) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "2f1f1769e5f69cce907b88ce02d29703163ff1c3fc2deb49aee7ab1a78a5abc0",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "c17665573b524a4c7f6ed6b78db52357aa0f52a4f357621643e7de4f203eb0c4",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_ordinary_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6948783999541774,
+            "started_utc": "2026-09-08T05:06:54Z",
+            "finished_utc": "2026-09-08T05:06:55Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_djinn_ordinary_forwarding-replay.lean"
+        },
+        "engine": "djinn",
+        "mode": "ordinary",
+        "operation": "forwarding"
+      },
+      {
+        "name": "context_djinn_ordinary_local_given",
+        "status": "passed",
+        "commands_sha256": "68b0640cdd85ba600f34501da2cc20fab4cbb617e085ea670afeeed72449a3f7",
+        "live": {
+          "label": "context_djinn_ordinary_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 6.951223200012464,
+          "started_utc": "2026-09-08T05:06:55Z",
+          "finished_utc": "2026-09-08T05:07:02Z",
+          "stdout_sha256": "4f16fa7a65de2373f0ea6b3869022e0df54416492aa920ea9a780e3ad3b95722",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "17ba15ca79a74940ca970caf1d76cfe8ddf6f7a31b762ff83d60a37066672a47",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType170 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType170)] => (fun (leantLocal5 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) (leantLocal9 : leantType170) => @(let leantHead104 : (leantType170 → @_root_.«ContextProduction».«Token») := @(let leantHead90 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType170)], (leantType170 → @_root_.«ContextProduction».«Token»)) := @(let leantHead65 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal5; @leantHead65 (leantType170)); @leantHead90 leantGiven2x0); @leantHead104 (@leantLocal9 : leantType170))))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "fc7b1a406846602281829937e9e3fdf3104667634c4cf6145339a52cc7e16538",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 8,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f5c859bb4a923c7beb65ea05d1da558153153c6bf25e80198ad10b4fa9de4748",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_ordinary_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.7213216000236571,
+            "started_utc": "2026-09-08T05:07:02Z",
+            "finished_utc": "2026-09-08T05:07:03Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_djinn_ordinary_local_given-replay.lean"
+        },
+        "engine": "djinn",
+        "mode": "ordinary",
+        "operation": "local_given"
+      },
+      {
+        "name": "context_djinn_ordinary_higher_universe",
+        "status": "passed",
+        "commands_sha256": "f5652931163d2705cbeae62fc2e9f136952d855b90e80acc2b932cc4043da966",
+        "live": {
+          "label": "context_djinn_ordinary_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 6.659438899951056,
+          "started_utc": "2026-09-08T05:07:03Z",
+          "finished_utc": "2026-09-08T05:07:10Z",
+          "stdout_sha256": "1467a43918e2800dead67826950b0d0731f9c179a831a390e47c01495bf946d9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "2022a6044353a86f8e13f184b94f957f702c1d994cba756d9b95996c4bab99b1",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "djinn",
+        "mode": "ordinary",
+        "operation": "higher_universe"
+      },
+      {
+        "name": "context_djinn_ordinary_constant_universe",
+        "status": "passed",
+        "commands_sha256": "a855aeb5144e217bcf22a70b68fb7ac56b6f3206336d56cb10012afce639ffcc",
+        "live": {
+          "label": "context_djinn_ordinary_constant_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 14.238791599986143,
+          "started_utc": "2026-09-08T05:07:10Z",
+          "finished_utc": "2026-09-08T05:07:24Z",
+          "stdout_sha256": "ec16e182192b23cbc29883334f1787425c370c4c326cd5acb24cb58374157136",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "7cd136c0d50132f138f01a09141feb1d9b43b79e48c61eb2297306f228774288",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "djinn",
+        "mode": "ordinary",
+        "operation": "constant_universe"
+      },
+      {
+        "name": "context_djinn_ordinary_global_metadata",
+        "status": "passed",
+        "commands_sha256": "8319d27afd7f4333e5d90e128edf741c6677e0ceb8c874cd8055fde89596bb31",
+        "live": {
+          "label": "context_djinn_ordinary_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 10.762220800039358,
+          "started_utc": "2026-09-08T05:07:24Z",
+          "finished_utc": "2026-09-08T05:07:35Z",
+          "stdout_sha256": "4df87a9e3371dd3488a763e1c39fa2db0e3a99ed89441ecf60479a5b4d3e3fa7",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "f73e19f7565e474f5c4b1e62317498163ed1730d75aa916418ce71dbf3714bf0",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata",
+        "engine": "djinn",
+        "mode": "ordinary",
+        "operation": "global_metadata"
+      },
+      {
+        "name": "context_djinn_where_identity",
+        "status": "passed",
+        "commands_sha256": "5fb581e97b35c165261a000c553aea02c22820c4a9c382645ab9ed7e50d55d59",
+        "live": {
+          "label": "context_djinn_where_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 7.422382200020365,
+          "started_utc": "2026-09-08T05:07:35Z",
+          "finished_utc": "2026-09-08T05:07:42Z",
+          "stdout_sha256": "9d520ff652bf25f5db8d09d18c5e33e4b4055647d84dd3af3918a4eb470c586a",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "d74caad663633de072165234f1da104b6fe33a930f75403b326646722cae5097",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType44 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType44)] => (fun (leantLocal5 : leantType44) => @leantLocal5))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "5fc51a8bd8e556a8fcbf42bffaa7bf34582d083c6e5073b54e88691af9c3e51f",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f8ffe38e5081380301d44f29314a1ded48f1d45326f60f067548b2986ca30e3e",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_where_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.8516068999888375,
+            "started_utc": "2026-09-08T05:07:42Z",
+            "finished_utc": "2026-09-08T05:07:43Z",
+            "stdout_sha256": "1fa0f0800400c3196b54c59fd3969e4f578546698b967435a9519edc16de17e5",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_djinn_where_identity-replay.lean"
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "engine": "djinn",
+        "mode": "where",
+        "operation": "identity"
+      },
+      {
+        "name": "context_djinn_where_forwarding",
+        "status": "passed",
+        "commands_sha256": "f4d78777441945e8418e421e74682c078069dfb525f7c7a15b9eed732a88b2a5",
+        "live": {
+          "label": "context_djinn_where_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 8.071224299957976,
+          "started_utc": "2026-09-08T05:07:43Z",
+          "finished_utc": "2026-09-08T05:07:51Z",
+          "stdout_sha256": "affd59c0d7ebc8a0346bdf7dc557685fef56c4cb7e9d9de3ca27c7e4a2c44dbd",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "33f9bf4a58a7638c3fdb717481dc892aac8d088cb0be4842ed5a110649c8e4c9",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal0 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal0) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "2f1f1769e5f69cce907b88ce02d29703163ff1c3fc2deb49aee7ab1a78a5abc0",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "c17665573b524a4c7f6ed6b78db52357aa0f52a4f357621643e7de4f203eb0c4",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_where_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.7565842000185512,
+            "started_utc": "2026-09-08T05:07:51Z",
+            "finished_utc": "2026-09-08T05:07:52Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_djinn_where_forwarding-replay.lean"
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "engine": "djinn",
+        "mode": "where",
+        "operation": "forwarding"
+      },
+      {
+        "name": "context_djinn_where_local_given",
+        "status": "passed",
+        "commands_sha256": "44d0ab99babaac0c5751bc8018fff6056afd71e5e43cf8f881df86a65ee379e3",
+        "live": {
+          "label": "context_djinn_where_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 7.206862399994861,
+          "started_utc": "2026-09-08T05:07:52Z",
+          "finished_utc": "2026-09-08T05:07:59Z",
+          "stdout_sha256": "4594623c47bdcbc6bcc9eeb769231662645e8a9de5a6434de9aafbed4f3eef7c",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "605bf9383eb93199816f2b564773ea620c18edc5f8746c437a95a80a70a960b7",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType170 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType170)] => (fun (leantLocal5 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) (leantLocal9 : leantType170) => @(let leantHead104 : (leantType170 → @_root_.«ContextProduction».«Token») := @(let leantHead90 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType170)], (leantType170 → @_root_.«ContextProduction».«Token»)) := @(let leantHead65 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal5; @leantHead65 (leantType170)); @leantHead90 leantGiven2x0); @leantHead104 (@leantLocal9 : leantType170))))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "fc7b1a406846602281829937e9e3fdf3104667634c4cf6145339a52cc7e16538",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 8,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f5c859bb4a923c7beb65ea05d1da558153153c6bf25e80198ad10b4fa9de4748",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_where_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.8071985999704339,
+            "started_utc": "2026-09-08T05:07:59Z",
+            "finished_utc": "2026-09-08T05:08:00Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_djinn_where_local_given-replay.lean"
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "engine": "djinn",
+        "mode": "where",
+        "operation": "local_given"
+      },
+      {
+        "name": "context_djinn_where_reject_all",
+        "status": "passed",
+        "commands_sha256": "1fa63373e8a4c771fc420c845ec1b2968c72cb7cf10543242527406ff669be1c",
+        "live": {
+          "label": "context_djinn_where_reject_all-live",
+          "exit_code": 0,
+          "wall_seconds": 7.3771299999789335,
+          "started_utc": "2026-09-08T05:08:00Z",
+          "finished_utc": "2026-09-08T05:08:08Z",
+          "stdout_sha256": "522d8ebcac4393ee36179544a3dafeb10dd936a7719258338d2825aea491b1af",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "d607a4189ffde8937b453aefe4092585aabef9b46c602639d71e0f2d5294f820",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "false_rejected",
+        "behavioral_observations": {
+          "passed": 0,
+          "falsified": 1,
+          "inconclusive": 0
+        },
+        "engine": "djinn",
+        "mode": "where",
+        "operation": "reject_all"
+      },
+      {
+        "name": "context_djinn_where_higher_universe",
+        "status": "passed",
+        "commands_sha256": "76bf9d8c1135b9a6af685a1296d64bcd23a46f602685aa196657e3d2b87d24dd",
+        "live": {
+          "label": "context_djinn_where_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 7.958795199985616,
+          "started_utc": "2026-09-08T05:08:08Z",
+          "finished_utc": "2026-09-08T05:08:16Z",
+          "stdout_sha256": "76b2e168a1a7570bc1f673f44e75f619090e5ef4d5b79b659e1fb7e6b4024502",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "c6b9e3f7659bbbc4fa9f21e00cbda1b5ef7ea569f5c5380275598d127cf244ae",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "djinn",
+        "mode": "where",
+        "operation": "higher_universe"
+      },
+      {
+        "name": "context_djinn_where_constant_universe",
+        "status": "passed",
+        "commands_sha256": "532e6e4e5a529857b22ee0b506729e3db17385214ecbbb91530d7c3e21c96db4",
+        "live": {
+          "label": "context_djinn_where_constant_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 7.2785614999593236,
+          "started_utc": "2026-09-08T05:08:16Z",
+          "finished_utc": "2026-09-08T05:08:23Z",
+          "stdout_sha256": "78f8f4d713e22892a7e5bdbbf9e8c9b56af42d626b6b493db334eec6b90f58c8",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "7f8c8e2c938e3d3a22c1822d78f47325cf4780d073aea5614e92eb924567a9de",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "djinn",
+        "mode": "where",
+        "operation": "constant_universe"
+      },
+      {
+        "name": "context_djinn_where_global_metadata",
+        "status": "passed",
+        "commands_sha256": "ad66cf5815b6a2e24306308bc08fbeeb023c0ab641b28cefdb9e24cc957865aa",
+        "live": {
+          "label": "context_djinn_where_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 8.515537100029178,
+          "started_utc": "2026-09-08T05:08:23Z",
+          "finished_utc": "2026-09-08T05:08:32Z",
+          "stdout_sha256": "f604c8e0aec7e9aefa00bb43db2fbf057095d4c83018a58a376e708e41e70a62",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "0e96f7492f4893cb6f8bc97e62f4e2801750613cda31adf91228640b483cff3e",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata",
+        "engine": "djinn",
+        "mode": "where",
+        "operation": "global_metadata"
+      },
+      {
+        "name": "context_exference_ordinary_identity",
+        "status": "passed",
+        "commands_sha256": "e9690c0c2bc85bb240f1c3094ee0e917e08a66a1942cdb3321eebb83692ac950",
+        "live": {
+          "label": "context_exference_ordinary_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 6.530219599953853,
+          "started_utc": "2026-09-08T05:08:32Z",
+          "finished_utc": "2026-09-08T05:08:38Z",
+          "stdout_sha256": "e7b3bead00523581a8d4ec575e7d0f12afe3043f8e69be22b7b9e470b0ece603",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "da3db32d11478ceef02832c1ee226b6b890678c1e11fed433cfa46e3f21d3a1a",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType21 : Type) => (fun [leantGiven29x0 : @_root_.«ContextProduction».«Dictionary» (leantType21)] => (fun (leantLocal38 : leantType21) => @leantLocal38))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "4fa721dd2800f5944041013accf0cc693d63c2981ca5e9696f510b07568a2055",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "2c7e58e86714f923e4da26fae5033f1082b4de31ec51c04e9fe8d4114fbbb153",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_ordinary_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6774972999701276,
+            "started_utc": "2026-09-08T05:08:38Z",
+            "finished_utc": "2026-09-08T05:08:39Z",
+            "stdout_sha256": "07cbcd8fdcbb7c7c95c20884089c365180d9ed72bc0d2514d8ab2a5e8894ee24",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_exference_ordinary_identity-replay.lean"
+        },
+        "engine": "exference",
+        "mode": "ordinary",
+        "operation": "identity"
+      },
+      {
+        "name": "context_exference_ordinary_forwarding",
+        "status": "passed",
+        "commands_sha256": "b45b00e68165ebd597a06d9030c50368d560c61b368e1ed3521770b0140921f1",
+        "live": {
+          "label": "context_exference_ordinary_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 6.484408900025301,
+          "started_utc": "2026-09-08T05:08:39Z",
+          "finished_utc": "2026-09-08T05:08:45Z",
+          "stdout_sha256": "947a21647777ce222f130e85515e1b6cb3674ffd3e84ac674558dfb6da5a3c32",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "c3153784b3edd2dffc21a42cb5930c7f4504a462b51c3361c08d2f724e5eb39d",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal21 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal21) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "e51a8dc2d96f3b250e9916f98f5589b6641fc2910dd5e5a9c581300af8ca2e97",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "6ad26fe0c707273476667e9c17b9acd89478a6887d2e239e07e6837d6250ac09",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_ordinary_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6978150000213645,
+            "started_utc": "2026-09-08T05:08:45Z",
+            "finished_utc": "2026-09-08T05:08:46Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_exference_ordinary_forwarding-replay.lean"
+        },
+        "engine": "exference",
+        "mode": "ordinary",
+        "operation": "forwarding"
+      },
+      {
+        "name": "context_exference_ordinary_local_given",
+        "status": "passed",
+        "commands_sha256": "a54e8cf0e776655d170d7e6183eb39b9d451c63561d49f8cfdfe39cf146d36ea",
+        "live": {
+          "label": "context_exference_ordinary_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 6.48968739999691,
+          "started_utc": "2026-09-08T05:08:46Z",
+          "finished_utc": "2026-09-08T05:08:53Z",
+          "stdout_sha256": "c5d54af0b015b8757e33b5c89685bbe99cbee6da8b8a90ac69e55f9f9d09fcb8",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "539d9cf783407a6c5f051df5fc3053f1b37914eb0b117cbdce90f08fef21b2f5",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType55 : Type) => (fun [leantGiven67x0 : @_root_.«ContextProduction».«Dictionary» (leantType55)] => (fun (leantLocal80 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @(let leantHead94 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType55)], (leantType55 → @_root_.«ContextProduction».«Token»)) := @(let leantHead109 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal80; @leantHead109 (leantType55)); @leantHead94 leantGiven67x0)))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "982672f22e9cd2f04fc7ebe9c94cc4d42cd9a015bfbc504e5997f95e26869478",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 6,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "2155640d6b12c547b4a2c3a455229fc1239a2f8672c9f976c6a701893e401d19",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_ordinary_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6849163000006229,
+            "started_utc": "2026-09-08T05:08:53Z",
+            "finished_utc": "2026-09-08T05:08:54Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_exference_ordinary_local_given-replay.lean"
+        },
+        "engine": "exference",
+        "mode": "ordinary",
+        "operation": "local_given"
+      },
+      {
+        "name": "context_exference_ordinary_higher_universe",
+        "status": "passed",
+        "commands_sha256": "59979303150b0d41be20cf44325e2be33b3775a6f9852cd108b29860de422bda",
+        "live": {
+          "label": "context_exference_ordinary_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 7.27341709996108,
+          "started_utc": "2026-09-08T05:08:54Z",
+          "finished_utc": "2026-09-08T05:09:01Z",
+          "stdout_sha256": "5bd5cd2b903dd6a06f298f6fd84e99245f9270ade55396aa4d471a5b65c648a0",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "e1a47c6c6c2764a1f51f84f246d5e007a7658d0bcdedbc482d50e9cf242022c8",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "exference",
+        "mode": "ordinary",
+        "operation": "higher_universe"
+      },
+      {
+        "name": "context_exference_ordinary_constant_universe",
+        "status": "passed",
+        "commands_sha256": "acc54c5491f5ebdf80e4ab8d2a0b8de1dcf6bd2ace5e48e8b2422fec2620d3d2",
+        "live": {
+          "label": "context_exference_ordinary_constant_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 7.082705000007991,
+          "started_utc": "2026-09-08T05:09:01Z",
+          "finished_utc": "2026-09-08T05:09:08Z",
+          "stdout_sha256": "0bfb80f264a71a929e6ebd8c1eec71ddbc3dfe550cd41ca2bed12820f0539ed6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "5f5443c993cad245d9e5a8cfa5f40ec310ea39ab5599d944d6166b602d2036f6",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "exference",
+        "mode": "ordinary",
+        "operation": "constant_universe"
+      },
+      {
+        "name": "context_exference_ordinary_global_metadata",
+        "status": "passed",
+        "commands_sha256": "61410d2dcdb623a6c07e37c21d97c451b64b3ad1df0a5bfdcb67e7874da94049",
+        "live": {
+          "label": "context_exference_ordinary_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 7.2401514000375755,
+          "started_utc": "2026-09-08T05:09:08Z",
+          "finished_utc": "2026-09-08T05:09:15Z",
+          "stdout_sha256": "b84d6137c22a8f756e8b79a3ca69fc72ee0779ade9676f12a173c9addf1c3b48",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "77b9815ce231b549269f28e9e369fc3f2a2c453a52c4b5421db58bbc9c550994",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata",
+        "engine": "exference",
+        "mode": "ordinary",
+        "operation": "global_metadata"
+      },
+      {
+        "name": "context_exference_where_identity",
+        "status": "passed",
+        "commands_sha256": "0e20dac432f11e44de2ad6f810c36b5e3d6eae2da77f0f2a527abbdcea1711e9",
+        "live": {
+          "label": "context_exference_where_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 6.4974929000018165,
+          "started_utc": "2026-09-08T05:09:15Z",
+          "finished_utc": "2026-09-08T05:09:22Z",
+          "stdout_sha256": "78996b79f1914f56a30f2ce6be396a1aef63c1cd13b218d1d6360520f4db1c7e",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "9f8db1cfab5531488b3bf50ef9f447e118d0798652fb3b6cec9d83acc9483c68",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType21 : Type) => (fun [leantGiven29x0 : @_root_.«ContextProduction».«Dictionary» (leantType21)] => (fun (leantLocal38 : leantType21) => @leantLocal38))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "4fa721dd2800f5944041013accf0cc693d63c2981ca5e9696f510b07568a2055",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "2c7e58e86714f923e4da26fae5033f1082b4de31ec51c04e9fe8d4114fbbb153",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_where_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6824069999856874,
+            "started_utc": "2026-09-08T05:09:22Z",
+            "finished_utc": "2026-09-08T05:09:23Z",
+            "stdout_sha256": "da82874b63ae94c7a8dbfc25b7e401dcfcf1111c799ae639b3b4b91c52184887",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_exference_where_identity-replay.lean"
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "engine": "exference",
+        "mode": "where",
+        "operation": "identity"
+      },
+      {
+        "name": "context_exference_where_forwarding",
+        "status": "passed",
+        "commands_sha256": "e9d6b37f295e176acbbf4e9ab307c1d0be1b1ef0c9cf2a5122f3653bcaa61ced",
+        "live": {
+          "label": "context_exference_where_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 6.70666969998274,
+          "started_utc": "2026-09-08T05:09:23Z",
+          "finished_utc": "2026-09-08T05:09:29Z",
+          "stdout_sha256": "83bf5443d358a7671aa48468aeb854830e9993b87d6afb7ac97621f0ca203fd5",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "9af8af1523eea402cf131a9d4e5912b150187ba059f5243ea5b0a4a2775377fe",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal21 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal21) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "e51a8dc2d96f3b250e9916f98f5589b6641fc2910dd5e5a9c581300af8ca2e97",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "6ad26fe0c707273476667e9c17b9acd89478a6887d2e239e07e6837d6250ac09",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_where_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.68906160001643,
+            "started_utc": "2026-09-08T05:09:29Z",
+            "finished_utc": "2026-09-08T05:09:30Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_exference_where_forwarding-replay.lean"
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "engine": "exference",
+        "mode": "where",
+        "operation": "forwarding"
+      },
+      {
+        "name": "context_exference_where_local_given",
+        "status": "passed",
+        "commands_sha256": "23e82e5ddacaa52d16f4f3455c63ca2f843b2d12fdb1e71a9483d397815d56e7",
+        "live": {
+          "label": "context_exference_where_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 7.051170599996112,
+          "started_utc": "2026-09-08T05:09:30Z",
+          "finished_utc": "2026-09-08T05:09:37Z",
+          "stdout_sha256": "8cec457c6032af464cc7cc11cf8639052afc4790617eee267e81c74021af37cb",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "9acd93c31f5c689de97f83d8a97bda02bbf43c5bb3efd295c55c7d32fbc5e2d5",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType55 : Type) => (fun [leantGiven67x0 : @_root_.«ContextProduction».«Dictionary» (leantType55)] => (fun (leantLocal80 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @(let leantHead94 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType55)], (leantType55 → @_root_.«ContextProduction».«Token»)) := @(let leantHead109 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal80; @leantHead109 (leantType55)); @leantHead94 leantGiven67x0)))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "982672f22e9cd2f04fc7ebe9c94cc4d42cd9a015bfbc504e5997f95e26869478",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 6,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "2155640d6b12c547b4a2c3a455229fc1239a2f8672c9f976c6a701893e401d19",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_where_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6631164000136778,
+            "started_utc": "2026-09-08T05:09:37Z",
+            "finished_utc": "2026-09-08T05:09:38Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_exference_where_local_given-replay.lean"
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "engine": "exference",
+        "mode": "where",
+        "operation": "local_given"
+      },
+      {
+        "name": "context_exference_where_reject_all",
+        "status": "passed",
+        "commands_sha256": "017c1b0df56fafcc8035dbc7ddfd43e2ffeb33a3d6ad9fa389e77e78f5b175f0",
+        "live": {
+          "label": "context_exference_where_reject_all-live",
+          "exit_code": 0,
+          "wall_seconds": 6.325917100009974,
+          "started_utc": "2026-09-08T05:09:38Z",
+          "finished_utc": "2026-09-08T05:09:44Z",
+          "stdout_sha256": "21ba48f42a99e82a5c6d34b12a46470c4e3815002bc722a90efd93ed2cd01daa",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "3e333ce441938bdb85c9e82815f65db145dd5d0126a8d9ca3b7d97aad96fca90",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "false_rejected",
+        "behavioral_observations": {
+          "passed": 0,
+          "falsified": 1,
+          "inconclusive": 0
+        },
+        "engine": "exference",
+        "mode": "where",
+        "operation": "reject_all"
+      },
+      {
+        "name": "context_exference_where_higher_universe",
+        "status": "passed",
+        "commands_sha256": "fdedeb808174c40a7ca418e0b575f065a66d30c391160f6a5acf3dde824d5af0",
+        "live": {
+          "label": "context_exference_where_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 6.266441699990537,
+          "started_utc": "2026-09-08T05:09:44Z",
+          "finished_utc": "2026-09-08T05:09:51Z",
+          "stdout_sha256": "0a8c645c39581176ad0a80221a83377d8c3966d46f499e2f05e820d6e104aef6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "795ad48abc28162892a96a7c2cbd651771d78a01addb5269d5e84b8d86098baa",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "exference",
+        "mode": "where",
+        "operation": "higher_universe"
+      },
+      {
+        "name": "context_exference_where_constant_universe",
+        "status": "passed",
+        "commands_sha256": "06c3d7af9ec85c59f8239f0f01974019a278fc8e73b3d26d8bbafa1538946d4b",
+        "live": {
+          "label": "context_exference_where_constant_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 6.322468300000764,
+          "started_utc": "2026-09-08T05:09:51Z",
+          "finished_utc": "2026-09-08T05:09:57Z",
+          "stdout_sha256": "a465b4be8a4b079ad5e4bf52c5fd83b3333254faae648a335e75341630b69f62",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "3165a07c8947f7906835134f59c6855e3d0b0304225db6d1655fb188f6fbcdeb",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "exference",
+        "mode": "where",
+        "operation": "constant_universe"
+      },
+      {
+        "name": "context_exference_where_global_metadata",
+        "status": "passed",
+        "commands_sha256": "a44a98a166a2c0e8241703072645ddd46710615fcc655fdbfd3bafd395b6cb3e",
+        "live": {
+          "label": "context_exference_where_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 6.961566000012681,
+          "started_utc": "2026-09-08T05:09:57Z",
+          "finished_utc": "2026-09-08T05:10:04Z",
+          "stdout_sha256": "c72c97d6c2f7fc670a0e2f14b69f4dae824d88818933d48d49eff6224748e2e6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "1152ba365415501f8b31213ad7f85ac4cafdcd38235a1bebc8766be48b82e6c6",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata",
+        "engine": "exference",
+        "mode": "where",
+        "operation": "global_metadata"
+      },
+      {
+        "name": "context_both_ordinary_identity",
+        "status": "passed",
+        "commands_sha256": "d62b84b18d777f27df3aa7667ce836d790b2ae7965c1dfdd3910e02cb4529afa",
+        "live": {
+          "label": "context_both_ordinary_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 6.261918900010642,
+          "started_utc": "2026-09-08T05:10:04Z",
+          "finished_utc": "2026-09-08T05:10:10Z",
+          "stdout_sha256": "eda106fe29c2f9211eca7c9a5dd34414a905dc8e16645ab778c1cb75c2fd3de3",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "c2bc8c2b333a60e984b10a9193eab672ee9acef78de7ef83c76bb278565e733f",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType44 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType44)] => (fun (leantLocal5 : leantType44) => @leantLocal5))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "5fc51a8bd8e556a8fcbf42bffaa7bf34582d083c6e5073b54e88691af9c3e51f",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f8ffe38e5081380301d44f29314a1ded48f1d45326f60f067548b2986ca30e3e",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_ordinary_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6744257000391372,
+            "started_utc": "2026-09-08T05:10:10Z",
+            "finished_utc": "2026-09-08T05:10:11Z",
+            "stdout_sha256": "e72ab4819607774fb36c41547c96d11f495595c7b2362c488cbf8661e4eeb652",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_both_ordinary_identity-replay.lean"
+        },
+        "engine": "both",
+        "mode": "ordinary",
+        "operation": "identity"
+      },
+      {
+        "name": "context_both_ordinary_forwarding",
+        "status": "passed",
+        "commands_sha256": "3656ddcf6b728d8129c02d55d6058f4261372fbc9cd2049d4555c495614981d2",
+        "live": {
+          "label": "context_both_ordinary_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 6.652549299993552,
+          "started_utc": "2026-09-08T05:10:11Z",
+          "finished_utc": "2026-09-08T05:10:18Z",
+          "stdout_sha256": "72fa4d18dd0803d13d6c8653ddea04a65a1c491c48deb3bb62854b28fa034b56",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "0b3b69516a545a78984ad33b79dc24a7b1bbafa5e01145c4aa1d35721c121045",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal0 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal0) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "2f1f1769e5f69cce907b88ce02d29703163ff1c3fc2deb49aee7ab1a78a5abc0",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "c17665573b524a4c7f6ed6b78db52357aa0f52a4f357621643e7de4f203eb0c4",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_ordinary_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6844001000281423,
+            "started_utc": "2026-09-08T05:10:18Z",
+            "finished_utc": "2026-09-08T05:10:18Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_both_ordinary_forwarding-replay.lean"
+        },
+        "engine": "both",
+        "mode": "ordinary",
+        "operation": "forwarding"
+      },
+      {
+        "name": "context_both_ordinary_local_given",
+        "status": "passed",
+        "commands_sha256": "92f4a8cd12229ddc97d72b320caf0e6ba77cac04fe51d898b55aea41db8c94b9",
+        "live": {
+          "label": "context_both_ordinary_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 6.328292699996382,
+          "started_utc": "2026-09-08T05:10:18Z",
+          "finished_utc": "2026-09-08T05:10:25Z",
+          "stdout_sha256": "1c293ae97f0b8568ab12a8ab7a3782a8405b0da7c30da240e0614d8ce0bf7e2c",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "63b3c373f36e954a64b474dfa61e6e09991c9d37a42812283493a4847ca0c2f8",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType170 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType170)] => (fun (leantLocal5 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) (leantLocal9 : leantType170) => @(let leantHead104 : (leantType170 → @_root_.«ContextProduction».«Token») := @(let leantHead90 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType170)], (leantType170 → @_root_.«ContextProduction».«Token»)) := @(let leantHead65 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal5; @leantHead65 (leantType170)); @leantHead90 leantGiven2x0); @leantHead104 (@leantLocal9 : leantType170))))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "fc7b1a406846602281829937e9e3fdf3104667634c4cf6145339a52cc7e16538",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 8,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f5c859bb4a923c7beb65ea05d1da558153153c6bf25e80198ad10b4fa9de4748",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_ordinary_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.667312600009609,
+            "started_utc": "2026-09-08T05:10:25Z",
+            "finished_utc": "2026-09-08T05:10:26Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_both_ordinary_local_given-replay.lean"
+        },
+        "engine": "both",
+        "mode": "ordinary",
+        "operation": "local_given"
+      },
+      {
+        "name": "context_both_ordinary_higher_universe",
+        "status": "passed",
+        "commands_sha256": "34799d25cb79745918dd5f4ca1993573da0d68bf7a2a7b646cf1990e8e70a199",
+        "live": {
+          "label": "context_both_ordinary_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 6.1793086000252515,
+          "started_utc": "2026-09-08T05:10:26Z",
+          "finished_utc": "2026-09-08T05:10:32Z",
+          "stdout_sha256": "263f95a41f7e08c395af3d3f9f53da6f6da26f4a1a84689f5e107855c0dbe5c9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "9a7f5b16851f63e5b8c52f48829246750ef5e134b9a5ac6f1e91f8bd6e0e02dc",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "both",
+        "mode": "ordinary",
+        "operation": "higher_universe"
+      },
+      {
+        "name": "context_both_ordinary_constant_universe",
+        "status": "passed",
+        "commands_sha256": "cb85746dca905f0759def1028c0c3a73e7c39b1f8e74adcce64cb07b2acc138b",
+        "live": {
+          "label": "context_both_ordinary_constant_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 6.6364673000061885,
+          "started_utc": "2026-09-08T05:10:32Z",
+          "finished_utc": "2026-09-08T05:10:39Z",
+          "stdout_sha256": "eb7f003977e763da53642d63958d21e9714c378dda627e9ce5116119107f9122",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "937afc1f8a10c858d9713c82686b69da04fab52200c8be643c9c328bde6419c8",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "both",
+        "mode": "ordinary",
+        "operation": "constant_universe"
+      },
+      {
+        "name": "context_both_ordinary_global_metadata",
+        "status": "passed",
+        "commands_sha256": "cf0c8bbf484eb312bd435dcb56d57ad8766bcc57655467d454a28e93576b57b8",
+        "live": {
+          "label": "context_both_ordinary_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 7.313665200024843,
+          "started_utc": "2026-09-08T05:10:39Z",
+          "finished_utc": "2026-09-08T05:10:46Z",
+          "stdout_sha256": "549f229e3c0a4b47572874dfd12a7f80cadefab219faa32620756798de2d36f8",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "a40845954fb2a45266688356edc5eab7c09072d0915374da1692b98826c22daa",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata",
+        "engine": "both",
+        "mode": "ordinary",
+        "operation": "global_metadata"
+      },
+      {
+        "name": "context_both_where_identity",
+        "status": "passed",
+        "commands_sha256": "14cfd3343ee29ff051ac87112834c08850da4da3d5d8f91c2053143a7db9d3a6",
+        "live": {
+          "label": "context_both_where_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 6.80344220000552,
+          "started_utc": "2026-09-08T05:10:46Z",
+          "finished_utc": "2026-09-08T05:10:53Z",
+          "stdout_sha256": "e8cfe78a452d50a14d3eb7c80626e0dcfd43cef4c5e2114741772036e2c52ac3",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "8f872396bb9f4533eb519eca069a38eee8f91857c9692e0157b3b4b3366d9532",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType44 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType44)] => (fun (leantLocal5 : leantType44) => @leantLocal5))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "5fc51a8bd8e556a8fcbf42bffaa7bf34582d083c6e5073b54e88691af9c3e51f",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f8ffe38e5081380301d44f29314a1ded48f1d45326f60f067548b2986ca30e3e",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_where_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.6851426999783143,
+            "started_utc": "2026-09-08T05:10:53Z",
+            "finished_utc": "2026-09-08T05:10:54Z",
+            "stdout_sha256": "af549d4125e0500624b00e7ca2ae90a2b61fbbbbd211b8e663fff84954eb08d3",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_both_where_identity-replay.lean"
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "engine": "both",
+        "mode": "where",
+        "operation": "identity"
+      },
+      {
+        "name": "context_both_where_forwarding",
+        "status": "passed",
+        "commands_sha256": "7c2a5f9f105ac2ac80baa2e27626c9ee41705819645e08562812a1a5d022845b",
+        "live": {
+          "label": "context_both_where_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 6.803979500022251,
+          "started_utc": "2026-09-08T05:10:54Z",
+          "finished_utc": "2026-09-08T05:11:00Z",
+          "stdout_sha256": "45e3589983b8dc06ad555a138e6e6af7bd933fc7b3ae0004d4382b5659817ff6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "cc43c2892a85db4b725fdc9b407e5bba6ec5e5bef5bb95f59454067f69ef2256",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal0 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal0) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "2f1f1769e5f69cce907b88ce02d29703163ff1c3fc2deb49aee7ab1a78a5abc0",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "c17665573b524a4c7f6ed6b78db52357aa0f52a4f357621643e7de4f203eb0c4",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_where_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.7418031999841332,
+            "started_utc": "2026-09-08T05:11:00Z",
+            "finished_utc": "2026-09-08T05:11:01Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_both_where_forwarding-replay.lean"
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "engine": "both",
+        "mode": "where",
+        "operation": "forwarding"
+      },
+      {
+        "name": "context_both_where_local_given",
+        "status": "passed",
+        "commands_sha256": "ff8a3a46a8a2bb252a977489f40ebe10c163bcb955dd77e41b50d92003049f07",
+        "live": {
+          "label": "context_both_where_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 7.115807700029109,
+          "started_utc": "2026-09-08T05:11:01Z",
+          "finished_utc": "2026-09-08T05:11:08Z",
+          "stdout_sha256": "162e657842a81b0759031559d47434180c80b517f5e16004695445394624a53b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "6f25d827a500eb1b6e6dc5fe4e2a29de0182b031a4cbb07c7d9a2a467572a52c",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType170 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType170)] => (fun (leantLocal5 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) (leantLocal9 : leantType170) => @(let leantHead104 : (leantType170 → @_root_.«ContextProduction».«Token») := @(let leantHead90 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType170)], (leantType170 → @_root_.«ContextProduction».«Token»)) := @(let leantHead65 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal5; @leantHead65 (leantType170)); @leantHead90 leantGiven2x0); @leantHead104 (@leantLocal9 : leantType170))))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "fc7b1a406846602281829937e9e3fdf3104667634c4cf6145339a52cc7e16538",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 8,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f5c859bb4a923c7beb65ea05d1da558153153c6bf25e80198ad10b4fa9de4748",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_where_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.7424313999945298,
+            "started_utc": "2026-09-08T05:11:08Z",
+            "finished_utc": "2026-09-08T05:11:09Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "source_path": "dist-newstyle/context-production-incremental-all-v1/context_both_where_local_given-replay.lean"
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "engine": "both",
+        "mode": "where",
+        "operation": "local_given"
+      },
+      {
+        "name": "context_both_where_reject_all",
+        "status": "passed",
+        "commands_sha256": "8d619c1a4cce38e3202716340969670b3367cff92334aba01bd2eecf4280f6e2",
+        "live": {
+          "label": "context_both_where_reject_all-live",
+          "exit_code": 0,
+          "wall_seconds": 7.403176499996334,
+          "started_utc": "2026-09-08T05:11:09Z",
+          "finished_utc": "2026-09-08T05:11:17Z",
+          "stdout_sha256": "81986ef2d36c607f6248efb441d9e5fe37c704b83857e64ba7867d0f22bfb9fe",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "37eaff992b3440b75891423b9fcb8464daebde716117e42b09d1e3cbb3ceb9c7",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "false_rejected",
+        "behavioral_observations": {
+          "passed": 0,
+          "falsified": 2,
+          "inconclusive": 0
+        },
+        "engine": "both",
+        "mode": "where",
+        "operation": "reject_all"
+      },
+      {
+        "name": "context_both_where_higher_universe",
+        "status": "passed",
+        "commands_sha256": "0c4b0c47ef44bc829c5969c1648840c7b0cca28961a2867eb684330a545e0ef7",
+        "live": {
+          "label": "context_both_where_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 6.501721699954942,
+          "started_utc": "2026-09-08T05:11:17Z",
+          "finished_utc": "2026-09-08T05:11:23Z",
+          "stdout_sha256": "9ddd68ce7faa122d329a0c056ac268c19ee5a06025a9b20a2a1d256aa4e9ef79",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "d09391e7637f762170780e68f1c8ee2f68387a26d0c7f71f986583b1d054f348",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "both",
+        "mode": "where",
+        "operation": "higher_universe"
+      },
+      {
+        "name": "context_both_where_constant_universe",
+        "status": "passed",
+        "commands_sha256": "8a8070eb61ab00a41836a4e396366ed8b89fbb2d63d7a04963cca0061970a24d",
+        "live": {
+          "label": "context_both_where_constant_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 6.415691100002732,
+          "started_utc": "2026-09-08T05:11:23Z",
+          "finished_utc": "2026-09-08T05:11:30Z",
+          "stdout_sha256": "cb7686b07ef135bccea457ac50b5d0fcf427284f53fe40b37eaeaa1b72b4af9f",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "eea50b108d8d8b96f85a6e34f6674afcc919833c3181217e3eb4ee38a6dc5071",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows",
+        "engine": "both",
+        "mode": "where",
+        "operation": "constant_universe"
+      },
+      {
+        "name": "context_both_where_global_metadata",
+        "status": "passed",
+        "commands_sha256": "75a73a577e1dec2e1418093f461a55ba8475f18787bd4f6f3747aa22a5501e01",
+        "live": {
+          "label": "context_both_where_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 7.548659999971278,
+          "started_utc": "2026-09-08T05:11:30Z",
+          "finished_utc": "2026-09-08T05:11:37Z",
+          "stdout_sha256": "c64d21c9ac781185db4789ab935ba0a2b5892e2e2f6ecd1baec37c693ce85dfc",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "eeb5ac9a95dd8dacaa1fb357ec0c6714b523ca0d8dcccd742f0a7d01f6206f7b",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata",
+        "engine": "both",
+        "mode": "where",
+        "operation": "global_metadata"
+      }
+    ],
+    "source_types": {
+      "identity": "∀ (α : Type), [ContextProduction.Dictionary α] → α → α",
+      "forwarding": "(∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token) → (∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token)",
+      "local_given": "∀ (α : Type), [ContextProduction.Dictionary α] → (∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token) → α → ContextProduction.Token",
+      "higher_universe": "∀ (α : Type), [ContextProduction.Dictionary α] → (∀ (β : Type 1), β → β)",
+      "constant_universe": "∀ (α : Type), [ContextProduction.UniverseDictionary.{1} α] → α → α",
+      "global_metadata": "∀ (α : Type), [ContextProduction.Dictionary α] → ContextProduction.Token",
+      "reject_all": "∀ (α : Type), [ContextProduction.Dictionary α] → α → α"
+    },
+    "inventory": {
+      "count": 39,
+      "unique_names": 39,
+      "ordered_names_sha256": "a8989fcc50cd213384f7eb7b263b4f1c3a1b8d648ada8f937acf8d5031348282",
+      "construction": "All three engines, ordinary and named where, across identity/forwarding/local_given/higher_universe/constant_universe/global_metadata, plus one named False control per engine."
+    },
+    "review": {
+      "mode": "Read/hash-only verification and receipt construction; no compiler, Lean kernel, synthesis or test execution.",
+      "raw_captures_rehashed": 142,
+      "live_inputs_rehashed": 39,
+      "prepared_commands_rehashed": 39,
+      "kernel_sources_rehashed": 32,
+      "candidate_observations_rehashed": 18,
+      "separate_process_manifests_matched": true,
+      "all_current_manifested_sources_rehashed": true,
+      "executable_and_kernel_rehashed": true,
+      "source_type_predicate_and_exact_candidate_replay_checked": true,
+      "command_input_relation": "Prepared LF commands and Windows CRLF stdin retain independent raw hashes and equal text after only CRLF-to-LF normalization.",
+      "scope": "The 18 positives have 72 finite observations and 144 empty declaration axiom inventories; explicit unsupported metadata cells count as expected refusals, not support for those source forms. Three False controls caused four genuine candidate falsifications and zero inconclusive decisions."
+    }
+  }
+}

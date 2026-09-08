@@ -44,6 +44,8 @@ module Leant.Synth.Fragment
   , Slot (..)
   , GoalSort (..)
   , ParsedGoal (..)
+  , parsedGoalContextSource
+  , contextSourceFragment
   , ProviderFrag (..)
   , ProviderForallDomain (..)
   , ProviderInstantiationArgument (..)
@@ -89,6 +91,10 @@ import Data.Bifunctor (second)
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Text.Read (readMaybe)
+import Leant.Synth.ContextSource
+  ( ContextSource, ContextSourceType (..), ContextSourceVisibility (..)
+  , mkContextSource, contextSourceType, contextSourceName
+  )
 
 
 import Leant.Synth.ProviderCache
@@ -241,7 +247,39 @@ data ParsedGoal = ParsedGoal
     -- instantiated at the goal's own element types.  Unfiltered here -
     -- the driver decides which are usable
   }
+  | ParsedContextGoal
+  { pgSort :: GoalSort
+  , pgProviderQuery :: ProviderQuery
+  , pgFrag :: Frag
+  , pgPrems :: [(String, Frag)]
+  , pgContextSourceResult :: Either String ContextSource
+  }
   deriving (Eq, Show)
+
+parsedGoalContextSource :: ParsedGoal -> Maybe (Either String ContextSource)
+parsedGoalContextSource parsed = case parsed of
+  ParsedContextGoal{pgContextSourceResult = source} -> Just source
+  ParsedGoal{}
+    | fragHasInstanceBinder (pgFrag parsed) ->
+        Just $ Left "context-source: contextual goal has no exact source metadata"
+    | otherwise -> Nothing
+
+-- A supported packet owns both the exact source tree and its matching search
+-- fragment. Canonical nominal heads stay abstract; constructor inventories and
+-- pretty-printed atoms do not become metadata authority in this route.
+contextSourceFragment :: ContextSource -> Frag
+contextSourceFragment = convert . contextSourceType
+ where
+  convert source = case source of
+    ContextVariable variable -> FVar variable
+    ContextNominal parts _ arguments ->
+      let name = contextSourceName parts
+      in FApp False name (AppNominal name) $ map convert arguments
+    ContextArrow domain result -> FArr (convert domain) (convert result)
+    ContextForall visibility variable body ->
+      FAll (visibility == ContextExplicit) variable $ convert body
+    ContextGiven parts _ arguments body -> FExactContext (contextSourceName parts)
+      [ExactContextFragmentArgument 0 (convert argument) | argument <- arguments] $ convert body
 
 -- | One exact provider-binder argument together with its ground kind.  Lean's
 -- admitted type-kind fragment is a chain of universe-domain arrows ending in
@@ -372,7 +410,7 @@ data ProviderEvidenceMetadata
 -- premise-offer list.  Names are validated by the caller; anything
 -- missing from the environment is skipped at premise time.
 synthPrelude :: [String] -> String
-synthPrelude inventory = unlines
+synthPrelude inventory = unlines $
   [ "namespace LeantSynth"
   , "open Lean Meta"
   , ""
@@ -1397,7 +1435,140 @@ synthPrelude inventory = unlines
   , "      mkPremises acc"
   , ""
   , "end LeantSynth"
+  ] ++ contextSourcePrelude
+
+contextSourcePrelude :: [String]
+contextSourcePrelude =
+  [ "namespace LeantSynth"
+  , "open Lean Meta"
+  , ""
+  , "private def contextTypeZero (e : Expr) : Bool :="
+  , "  match e with"
+  , "  | .sort (.succ .zero) => true"
+  , "  | _ => false"
+  , ""
+  , "private def contextVisibility? (bi : BinderInfo) : Option String :="
+  , "  match bi with"
+  , "  | .default => some \"explicit\""
+  , "  | .implicit => some \"implicit\""
+  , "  | _ => none"
+  , ""
+  , "private partial def contextNameParts? : Name → Option (List String)"
+  , "  | .anonymous => some []"
+  , "  | .str parentName part => do"
+  , "      let parts ← contextNameParts? parentName"
+  , "      pure (parts ++ [part])"
+  , "  | .num _ _ => none"
+  , ""
+  , "private def contextName? (name : Name) : Option String := do"
+  , "  let parts ← contextNameParts? name"
+  , "  if parts.isEmpty then none"
+  , "  else some (\"(name \" ++ String.intercalate \" \" (parts.map esc) ++ \")\")"
+  , ""
+  , "-- Inspect the actual instantiated declaration telescope, including its result."
+  , "private partial def contextTypeZeroArity? (fuel : Nat) (e : Expr) : MetaM (Option Nat) := do"
+  , "  match fuel with"
+  , "  | 0 => pure none"
+  , "  | fuel + 1 =>"
+  , "    let e ← whnfR (← instantiateMVars e).consumeMData"
+  , "    if contextTypeZero e then pure (some 0)"
+  , "    else match e with"
+  , "    | .forallE _ domain body bi =>"
+  , "      let domain ← whnfR domain"
+  , "      if !contextTypeZero domain || (contextVisibility? bi).isNone then pure none"
+  , "      else withLocalDeclD (Name.mkSimple \"contextParameter\") domain fun localValue => do"
+  , "        match ← contextTypeZeroArity? fuel (body.instantiate1 localValue) with"
+  , "        | some arity => pure (some (arity + 1))"
+  , "        | none => pure none"
+  , "    | _ => pure none"
+  , ""
+  , "private partial def contextUsesGiven (fuel : Nat) (e : Expr) : MetaM Bool := do"
+  , "  match fuel with"
+  , "  | 0 => pure true"
+  , "  | fuel + 1 =>"
+  , "    let e ← whnfR (← instantiateMVars e).consumeMData"
+  , "    match e with"
+  , "    | .forallE _ domain body bi =>"
+  , "      if bi.isInstImplicit then pure true"
+  , "      else if ← contextUsesGiven fuel domain then pure true"
+  , "      else withLocalDeclD (Name.mkSimple \"contextScan\") domain fun localValue =>"
+  , "        contextUsesGiven fuel (body.instantiate1 localValue)"
+  , "    | .app function argument =>"
+  , "      if ← contextUsesGiven fuel function then pure true"
+  , "      else contextUsesGiven fuel argument"
+  , "    | _ => pure false"
+  , ""
+  , "-- Local type identities come from FVarId, never from pretty-printed types."
+  , "private partial def contextSourceType? (fuel depth : Nat)"
+  , "    (scope : List (FVarId × String)) (e : Expr) : MetaM (Option String) := do"
+  , "  match fuel with"
+  , "  | 0 => pure none"
+  , "  | fuel + 1 =>"
+  , "    let e ← whnfR (← instantiateMVars e).consumeMData"
+  , "    match e with"
+  , "    | .fvar id =>"
+  , "      match scope.find? (fun entry => entry.1 == id) with"
+  , "      | some entry => pure (some (\"(var \" ++ esc entry.2 ++ \")\"))"
+  , "      | none => pure none"
+  , "    | .forallE _ domain body bi =>"
+  , "      let domain ← whnfR domain"
+  , "      if bi.isInstImplicit then do"
+  , "        if body.hasLooseBVars then return none"
+  , "        let some className ← Meta.isClass? domain | return none"
+  , "        -- Packet v1 does not retain constant universe arguments. Even an"
+  , "        -- otherwise Type-0 class can use a universe only in a Prop field."
+  , "        let .const _ levels := domain.getAppFn | return none"
+  , "        if !levels.isEmpty then return none"
+  , "        let some name := contextName? className | return none"
+  , "        let arguments := domain.getAppArgs"
+  , "        let some arity ← contextTypeZeroArity? 65 (← inferType domain.getAppFn) | return none"
+  , "        if arity > 64 || arguments.size != arity then return none"
+  , "        let mut argumentsText := \"\""
+  , "        for argument in arguments do"
+  , "          let some text ← contextSourceType? fuel depth scope argument | return none"
+  , "          argumentsText := argumentsText ++ \" \" ++ text"
+  , "        let some result ← contextSourceType? fuel depth scope body | return none"
+  , "        pure (some (\"(given \" ++ name ++ \" \" ++ toString arity"
+  , "          ++ \" (args\" ++ argumentsText ++ \") \" ++ result ++ \")\"))"
+  , "      else if contextTypeZero domain then do"
+  , "        let some visibility := contextVisibility? bi | return none"
+  , "        let identity := \"contextType\" ++ toString depth"
+  , "        withLocalDeclD (Name.mkSimple identity) domain fun localValue => do"
+  , "          let some result ← contextSourceType? fuel (depth + 1)"
+  , "            ((localValue.fvarId!, identity) :: scope) (body.instantiate1 localValue) | return none"
+  , "          pure (some (\"(all \" ++ visibility ++ \" \" ++ esc identity ++ \" \" ++ result ++ \")\"))"
+  , "      else if bi.isExplicit && !body.hasLooseBVars then do"
+  , "        let some parameter ← contextSourceType? fuel depth scope domain | return none"
+  , "        let some result ← contextSourceType? fuel depth scope body | return none"
+  , "        pure (some (\"(arrow \" ++ parameter ++ \" \" ++ result ++ \")\"))"
+  , "      else pure none"
+  , "    | _ =>"
+  , "      match e.getAppFn with"
+  , "      | .const constant levels =>"
+  , "        if !levels.isEmpty then return none"
+  , "        if (← Meta.isClass? e).isSome then return none"
+  , "        let some name := contextName? constant | return none"
+  , "        let some arity ← contextTypeZeroArity? 65 (← inferType e.getAppFn) | return none"
+  , "        let arguments := e.getAppArgs"
+  , "        if arity > 64 || arguments.size != arity then return none"
+  , "        let mut argumentsText := \"\""
+  , "        for argument in arguments do"
+  , "          let some text ← contextSourceType? fuel depth scope argument | return none"
+  , "          argumentsText := argumentsText ++ \" \" ++ text"
+  , "        pure (some (\"(nominal \" ++ name ++ \" \" ++ toString arity"
+  , "          ++ \" (args\" ++ argumentsText ++ \"))\"))"
+  , "      | _ => pure none"
+  , ""
+  , "def contextSourcePacket (e : Expr) : MetaM String := do"
+  , "  if !(← contextUsesGiven 256 e) then return \"\""
+  , "  match ← contextSourceType? 256 0 [] e with"
+  , "  | some source => pure (\" (context-source 1 \" ++ source ++ \")\")"
+  , "  | none => pure (\" (context-source unsupported \" ++ esc"
+  , "      \"exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows\" ++ \")\")"
+  , ""
+  , "end LeantSynth"
   ]
+
 
 -- | The per-goal Lean command run in the synthesis environment.  The
 -- goal text is spliced verbatim between parentheses; elaboration errors
@@ -1415,6 +1586,7 @@ serializerProgram goal = unlines
   , "    let isP \8592 Meta.isProp tgt"
   , "    let s \8592 LeantSynth.go false false 100 0 [] tgt"
   , "    let prems \8592 LeantSynth.premSpine 100 0 #[] tgt"
+  , "    let contextSource \8592 LeantSynth.contextSourcePacket tgt"
   , "    let roots := tgt.getUsedConstants.toList.map Name.getRoot"
   , "    let rootText := String.intercalate \" \" (roots.map fun n =>"
   , "      LeantSynth.esc n.toString)"
@@ -1424,7 +1596,7 @@ serializerProgram goal = unlines
   , "      | none => \"(head)\""
   , "    logInfo (\"(goal \" ++ (if isP then \"prop\" else \"type\")"
   , "      ++ \" (query (roots \" ++ rootText ++ \") \" ++ headText"
-  , "      ++ \") \" ++ s ++ prems ++ \")\")"
+  , "      ++ \") \" ++ s ++ prems ++ contextSource ++ \")\")"
   , "  sorry"
   ]
 
@@ -1635,8 +1807,74 @@ parseGoalSexp text = do
       (prems, rest'') <- parsePrems rest'
       case rest'' of
         [TR] -> Right (ParsedGoal gs query frag prems)
+        TL : TSym "context-source" : payload ->
+          let metadata = parseContextSourcePacket payload
+              exactFragment = either (const frag) contextSourceFragment metadata
+          in Right $ ParsedContextGoal gs query exactFragment prems metadata
         _ -> Left "trailing tokens in goal translation"
     _ -> Left "malformed goal translation"
+
+parseContextSourcePacket :: [Tok] -> Either String ContextSource
+parseContextSourcePacket [TSym "unsupported", TStr reason, TR, TR] =
+  Left $ "context-source: " ++ reason
+parseContextSourcePacket (TSym "1" : rest) = do
+  (source, remaining) <- parseContextSourceType 256 rest
+  case remaining of
+    [TR, TR] -> mkContextSource source
+    _ -> Left "context-source: trailing or missing source-packet delimiters"
+parseContextSourcePacket _ = Left "context-source: malformed or unsupported source-packet version"
+
+parseContextSourceType :: Int -> [Tok] -> Either String (ContextSourceType, [Tok])
+parseContextSourceType fuel _ | fuel <= 0 = Left "context-source: source nesting exceeds limit"
+parseContextSourceType fuel (TL : TSym tag : rest) = case (tag, rest) of
+  ("var", TStr variable : TR : remaining) -> Right (ContextVariable variable, remaining)
+  ("all", TSym visibility : TStr variable : body) -> do
+    visible <- case visibility of
+      "explicit" -> Right ContextExplicit
+      "implicit" -> Right ContextImplicit
+      _ -> Left "context-source: unsupported type-binder visibility or domain"
+    (result, remaining) <- descend body
+    finish (ContextForall visible variable result) remaining
+  ("arrow", body) -> do
+    (domain, afterDomain) <- descend body
+    (result, remaining) <- descend afterDomain
+    finish (ContextArrow domain result) remaining
+  ("nominal", body) -> named False body
+  ("given", body) -> named True body
+  _ -> Left "context-source: unsupported source type form"
+ where
+  descend = parseContextSourceType (fuel - 1)
+  finish value (TR : remaining) = Right (value, remaining)
+  finish _ _ = Left "context-source: missing source-type delimiter"
+  named given body = do
+    (parts, afterName) <- case body of
+      TL : TSym "name" : names -> nameParts 0 names
+      _ -> Left "context-source: missing canonical name components"
+    (arity, afterArity) <- case afterName of
+      TSym raw : remaining -> case readMaybe raw of
+        Just number | number >= 0 && number <= (64 :: Int) -> Right (number, remaining)
+        _ -> Left "context-source: unsupported source arity"
+      _ -> Left "context-source: missing source arity"
+    (arguments, afterArguments) <- case afterArity of
+      TL : TSym "args" : values -> argumentsOf 0 values
+      _ -> Left "context-source: missing ordered source arguments"
+    if length arguments /= arity then Left "context-source: source arity does not match its arguments"
+    else if given then do
+      (result, remaining) <- descend afterArguments
+      finish (ContextGiven parts arity arguments result) remaining
+    else finish (ContextNominal parts arity arguments) afterArguments
+  nameParts _ (TR : remaining) = Right ([], remaining)
+  nameParts count (TStr part : remaining) | count < (64 :: Int) = do
+    (parts, final) <- nameParts (count + 1) remaining
+    Right (part : parts, final)
+  nameParts _ _ = Left "context-source: invalid canonical name"
+  argumentsOf _ (TR : remaining) = Right ([], remaining)
+  argumentsOf count remaining | count < (64 :: Int) = do
+    (argument, afterArgument) <- descend remaining
+    (arguments, final) <- argumentsOf (count + 1) afterArgument
+    Right (argument : arguments, final)
+  argumentsOf _ _ = Left "context-source: source argument limit exceeded"
+parseContextSourceType _ _ = Left "context-source: malformed source type"
 
 parseProviderQuery :: [Tok] -> Either String (ProviderQuery, [Tok])
 parseProviderQuery

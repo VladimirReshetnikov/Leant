@@ -135,63 +135,37 @@ Companion documents:
   Rendering and Length consume the candidate's own graph and source inventory;
   `both` preserves each retained candidate's engine ownership. See the
   [implementation and validated coverage](docs/synth-internals.md#djinn-source-graphs-and-current-validation).
-- **Current synthesis progress.** The pinned Djex checkpoint adds checked
-  ordinary-data cases, supplied-fold composition, and lexical `Given` evidence.
-  All eight ordinary-data scenarios now pass in Djinn, Exference, and Both:
-  24 exact displayed terms pass independent Lean replay, with 48 empty axiom
-  inventories and three actual false controls. The isolated dictionary renderer
-  also passes seven full-signature replays with distinct dictionary payloads;
-  the bounded working production route now also passes three public Djinn
-  behavioral queries, exact full-type replay with 24 empty inventories, and an
-  actual false control. The fresh strict build, 52 focused tests, and two Djinn
-  identity ordinary/`where` full-type replays pass with their own accepted-variant
-  provenance. The corrected [complete integration suite](test-context/receipts/unit-context-integration.json)
-  passes all 678 tests in 283.51 seconds (283.64 seconds for the owned process).
-  The contextual matrix has 35/39 accepted cells; four ordinary-query timeouts
-  remain open. The earlier configured 647-test
-  suite passes in 343.79 seconds on its recorded source revision. Native fold `map` now also passes live synthesis and exact replay;
-  append and length produce correct candidates but encounter backend request failures
-  before acceptance. Next, validate the working integration of the accepted
-  canonical nested-Given guard and bounded production contexts, and repair
-  live fold verification. Canonical Djex's supported-fragment Haskell elaboration
-  now completes priority 1: all 101 CLI tests pass, including retention of the
-  original failure sample across a retry timeout under the same deadline.
-  Priorities 2–4 remain open; this does not enlarge a pinned Lean receipt. Both
-  partial oracle preflights pass: 20 Lean files with 491 inventories (487 empty, four allowlisted
-  observer/proofs), and 63 Haskell controls. Supplied-default `head` now passes
-  live synthesis, exact GHC execution, and False controls in both Haskell engines.
-  Most expanded cells remain open, including their Lean synthesis acceptance.
-  Preflight and the 350-signature inhabitation result remain separate from behavioral
-  synthesis. Full proof-selected dictionary transport follows before overlap
-  guards are relaxed. See the
-  [current re-triage and exact evidence
-  boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
-- **Checked conditional providers in canonical Djex.** The newer
+- **Current synthesis progress.** The bounded local `Type 0` contextual route
+  is accepted across Djinn, Exference and Both, through ordinary and named-`where`
+  commands. The fresh [39-cell matrix and complete 680-test suite](test-context/receipts/ordinary-context-streaming.json)
+  pass: 18 exact full-type/payload outputs, three actual False controls and 18
+  explicit metadata refusals. Each accepted variant retains its own graph,
+  renderer and engine; the replay kernel and inputs are pinned. Ordinary-data
+  synthesis separately retains its 24 accepted cells. This bounded milestone
+  advances original priority 3; global contextual providers, equal-predicate
+  dictionary selection, methods and superclass evidence remain open.
+  Canonical Djex's supported-fragment Haskell elaboration completes original
+  priority 1; priorities 2–4 retain their broader requirements.
+  Native fold `map` and the recorded `length` query pass live synthesis and
+  exact replay. [Native request traces](test-recursive/receipts/native-request-traces.json)
+  preserve append's failed positive and False-control runs; they do not justify
+  a transport fix. Next are reliable native verification with exact
+  candidate/request correlation, broader Church behavior including all 19
+  explicit-default cases, and one described global `Type 0` provider under
+  the current guard. See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
+- **Checked conditional providers in canonical Djex.** The
   [conditional-Given implementation](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)
-  synthesizes constrained local/global calls from exact root dictionary
-  assumptions, preserves kinds and shared search budgets, and prevents false
-  non-inhabitation claims when class methods are omitted. Its twelve complete
-  affected suites record 2,168 passing tests across complementary runs.
-  Leant's published `922c5558` dependency does not yet contain this increment.
-  The subsequent [guarded nested-Given increment](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/docs/reports/2026-09-07-djinn-nested-givens.md)
-  is now accepted in canonical Djex: 106 private and 147 facade tests pass,
-  including 24 contextual cases and GHC witnesses. Leant's working dependency
-  is now `38435709bf4e70c4b53c541c462b0bbd35837bf2`; the published gitlink remains
-  `922c5558`. The new strict build and 52 focused tests pass. Two Djinn identity
-  ordinary/`where` full-type replays retain each accepted variant's own graph,
-  renderer and engine, with the actual kernel pinned. The corrected complete
-  suite passes **678/678**; its [receipt](test-context/receipts/unit-context-integration.json)
-  preserves the earlier 675/678 result and the three stale source-routing
-  assertion corrections. Production sources and bounds stayed unchanged.
-  The [contextual matrix receipt](test-context/receipts/production-context-initial.json)
-  records **35/39 accepted cells across two runs**: 14 exact outputs, three
-  actual False controls and 18 metadata refusals. The initial run accepted 29;
-  a separate six-cell replay passed after explicitly declaring the universe
-  fixture's class as `Type`, with production unchanged. All nine named-`where`
-  positives pass. Four ordinary forwarding/local-Given queries in Exference
-  and Both still reach their 45-second command timeout. Source inspection
-  identifies pool collection before first verification; an incremental
-  collection patch is prepared but unapplied and unvalidated.
+  and [guarded nested-Given increment](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/docs/reports/2026-09-07-djinn-nested-givens.md)
+  preserve exact root dictionary assumptions, kinds, search budgets and sound
+  negative-evidence boundaries. Leant's validated integration uses Djex
+  `38435709bf4e70c4b53c541c462b0bbd35837bf2`. Its ordinary contextual collection
+  now verifies bounded groups before demanding a complete pool; all four formerly
+  timed-out cells pass in the fresh 39-cell matrix. The complete unit suite
+  passes **680/680 in 293.73 seconds** (293.86 seconds for the owned process).
+  The [receipt](test-context/receipts/ordinary-context-streaming.json) preserves
+  earlier failures and fixture corrections. Full dictionary selection remains
+  required before overlap guards are relaxed; successful compilation or graph
+  identities alone do not establish which dictionary payload was used.
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked

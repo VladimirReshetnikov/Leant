@@ -328,6 +328,12 @@ renderLeanContextGraph environment graph = do
         let name = localName pattern
         pure (parameters ++ ["(" ++ name ++ " : " ++ signature ++ ")"],
           Map.insert variable (name, domain) locals, result)
+      (LeanArrow domain result, Q.TypedWildcard) -> do
+        unless (A.alphaEquivalentTypes (Q.typedPatternType pattern) $ eraseLeanType domain) $
+          Left ContextLocalMetadataMismatch
+        signature <- properType scope domain
+        pure (parameters ++ ["(" ++ localName pattern ++ " : " ++ signature ++ ")"],
+          locals, result)
       _ -> Left UnsupportedContextPattern
 
   -- Explicit application is always headed by a fresh local with the complete

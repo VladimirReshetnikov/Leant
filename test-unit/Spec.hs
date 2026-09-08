@@ -103,6 +103,8 @@ import Test.Tasty (TestTree, defaultMain, testGroup, withResource)
 import Test.Tasty.HUnit ((@?=), assertBool, assertEqual, assertFailure, testCase)
 
 import qualified ContextRenderSpec
+import qualified ContextSourceSpec
+import qualified BackendTraceSpec
 
 import qualified Language.Haskell.Djex as Djex
 import Language.Haskell.Djex
@@ -709,10 +711,14 @@ main :: IO ()
 main = do
   arguments <- getArgs
   case arguments of
+    ["--emit-synthesis-prelude"] ->
+      ByteString.putStr $ TextEncoding.encodeUtf8 $ Text.pack $ synthPrelude []
     ["--emit-context-replay"] -> either (fail . show)
       (ByteString.putStr . TextEncoding.encodeUtf8 . Text.pack)
       ContextRenderSpec.contextReplaySource
     ["env", mode]
+      | "--backend-trace-helper=" `isPrefixOf` mode ->
+          void $ BackendTraceSpec.runBackendTraceHelper arguments
       | mode == backendStderrFloodMode -> backendStderrFloodHelper
       | backendProcessTreeWrapperPrefix `isPrefixOf` mode ->
           backendProcessTreeWrapperHelper
@@ -727,6 +733,7 @@ main = do
       [ commandLineTests
       , backendDiscoveryTests
       , backendLifecycleTests
+      , BackendTraceSpec.backendTraceTests
       , isolatedBackendPairTests
       , boundedJsonTests
       , snapshotMetadataTests
@@ -772,6 +779,7 @@ main = do
       , rankNFrontierTests
       , visibleTypeApplicationTests
       , ContextRenderSpec.tests
+      , ContextSourceSpec.tests
       ]
 
 commandLineTests :: TestTree
@@ -3240,9 +3248,9 @@ behavioralStreamingTests = testGroup "named behavioral candidate streaming"
         [ "Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits"
         , "Just _ -> synthesizeBehavioralTunedDetailedWith"
         , "&& isNothing behavioral"
-        , "isJust behavioral && acceptedCount reverseOutcomes >= synthLaneCursorShown policy"
-        , "isJust behavioral && groupCount >= synthLaneCursorBatchSize policy"
-        , "if isJust behavioral then 1 else synthLaneCursorBatchSize policy"
+        , "incremental && acceptedCount reverseOutcomes >= synthLaneCursorShown policy"
+        , "incremental && groupCount >= incrementalGroupLimit"
+        , "if incremental then 1 else synthLaneCursorBatchSize policy"
         , "previous <- readIORef $ behavioralRunObservations active"
         , "[text | (text, BehavioralSatisfied) <- previous]"
         , "presentations = presentLengthAssessmentBatches shown assessments"
@@ -6150,8 +6158,8 @@ djinnStrategyIntegrationTests = testGroup "Djinn strategy integration"
         ":set synth-djinn-strategy S depth-first (default) | interleave"
       engine <- lines <$> readFile "src/Leant/Synth/Engine.hs"
       mapM_ (assertMainSourceContains "common Djinn strategy request" engine)
-        [ "outcome <- djinnRun streaming limits djinnLimits prepared"
-        , "djinn <- djinnRun streaming limits djinnLimits djinnPrepared"
+        [ "outcome <- djinnRun incrementalCollection limits djinnLimits prepared"
+        , "djinn <- djinnRun incrementalCollection limits djinnLimits djinnPrepared"
         , "requestOptions = djinnQueryOptionsForLimits limits laneBounds"
         ]
   ]
@@ -16749,6 +16757,12 @@ assertLengthAssessmentMainCommandContext = do
         "synthClassical behavioral assessmentContext commandDeadline st goal parsed accumulation ="
         "verifySynthLane behavioral assessmentContext groupLimit st goal notes groups ="
         sourceLines
+      cursorWrapperSection = mainSourceSection
+        "-- | Consume one lazy detailed outcome"
+        "-- | The new exact-context route" sourceLines
+      collectionCursorSection = mainSourceSection
+        "-- | The new exact-context route"
+        "-- | Debug candidate ordinals" sourceLines
   mapM_ (assertMainSourceContains "Length Integration import" importSection)
     [ "LengthAssessmentContext"
     , "assessLengthVerificationContext"
@@ -16777,9 +16791,22 @@ assertLengthAssessmentMainCommandContext = do
   length (mainSourcePositions
       "withLengthAssessmentRequestContext"
       $ dropWhile (not . isInfixOf "synthRun ::") sourceLines) @?= 3
+  -- The collection worker adds one signature, not a new nominal context.
   length (mainSourcePositions
       "LengthAssessmentContext command" sourceLines)
-    @?= 7
+    @?= 8
+  mapM_ (\(label, section) -> do
+      length (mainSourcePositions "LengthAssessmentContext command" section) @?= 1
+      assertBool (label ++ " reacquired the command's nominal context")
+        $ not ("withLengthAssessmentRequestContext" `isInfixOf` unlines section))
+    [("ordinary cursor wrapper", cursorWrapperSection),
+      ("collection cursor worker", collectionCursorSection)]
+  assertMainSourceContains "ordinary cursor default" cursorWrapperSection
+    "runSynthLaneCursor = runSynthLaneCursorWithCollection False"
+  assertMainSourceContains "collection cursor context forwarding" collectionCursorSection
+    "runSynthLaneCursorWithCollection contextual behavioral assessmentContext policy deadline st goal transform outcome"
+  assertMainSourceContains "collection cursor verification owner" collectionCursorSection
+    "lane <- verifySynthLane behavioral assessmentContext"
 
   assertMainSourceContains "command entrance" commandSection
     "synthRun assessmentRequest st args goal"
@@ -16846,6 +16873,7 @@ assertLengthAssessmentMainCommandContext = do
     "synthGo' behavioral assessmentContext st args retriedVars goal parsed"
   mapM_ (assertMainSourceContains "constructive context" schedulerSection)
     [ "runSynthLaneCursor behavioral assessmentContext"
+    , "runSynthLaneCursorWithCollection (isJust contextSource) behavioral assessmentContext"
     , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "synthClassical behavioral assessmentContext runDeadline st goal parsed"
     ]
@@ -17220,6 +17248,9 @@ assertLengthAssessmentMainLaneScheduling = do
       constructiveSection = mainSourceSection
         "limit <- synthTimeoutSeconds st"
         "if structuralFirst" schedulerSection
+      contextualBaseSection = mainSourceSection
+        "let base = case contextSource of"
+        "Nothing -> case behavioral of" constructiveSection
       baselineSection = mainSourceSection
         "if structuralFirst"
         "where" schedulerSection
@@ -17234,21 +17265,38 @@ assertLengthAssessmentMainLaneScheduling = do
       schedulerText = unlines schedulerSection
   assertMainSourceContains "command ranking capture" schedulerSection
     "ranking = synthLimitRanking limits"
+  mapM_ (assertMainSourceContains "contextual source routing" schedulerSection)
+    [ "contextSource = parsedGoalContextSource parsed"
+    , "structuralFirst = isJust contextSource || isNothing refusal"
+    ]
   mapM_ (assertMainSourceContains "constructive cursor lane"
       constructiveSection)
     [ "let deadline"
     , "runSynthesis includeLibrary checked laneEngine providers accumulation ="
-    , "base = case behavioral of"
+    , "base = case contextSource of"
+    , "Just (Left failure) -> Left failure"
+    , "Just (Right source) -> synthesizeContextualWithProvidersSkippingDetailedWith (isJust behavioral) limits laneEngine (rsSynthSteps state) checked providers source fragment"
+    , "Nothing -> case behavioral of"
     , "Nothing -> synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
     , "Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
-    , "in runSynthLaneCursor behavioral assessmentContext"
+    , "in runSynthLaneCursorWithCollection (isJust contextSource) behavioral assessmentContext"
     , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "deadline st goal id outcome accumulation"
     ]
-  assertBool
-      "constructive scheduling lost its serial or two parallel cursors"
+  mapM_ (\legacyRoute -> assertBool
+      ("contextual source escaped to legacy construction via " ++ legacyRoute)
+      $ not $ legacyRoute `isInfixOf` unlines contextualBaseSection)
+    [ "synthesizeWithProvidersSkippingDetailedWith"
+    , "synthesizeBehavioralWithProvidersSkippingDetailedWith"
+    , "synthesizeTunedDetailedWith"
+    , "synthesizeBehavioralTunedDetailedWith"
+    ]
+  assertBool "constructive scheduling lost its two ordinary parallel cursors"
     $ length (mainSourcePositions
-        "runSynthLaneCursor behavioral assessmentContext" constructiveSection) == 3
+        "runSynthLaneCursor behavioral assessmentContext" constructiveSection) == 2
+  assertBool "constructive scheduling lost its exact-context serial cursor"
+    $ length (mainSourcePositions
+        "runSynthLaneCursorWithCollection (isJust contextSource)" constructiveSection) == 1
 
   mapM_ (assertMainSourceContains "baseline run routing" baselineSection)
     [ "baseline <- case initialBaselineSchedule of"
@@ -17366,6 +17414,12 @@ assertLengthAssessmentMainParallelBaseline = do
       engineBothSection = mainSourceSection
         "EngineBoth -> do"
         "-- | Prepare one engine-specific translation" engineLines
+      engineContextRoutingSection = mainSourceSection
+        "runTunedSynthesisWithCollection = runTunedSynthesisWithContext Nothing"
+        "-- | Prepare one engine-specific translation" engineLines
+      engineContextPreparationSection = mainSourceSection
+        "prepareSynthesis = prepareSynthesisWithContext Nothing"
+        "-- | Resolve exact contextual provider fact groups" engineLines
       excludedSerialSections =
         [ ("ordinary/library/provider callback", serialSection)
         , ("provider widening", providerSection)
@@ -17373,13 +17427,21 @@ assertLengthAssessmentMainParallelBaseline = do
         ]
 
   length (mainSourcePositions
-      "runSynthLaneCursor behavioral assessmentContext" constructiveSection) @?= 3
+      "runSynthLaneCursor behavioral assessmentContext" constructiveSection) @?= 2
   length (mainSourcePositions
-      "runSynthLaneCursor behavioral assessmentContext" serialSection) @?= 1
+      "runSynthLaneCursorWithCollection (isJust contextSource)" constructiveSection) @?= 1
+  length (mainSourcePositions
+      "runSynthLaneCursor behavioral assessmentContext" serialSection) @?= 0
+  length (mainSourcePositions
+      "runSynthLaneCursorWithCollection (isJust contextSource)" serialSection) @?= 1
   length (mainSourcePositions
       "runSynthLaneCursor behavioral assessmentContext" structuralParallelSection) @?= 1
   length (mainSourcePositions
       "runSynthLaneCursor behavioral assessmentContext" libraryParallelSection) @?= 1
+  length (mainSourcePositions
+      "runSynthLaneCursorWithCollection" parallelSection) @?= 0
+  assertMainSourceContains "serial exact-context cursor ownership" serialSection
+    "runSynthLaneCursorWithCollection (isJust contextSource) behavioral assessmentContext (ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits) deadline st goal id outcome accumulation"
 
   mapM_ (assertMainSourceContains "parallel baseline eligibility"
       parallelSection)
@@ -17409,9 +17471,11 @@ assertLengthAssessmentMainParallelBaseline = do
       structuralEligibilitySection = mainSourceSection
         "parallelStructuralBaselineStaticallyEligible ="
         "parallelLibraryBaselineStaticallyEligible =" parallelSection
-  mapM_ (\(label, section) ->
+  mapM_ (\(label, section) -> do
       assertMainSourceContains (label ++ " excludes named streaming") section
-        "&& isNothing behavioral")
+        "&& isNothing behavioral"
+      assertMainSourceContains (label ++ " excludes contextual source") section
+        "&& isNothing contextSource")
     [("structural pair", structuralEligibilitySection), ("library pair", libraryEligibilitySection)]
   assertBool "library-pair admission was restricted to one engine"
     $ not ("engine ==" `isInfixOf` unlines libraryEligibilitySection)
@@ -17599,11 +17663,15 @@ assertLengthAssessmentMainParallelBaseline = do
       ]) excludedSerialSections
   mapM_ (assertMainSourceContains "serial ordinary/library lane"
       serialSection)
-    [ "base = case behavioral of"
+    [ "base = case contextSource of"
+    , "Just (Left failure) -> Left failure"
+    , "Just (Right source) -> synthesizeContextualWithProvidersSkippingDetailedWith (isJust behavioral) limits laneEngine (rsSynthSteps state) checked providers source fragment"
+    , "Nothing -> case behavioral of"
     , "Nothing -> synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
     , "Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
     , "includeLibrary && not (null libraryPremises)"
-    , "mergeLibraryForCommand base (tunedForCommand limits laneEngine"
+    , "mergeLibraryForCommand base (if isJust contextSource then Right $ DetailedSynthNoTerm"
+    , "[\"contextual library premises need exact source metadata; local contextual search remains available\"] else tunedForCommand limits laneEngine"
     , "tunedForCommand = case behavioral of Nothing -> synthesizeTunedDetailedWith Just _ -> synthesizeBehavioralTunedDetailedWith"
     , "mergeLibraryForCommand base library = case behavioral of Nothing -> mergeLibraryDetailedOutcomes base library"
     , "Just _ -> Right $ prependBehavioralLibraryOutcome (deferDetailedOutcome base) (deferDetailedOutcome library)"
@@ -17616,12 +17684,27 @@ assertLengthAssessmentMainParallelBaseline = do
     ]
   mapM_ (assertMainSourceContains "serial EngineBoth implementation"
       engineBothSection)
-    [ "djinnPrepared <- prepareSynthesis djinnRecursiveProjection"
+    [ "djinnPrepared <- prepareSynthesisWithContext contextSource djinnRecursiveProjection providers extras engineFrag fitFrag"
     , "djinn <- djinnRun"
-    , "exferencePrepared <- prepareSynthesis exferenceRecursiveProjection"
+    , "exferencePrepared <- prepareSynthesisWithContext contextSource exferenceRecursiveProjection providers extras engineFrag fitFrag"
     , "exference <- exferenceRun"
     , "mergeDetailedOutcomesSkippingWith limits checked (asCollection djinn) exference"
-    , "asCollection outcome | streaming = DetailedSynthStreaming $ outcomeStream outcome | otherwise = outcome"
+    , "asCollection outcome | incrementalCollection = DetailedSynthStreaming $ outcomeStream outcome | otherwise = outcome"
+    ]
+  mapM_ (assertMainSourceContains "ordinary/contextual engine routing"
+      engineContextRoutingSection)
+    [ "runTunedSynthesisWithCollection = runTunedSynthesisWithContext Nothing"
+    , "runTunedSynthesisWithContext contextSource streaming limits"
+    , "single selected = runTunedSynthesisWithContext contextSource streaming limits"
+    ]
+  mapM_ (assertMainSourceContains "exact contextual engine preparation"
+      engineContextPreparationSection)
+    [ "prepareSynthesis = prepareSynthesisWithContext Nothing"
+    , "prepareSynthesisWithContext contextSource recursiveProjection activeProviders extras engineFrag fitFrag = do"
+    , "when (contextSource /= Nothing) $ do unless (null activeProviders && null extras && engineFrag == fitFrag)"
+    , "Left \"context-source: provider, premise or changed fitting target lacks exact metadata\""
+    , "(translationContextNominals translation) sourceGoal source) contextSource"
+    , "semanticOriginContextSource = contextual"
     ]
   mapM_ (\parallelToken -> assertBool
       ("pure EngineBoth unexpectedly owns concurrency via " ++ parallelToken)
@@ -17714,7 +17797,7 @@ assertLengthAssessmentMainCursorDriver = do
         "forceDetailedSynthPairBefore"
         sourceLines
       driverSection = mainSourceSection
-        "runSynthLaneCursor behavioral assessmentContext policy deadline st goal transform outcome"
+        "runSynthLaneCursorWithCollection contextual behavioral assessmentContext policy deadline st goal transform outcome"
         "debugSynthLaneGroups ::" sourceLines
       debugSection = mainSourceSection
         "debugSynthLaneGroups ::"
@@ -17767,7 +17850,7 @@ assertLengthAssessmentMainCursorDriver = do
     , "notes = detailedCandidateBatchNotes batch"
     , "nextCount = groupCount + length groups"
     , "debugSynthLaneGroups st groupCount groups"
-    , "lane <- verifySynthLane behavioral assessmentContext (if isJust behavioral then 1 else synthLaneCursorBatchSize policy) st goal [] groups"
+    , "lane <- verifySynthLane behavioral assessmentContext (if incremental then 1 else synthLaneCursorBatchSize policy) st goal [] groups"
     , "let reverseOutcomes' = lane : reverseOutcomes"
     , "SynthLaneSurvivors _ _ -> finish reverseOutcomes' nextCount notes SynthLaneRunStoppedByDisposition"
     , "SynthLaneAssessmentPreserved _ _ -> finish reverseOutcomes' nextCount notes SynthLaneRunStoppedByDisposition"
@@ -17798,7 +17881,7 @@ assertLengthAssessmentMainCursorDriver = do
   length (mainSourcePositions
       "runDetailedSynthCursorBefore" driverSection) @?= 1
   length (mainSourcePositions
-      "runSynthLaneCursor" sourceLines) @?= 7
+      "runSynthLaneCursor" sourceLines) @?= 9
   length (mainSourcePositions
       "verifySynthLane behavioral assessmentContext" driverSection) @?= 1
   length (mainSourcePositions
@@ -17861,7 +17944,7 @@ assertLengthAssessmentMainClassicalScheduling = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let deadlineSection = mainSourceSection
         "classicalSynthLaneDeadline assessmentContext commandDeadline st ="
-        "runSynthLaneCursor behavioral assessmentContext policy deadline st goal transform outcome"
+        "runSynthLaneCursorWithCollection contextual behavioral assessmentContext policy deadline st goal transform outcome"
         sourceLines
       filterDeadlineSection = mainSourceSection
         "LengthBehaviorFilter -> pure commandDeadline"
@@ -17997,7 +18080,8 @@ assertLengthAssessmentMainDiagnosticGates = do
         "report runDeadline laneRun@SynthLaneRun"
         "synthLaneRunEnd = SynthLaneRunNoTerm" reportSection
       soundSection = mainSourceSection
-        "| sound = do" "| otherwise = do" refutationSection
+        "| sound && isNothing (parsedGoalContextSource parsed) = do"
+        "| otherwise = do" refutationSection
       unsoundSection = mainSourceSection
         "| otherwise = do" "synthLaneRunEnd = SynthLaneRunNoTerm"
         refutationSection
@@ -18026,7 +18110,7 @@ assertLengthAssessmentMainDiagnosticGates = do
     $ timeoutFinalize < timeoutDiagnostic
   mapM_ (assertMainSourceContains "partial behavioral timeout" timeoutSection)
     [ "disposition <- finalizeSynthLaneAccumulation st args goal"
-    , "partialSuccess = isJust behavioral && case disposition of"
+    , "partialSuccess = case disposition of"
     , "SynthLaneSurvivors presentations _ -> not (null presentations)"
     , "SynthLaneAssessmentPreserved presentations _ -> not (null presentations)"
     , "_ -> False"
@@ -18034,7 +18118,7 @@ assertLengthAssessmentMainDiagnosticGates = do
     , "| otherwise = \"s \\8212 no answer, not a verdict\""
     ]
   partialGate <- expectMainSourcePosition "partial behavioral timeout"
-    "partialSuccess = isJust behavioral && case disposition of" timeoutSection
+    "partialSuccess = case disposition of" timeoutSection
   assertBool "timeout classified partial success before its exact final disposition"
     $ timeoutFinalize < partialGate && partialGate < timeoutDiagnostic
   length (mainSourcePositions
@@ -18121,6 +18205,10 @@ assertLengthAssessmentMainDiagnosticGates = do
   length (mainSourcePositions
       "reportSynthLaneNotes" noTermSection) @?= 1
 
+  assertMainSourceContains "sound-refutation contextual exclusion" soundSection
+    "| sound && isNothing (parsedGoalContextSource parsed) = do"
+  assertBool "contextual/unsound refutation entered classical synthesis"
+    $ not ("synthClassical" `isInfixOf` unlines unsoundSection)
   classicalRetry <- expectMainSourcePosition "sound-refutation diagnostic"
     "then synthClassical behavioral assessmentContext runDeadline"
       soundSection

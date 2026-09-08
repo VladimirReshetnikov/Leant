@@ -61,6 +61,9 @@ Executable leant
     Leant.Synth.BehavioralSelection
     Leant.Synth.Behavioral
     Leant.Synth.BehavioralSelection.Internal
+    Leant.Synth.ContextSource
+    Leant.Synth.ContextRender
+    Leant.Synth.CandidateObservation
     Leant.Synth.Engine
     Leant.Synth.Engine.Parallel
     Leant.Synth.Fragment
@@ -131,7 +134,9 @@ Test-Suite leant-synth-tests
   Hs-Source-Dirs:   test-unit, src
   Main-Is:          Spec.hs
   Other-Modules:
+    BackendTraceSpec
     ContextRenderSpec
+    ContextSourceSpec
     Leant.Backend
     Leant.Backend.Isolated
     Leant.Options
@@ -139,6 +144,8 @@ Test-Suite leant-synth-tests
     Leant.Synth.Behavioral
     Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.ContextRender
+    Leant.Synth.ContextSource
+    Leant.Synth.CandidateObservation
     Leant.Synth.Engine
     Leant.Synth.Engine.Parallel
     Leant.Synth.Fragment
@@ -215,6 +222,8 @@ Benchmark leant-parallel-bench
   Hs-Source-Dirs:   bench-parallel, src
   Main-Is:          Bench.hs
   Other-Modules:
+    Leant.Synth.ContextSource
+    Leant.Synth.ContextRender
     Leant.Synth.Engine
     Leant.Synth.Engine.Parallel
     Leant.Synth.Fragment

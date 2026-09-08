@@ -286,7 +286,7 @@ def source_paths():
         ROOT / "lib/Djex/djinn/src-core/Djinn/Core.hs",
         ROOT / "lib/Djex/djinn/src-core/Djinn/Internal/Environment.hs",
         ROOT / "lib/Djex/djinn/src-core/Djinn/Internal/TypeFormula.hs",
-        ROOT / "lib/Djex/djinn/src-core/Djinn/Internal/Instantiation.hs",
+        ROOT / "lib/Djex/djinn/src-internal/Djinn/Internal/Instantiation.hs",
         ROOT / "lib/Djex/djinn/src-core/Djinn/Internal/LJT.hs",
         ROOT / "lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/Exference.hs",
         ROOT / "lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/ExpressionCheck.hs",

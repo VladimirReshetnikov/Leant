@@ -1,0 +1,502 @@
+{
+  "schema_version": 1,
+  "status": "mixed: length accepted; append and its False control failed",
+  "scope": "Completed native supplied-fold Djinn runs with optional transport diagnostics. No generalized reliability or transport-fix acceptance.",
+  "runs": [
+    {
+      "operation": "length",
+      "original_status": "passed",
+      "original_runner_exit_code": 0,
+      "result": {
+        "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/results.json",
+        "sha256": "755655528cbe3771ed7fcee7dc4adace4a169436af8b00878c2a7f7d9f047260"
+      },
+      "trace_index": {
+        "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/trace-index.json",
+        "sha256": "aa5c56c5b287487dbd10f104fda88a0e5bdee1a750dadce9b50a0ed9ba73114e"
+      },
+      "process_inventory": {
+        "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/processes.json",
+        "sha256": "6674edcae973daa075f1529930507064357149bc852f94b913fd851167bf14cf"
+      },
+      "settings": {
+        "window": 1024,
+        "steps": 100000,
+        "budget": 100000,
+        "provider_cap": 80,
+        "timeout": 90,
+        "process_timeout": 180.0,
+        "strategy": "interleave",
+        "shown": 1,
+        "debug": true,
+        "library": false,
+        "classical": false
+      },
+      "recorded_integrity": {
+        "executable_unchanged": true,
+        "sources_unchanged": true,
+        "commands_unchanged": true,
+        "provider_definitions_unchanged": true
+      },
+      "trace_collection_complete": true,
+      "cells": [
+        {
+          "name": "recursor_djinn_native_length",
+          "kind": "positive synthesis",
+          "acceptance_status": "passed",
+          "behavioral_observations": {
+            "passed": 1,
+            "falsified": 1,
+            "inconclusive": 0
+          },
+          "failure": null,
+          "process_wall_seconds": 17.743862299947068,
+          "process_exit_code": 0,
+          "process_guard_fired": false,
+          "owned_root_pid": 41640,
+          "started_utc": "2026-09-08T04:34:55Z",
+          "finished_utc": "2026-09-08T04:35:13Z",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain"
+          ],
+          "captures": {
+            "input": {
+              "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_length-live.input.txt",
+              "sha256": "79c6352c0776e2ffde058eb5b56e0b4123b1036add6c101271f474586af59cf5"
+            },
+            "stdout": {
+              "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_length-live.stdout.txt",
+              "sha256": "d9113c2b69cfb741629c62ae775252a8b3fa6f90f332be692eea0a288dd41836"
+            },
+            "stderr": {
+              "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_length-live.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "commands": {
+            "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_length.commands.txt",
+            "sha256": "79c6352c0776e2ffde058eb5b56e0b4123b1036add6c101271f474586af59cf5"
+          },
+          "trace": {
+            "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_length-live.backend-trace.json",
+            "sha256": "d03cf98befa478629aac2274f944fc22be270dfb6aec0929a47c0900d5c8cbd6"
+          },
+          "trace_retained_events": 297,
+          "trace_dropped_events": 0,
+          "request_count": 13,
+          "request_cycle_sum_seconds": 17.548385103,
+          "request_timeouts": [],
+          "timing_milliseconds": {
+            "write_to_flush_max": 2.8771,
+            "write_to_flush_sum": 4.0453,
+            "read_complete_to_parse_max": 1.2441,
+            "read_complete_to_parse_sum": 1.554303,
+            "matched_stdout_read_to_queue_count": 58,
+            "matched_stdout_read_to_queue_max": 0.1521,
+            "matched_stdout_read_to_queue_sum": 0.609505
+          },
+          "index_inputs_before_after_equal": true,
+          "index_request_inventory_matches_trace": true,
+          "trace_has_candidate_or_request_role_tags": false,
+          "exact_displayed_candidate": "fun f x g y => f _ (fun _ => g) x y",
+          "kernel_replay": {
+            "status": "passed",
+            "source": {
+              "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_length.lean",
+              "sha256": "5b6b07bdfddade575eb975ee7cc677c469cb52668de3e86a7f4fd41c6186a302"
+            },
+            "actual_command": [
+              "lean",
+              "+leanprover/lean4:v4.32.0",
+              "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-length-traced-v1\\recursor_djinn_native_length.lean"
+            ],
+            "exit_code": 0,
+            "wall_seconds": 1.219984699971974,
+            "captures": {
+              "stdout": {
+                "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_length-kernel.stdout.txt",
+                "sha256": "6f84b3a127f7a7e27044a9a9be9f2f93969ddef46792de0b7303b077aa3663cf"
+              },
+              "stderr": {
+                "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_length-kernel.stderr.txt",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              }
+            },
+            "axiom_inventories": {
+              "List.foldr": [],
+              "FoldReplay.accepted": [],
+              "FoldReplay.accepted_passes": []
+            },
+            "resolved_kernel_executable_sha256": null,
+            "kernel_identity_boundary": "Recorded command invokes lean +leanprover/lean4:v4.32.0; the actual resolved kernel executable was not hashed."
+          }
+        },
+        {
+          "name": "recursor_djinn_native_reject_all",
+          "kind": "False control",
+          "acceptance_status": "passed",
+          "behavioral_observations": {
+            "passed": 0,
+            "falsified": 14,
+            "inconclusive": 0
+          },
+          "failure": null,
+          "process_wall_seconds": 102.0680744999554,
+          "process_exit_code": 0,
+          "process_guard_fired": false,
+          "owned_root_pid": 7684,
+          "started_utc": "2026-09-08T04:35:14Z",
+          "finished_utc": "2026-09-08T04:36:56Z",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain"
+          ],
+          "captures": {
+            "input": {
+              "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_reject_all-live.input.txt",
+              "sha256": "432feca4b07657ae7e334cbf29f4906e0abb91c128356e100d2b6d640c4a8c4c"
+            },
+            "stdout": {
+              "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_reject_all-live.stdout.txt",
+              "sha256": "a395f9e727e0006d4c0c48c5abcbc76f394fffd0bccd4b2d0fcbc75eed0dca56"
+            },
+            "stderr": {
+              "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_reject_all-live.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "commands": {
+            "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_reject_all.commands.txt",
+            "sha256": "432feca4b07657ae7e334cbf29f4906e0abb91c128356e100d2b6d640c4a8c4c"
+          },
+          "trace": {
+            "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/recursor_djinn_native_reject_all-live.backend-trace.json",
+            "sha256": "f6aceb81741bbb5036a45470e7957c76590a9d9b6b8c40965aa28b3190d62f60"
+          },
+          "trace_retained_events": 1374,
+          "trace_dropped_events": 0,
+          "request_count": 51,
+          "request_cycle_sum_seconds": 101.342206499,
+          "request_timeouts": [
+            {
+              "backend_id": 1,
+              "request_id": 34,
+              "requested_limit": "TraceRequestStarted (Just 5)",
+              "response_wait_seconds": 5.0130944
+            },
+            {
+              "backend_id": 2,
+              "request_id": 51,
+              "requested_limit": "TraceRequestStarted (Just 4)",
+              "response_wait_seconds": 4.002119
+            }
+          ],
+          "timing_milliseconds": {
+            "write_to_flush_max": 2.518601,
+            "write_to_flush_sum": 5.804098,
+            "read_complete_to_parse_max": 0.0624,
+            "read_complete_to_parse_sum": 1.785697,
+            "matched_stdout_read_to_queue_count": 303,
+            "matched_stdout_read_to_queue_max": 0.8785,
+            "matched_stdout_read_to_queue_sum": 7.804008
+          },
+          "index_inputs_before_after_equal": true,
+          "index_request_inventory_matches_trace": true,
+          "trace_has_candidate_or_request_role_tags": false
+        }
+      ],
+      "fold_definition_preflight": {
+        "status": "passed",
+        "source": {
+          "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/native-fold-definitions.lean",
+          "sha256": "b10653eef9ddb2c5a32125d0da906f2399af24cdcb66b103b76d98115e8aadea"
+        },
+        "actual_command": [
+          "lean",
+          "+leanprover/lean4:v4.32.0",
+          "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-length-traced-v1\\native-fold-definitions.lean"
+        ],
+        "exit_code": 0,
+        "captures": {
+          "stdout": {
+            "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/native-fold-definitions.stdout.txt",
+            "sha256": "fd974e14fd87150ec34a6385bd35e8127c6447312db438ab6c87854cde95dc45"
+          },
+          "stderr": {
+            "path": "dist-newstyle/recursor-acceptance/native-length-traced-v1/native-fold-definitions.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "axiom_inventories": {
+          "List.foldr": []
+        }
+      }
+    },
+    {
+      "operation": "append",
+      "original_status": "failed",
+      "original_runner_exit_code": 1,
+      "result": {
+        "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/results.json",
+        "sha256": "62699356ff358d784085eb7b59d398fd2465735a551134615374c56329184c02"
+      },
+      "trace_index": {
+        "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/trace-index.json",
+        "sha256": "cc0cf4f066785149c893e20b55341ce386499d6ae49adfd849755765277d4b52"
+      },
+      "process_inventory": {
+        "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/processes.json",
+        "sha256": "38a79640ff11f3a167fceb2295167119373d2fbd04be0b2752e5756590bdd807"
+      },
+      "settings": {
+        "window": 1024,
+        "steps": 100000,
+        "budget": 100000,
+        "provider_cap": 80,
+        "timeout": 90,
+        "process_timeout": 180.0,
+        "strategy": "interleave",
+        "shown": 1,
+        "debug": true,
+        "library": false,
+        "classical": false
+      },
+      "recorded_integrity": {
+        "executable_unchanged": true,
+        "sources_unchanged": true,
+        "commands_unchanged": true,
+        "provider_definitions_unchanged": true
+      },
+      "trace_collection_complete": true,
+      "cells": [
+        {
+          "name": "recursor_djinn_native_append",
+          "kind": "positive synthesis",
+          "acceptance_status": "failed",
+          "behavioral_observations": {
+            "passed": 0,
+            "falsified": 10,
+            "inconclusive": 2
+          },
+          "failure": "expected one behaviorally accepted output for recursor_djinn_native_append: []",
+          "process_wall_seconds": 119.3540917999926,
+          "process_exit_code": 0,
+          "process_guard_fired": false,
+          "owned_root_pid": 40840,
+          "started_utc": "2026-09-08T04:39:23Z",
+          "finished_utc": "2026-09-08T04:41:22Z",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain"
+          ],
+          "captures": {
+            "input": {
+              "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_append-live.input.txt",
+              "sha256": "29e2b332b3a65b5c52c07e99e78536c9fa0bb2f2be89180954e98dc279ccc1c6"
+            },
+            "stdout": {
+              "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_append-live.stdout.txt",
+              "sha256": "602401606d85c029c8e46ae8f94537bd96fe661bd1e57f2e1c5636d50721a78a"
+            },
+            "stderr": {
+              "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_append-live.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "commands": {
+            "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_append.commands.txt",
+            "sha256": "29e2b332b3a65b5c52c07e99e78536c9fa0bb2f2be89180954e98dc279ccc1c6"
+          },
+          "trace": {
+            "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_append-live.backend-trace.json",
+            "sha256": "36aba67138b639494e1ce7339202373113674302aea3caa8e1b1f911d663addc"
+          },
+          "trace_retained_events": 957,
+          "trace_dropped_events": 0,
+          "request_count": 43,
+          "request_cycle_sum_seconds": 117.789815001,
+          "request_timeouts": [
+            {
+              "backend_id": 1,
+              "request_id": 24,
+              "requested_limit": "TraceRequestStarted (Just 5)",
+              "response_wait_seconds": 5.0121535
+            },
+            {
+              "backend_id": 2,
+              "request_id": 43,
+              "requested_limit": "TraceRequestStarted (Just 1)",
+              "response_wait_seconds": 1.0072943
+            }
+          ],
+          "timing_milliseconds": {
+            "write_to_flush_max": 10.2515,
+            "write_to_flush_sum": 15.929393,
+            "read_complete_to_parse_max": 0.3635,
+            "read_complete_to_parse_sum": 1.751296,
+            "matched_stdout_read_to_queue_count": 187,
+            "matched_stdout_read_to_queue_max": 0.3293,
+            "matched_stdout_read_to_queue_sum": 3.372802
+          },
+          "index_inputs_before_after_equal": true,
+          "index_request_inventory_matches_trace": true,
+          "trace_has_candidate_or_request_role_tags": false
+        },
+        {
+          "name": "recursor_djinn_native_reject_all",
+          "kind": "False control",
+          "acceptance_status": "failed",
+          "behavioral_observations": {
+            "passed": 0,
+            "falsified": 11,
+            "inconclusive": 2
+          },
+          "failure": "where False did not establish actual predicate rejection",
+          "process_wall_seconds": 124.34052319999319,
+          "process_exit_code": 0,
+          "process_guard_fired": false,
+          "owned_root_pid": 35440,
+          "started_utc": "2026-09-08T04:41:23Z",
+          "finished_utc": "2026-09-08T04:43:27Z",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain"
+          ],
+          "captures": {
+            "input": {
+              "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_reject_all-live.input.txt",
+              "sha256": "432feca4b07657ae7e334cbf29f4906e0abb91c128356e100d2b6d640c4a8c4c"
+            },
+            "stdout": {
+              "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_reject_all-live.stdout.txt",
+              "sha256": "b95ce7c835a98bf43e1162862b70dbc67e69eb3cf8a4e3e9064708d3c3943db3"
+            },
+            "stderr": {
+              "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_reject_all-live.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "commands": {
+            "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_reject_all.commands.txt",
+            "sha256": "432feca4b07657ae7e334cbf29f4906e0abb91c128356e100d2b6d640c4a8c4c"
+          },
+          "trace": {
+            "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/recursor_djinn_native_reject_all-live.backend-trace.json",
+            "sha256": "37e17e2ff50538cf4097a7751ba213af6a2af6264ebee6c7957ba0fc3c5ccfdb"
+          },
+          "trace_retained_events": 1223,
+          "trace_dropped_events": 0,
+          "request_count": 46,
+          "request_cycle_sum_seconds": 121.811570499,
+          "request_timeouts": [
+            {
+              "backend_id": 1,
+              "request_id": 10,
+              "requested_limit": "TraceRequestStarted (Just 5)",
+              "response_wait_seconds": 5.005486501
+            },
+            {
+              "backend_id": 2,
+              "request_id": 24,
+              "requested_limit": "TraceRequestStarted (Just 5)",
+              "response_wait_seconds": 5.0156979
+            },
+            {
+              "backend_id": 3,
+              "request_id": 46,
+              "requested_limit": "TraceRequestStarted (Just 1)",
+              "response_wait_seconds": 1.0052886
+            }
+          ],
+          "timing_milliseconds": {
+            "write_to_flush_max": 9.4217,
+            "write_to_flush_sum": 12.838598,
+            "read_complete_to_parse_max": 0.1582,
+            "read_complete_to_parse_sum": 1.782198,
+            "matched_stdout_read_to_queue_count": 266,
+            "matched_stdout_read_to_queue_max": 0.2445,
+            "matched_stdout_read_to_queue_sum": 5.357695
+          },
+          "index_inputs_before_after_equal": true,
+          "index_request_inventory_matches_trace": true,
+          "trace_has_candidate_or_request_role_tags": false
+        }
+      ],
+      "fold_definition_preflight": {
+        "status": "passed",
+        "source": {
+          "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/native-fold-definitions.lean",
+          "sha256": "b10653eef9ddb2c5a32125d0da906f2399af24cdcb66b103b76d98115e8aadea"
+        },
+        "actual_command": [
+          "lean",
+          "+leanprover/lean4:v4.32.0",
+          "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-append-traced-v1\\native-fold-definitions.lean"
+        ],
+        "exit_code": 0,
+        "captures": {
+          "stdout": {
+            "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/native-fold-definitions.stdout.txt",
+            "sha256": "fd974e14fd87150ec34a6385bd35e8127c6447312db438ab6c87854cde95dc45"
+          },
+          "stderr": {
+            "path": "dist-newstyle/recursor-acceptance/native-append-traced-v1/native-fold-definitions.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "axiom_inventories": {
+          "List.foldr": []
+        }
+      }
+    }
+  ],
+  "first_append_timeout": {
+    "backend_id": 1,
+    "request_id": 24,
+    "read_started_monotonic_ns": 274648780817800,
+    "timeout_monotonic_ns": 274653792971300,
+    "response_wait_seconds": 5.0121535,
+    "first_subsequent_stdout_line_monotonic_ns": 274654258721000,
+    "stdout_line_after_timeout_milliseconds": 465.7497,
+    "request_received_first_line_before_timeout": false,
+    "first_debug_failure": "debug behavioral request failure: stage=negative-decide; remaining-command-seconds=26; candidate=\"fun _ x _ => (fun a => match a with | List.nil => x | List.cons _ b => b) x\"; reason=\"decision timed out after 5s; the backend was retired for session replay\"",
+    "candidate_group": 4,
+    "association": "Sequential inference: the first negative-decide failure for candidate group4 aligns in order with the first trace timeout. Trace v1 has no payload/role tags and does not prove the association.",
+    "diagnostic_boundary": "The producer records its first subsequent line after the timeout. This does not distinguish Lean evaluation, process scheduling or stdout-read scheduling as the cause."
+  },
+  "shared_provenance": {
+    "leant_executable": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+    "recorded_leant_executable_sha256": "49d1dca002474e9a16ed35007110d40d8b3ecd2e46bb14e40ceb6a0a769aa26e",
+    "source_entries": 248,
+    "source_hash_maps_equal_between_runs": true,
+    "source_manifest_sha256": "745aae2a484e9a2340f6f7e3ab24fa2bd62a0af7cb8e430a267efb8309b9ed0e",
+    "manifest_encoding": "UTF-8 sorted compact JSON, separators comma/colon, no trailing newline; original source_hashes map.",
+    "selected_source_pins": {
+      "src\\Leant\\Backend.hs": "4ec498162774012a74764b00abf6aa1c8954d53fd93188253a348901aa026d96",
+      "src\\Leant\\Synth\\Engine.hs": "938ed002991edede9790e56a723c688dcaefa2c38668efeb01f3fd3ce3164667",
+      "src\\Main.hs": "1774f806f7e469ae38e11e092e29d5e54500cf14b863f98bc9d362d1c4b07775",
+      "test-recursive\\run_recursors.py": "385ce828107e81f5c687e94ad0396e1221b3919858ff5e67bd922a4d067188f0"
+    },
+    "all_raw_capture_command_replay_and_trace_hashes_verified": true,
+    "all_four_live_trace_paths_unique": true,
+    "no_dropped_trace_events": true,
+    "recorded_input_maps_before_after_equal": true,
+    "current_working_tree_hashes_not_used_as_historical_identity": true
+  },
+  "metric_definitions": {
+    "clock": "Monotonic nanoseconds; compare cross-thread observations by timestamp, not insertion order.",
+    "request_cycle_sum_seconds": "Sum of request-start to parsed-response or timeout terminal event, including startup/environment/verification requests. No candidate-role attribution.",
+    "process_wall_seconds": "Owned process elapsed duration includes preparation and teardown; command timeout90s is not total process time.",
+    "matched_stdout_read_to_queue": "Pairs a producer line-read event with the following queue event on the same backend; excludes unmatched cleanup events.",
+    "snapshot": "Last successful command/lifecycle export, not a continuous file log; these completed traces report0 dropped events."
+  },
+  "interpretation": [
+    "Length positive synthesis and exact kernel replay passed; the separate False control passed with14 actual falsifications and0 behavioral inconclusive checks. This is one accepted run, not a general reliability guarantee.",
+    "Append positive synthesis failed with0 passes,10 falsifications and2 inconclusive checks. Its separate False control also failed with0 passes,11 falsifications and2 inconclusive checks. Process exit0 is not synthesis acceptance.",
+    "Transport timeouts and behavioral inconclusive counts differ: type-verification failures can be rejected before behavioral checking. The length False control passed despite2 transport timeouts.",
+    "Observed writes, matched producer queue operations and parsing consume milliseconds. These traces do not justify a transport implementation fix or establish the cause of long response waits.",
+    "Actual resolved Lean kernel identity was not captured. The exact launcher/toolchain command and replay source/log hashes are retained; no later kernel hash is substituted.",
+    "Trace v1 IDs identify each owning process/backend/request; no request-role or candidate payload tags exist. Candidate4 negative-decide to backend1/request24 remains sequential inference."
+  ]
+}
