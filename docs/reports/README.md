@@ -270,3 +270,5 @@ a forward-looking proposal rather than a dated record:
   it trusts, and a chapter-by-chapter account of Leant's translation,
   search, rendering, verification, and negative-evidence boundaries with
   worked traces.
+
+- 2026-09-08 — [Expanded Church behavioral coverage and remaining delivery gates](2026-09-07-priority4-behavioral-coverage.md)

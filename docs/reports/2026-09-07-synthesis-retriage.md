@@ -18,18 +18,23 @@ is complete. Priorities 2–4 retain their original requirements.
 
 | Order | Delivery | Required acceptance |
 | --- | --- | --- |
-| 1 | Broaden supplied-fold acceptance after the native verification repair | Exact empty-user-root reuse now passes native Djinn append/length, lifecycle isolation/reset/recovery and the complete 686-test suite. Continue the remaining engine and supplied tree-fold/accumulator cases with exact provider inventories, full-signature behavior and termination-checked replay. Keep existing bounds and failure classifications. |
-| 2 | Execute broader Church behavior independently | Run additional totals and all 19 explicit-default counterparts in both Haskell engines and all three Lean modes. Require controlled providers, actual False controls and independent exact full-signature replay. Record success, timeout and inconclusive outcomes per cell. These cells need not wait for native fold repair. |
+| 1 | Complete expanded Church behavior and its concrete failures | Both Haskell engines accept 12/13 extended operations from separate batches; maybeEither remains missing. Close the observed graph/elaboration and fixture gates, then all 19 explicit-default counterparts and remaining Lean cells. Preserve exact providers, actual False controls, full-signature replay and per-cell limits. |
+| 2 | Broaden supplied-fold acceptance after the native verification repair | Exact empty-user-root reuse now passes native Djinn append/length, lifecycle isolation/reset/recovery and the complete 686-test suite. Continue the remaining engine and supplied tree-fold/accumulator cases with exact provider inventories, full-signature behavior and termination-checked replay. Keep existing bounds and failure classifications. |
 | 3 | Admit one described global contextual provider | Extend the existing `Type 0` route with one fully described global provider while retaining the current non-overlap guard. Preserve complete source metadata, exact owned graph/renderer evidence and payload-sensitive replay; do not broaden instances or universes as part of this increment. |
 | 4 | Preserve selected dictionary identity before relaxing overlap guards | Carry the selected introduction occurrence and ordered slot through lowering and reconstruction. Require a forced equal-predicate outer/inner fixture whose faithful scoped capture preserves distinct payload behavior in Haskell and Lean replay. Graph IDs or successful compilation alone are insufficient. Methods, superclass evidence and further provider schemes remain separate extensions. |
 
 These are delivery steps, not replacement priority numbers: step 1 advances
-priority 2, step 2 advances priority 4, and steps 3–4 advance priority 3.
+priority 4, step 2 advances priority 2, and steps 3–4 advance priority 3.
 Independent cells may proceed while heavy runtime work remains serialized.
 Tree folds and accumulator programs depend on reliable native verification,
 not on completing dictionary selection.
 
 ## Current evidence and its limits
+
+The 2026-09-08 coverage update uses separate receipt boundaries. The latest
+failed batches make concrete behavioral failures the next delivery gate; this
+supersedes the earlier native-fold-first order. Independent preparation can
+continue in parallel while heavy execution stays serialized.
 
 The [contextual acceptance receipt](../../test-context/receipts/ordinary-context-streaming.json) records a **fresh complete 39/39
 public matrix**: 18 exact displayed outputs with full-type replay, 72 finite
@@ -92,13 +97,29 @@ while explicitly omitting 184 payload records at the unchanged row cap. The
 [production receipt](../../test-recursive/receipts/empty-user-environment.json)
 keeps those diagnostic omissions separate from behavioral acceptance.
 
-Both partial Church oracle preflights pass: 20 Lean files with 491 exact
-inventories (487 empty and four named observer/proof allowances), and 63 Haskell
-controls. All 19 explicit defaults and 736 observations remain represented.
-Supplied-default `head` passes live synthesis, exact GHC execution and False
-controls in both Haskell engines. Most expanded live cells remain open;
-oracle preflight and the earlier 350-signature inhabitation corpus do not
-establish behavioral synthesis. The exact named axiom allowances remain in the corpus receipts.
+The [P4 behavioral coverage report](2026-09-07-priority4-behavioral-coverage.md)
+records the union of separate accepted runs: **12/13 extended operations
+in each Haskell engine and 2/4 Exference explicit-default operations**.
+Both engines still lack `maybeEither`; Exference `foldl1` and `at`
+remain unaccepted at the recorded bounds. Fresh native-Int length synthesis,
+exact GHC replay and False controls pass in both Haskell engines; Exference's
+repeat length run adds no unique coverage. Historical harness hashes and
+the two earlier Djinn length fixture failures remain separate.
+
+Lean Exference now accepts **6/6 of the selected first-six operations**
+from two runs: five exact kernel replays in the original batch and native
+length in an independent corrected-fixture follow-up. Both False controls
+pass. The initial length inventory failure and missing replay remain in the
+historical receipt; this is a composite, not a fresh six-cell rerun.
+These are recorded subsets, not a complete new matrix. All 13 extended
+operations and all 19 explicit-default counterparts remain required across
+both Haskell engines and all three Lean modes.
+
+Both partial oracle preflights pass: 20 Lean files with 491 exact inventories
+(487 empty and four named observer/proof allowances), and 63 Haskell controls.
+All 736 observations remain represented. Earlier supplied-default `head`
+acceptance has its own two-engine receipts. Preflight and the 350-signature
+inhabitation corpus do not substitute for the remaining behavioral cells.
 
 Original priority 1 is complete within its supported fragment. The
 [completion register](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/docs/reports/2026-09-07-synthesis-priorities-1-4.md) and [timeout-sample receipt](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/test-integration/receipts/elaboration-timeout-samples.json) record the

@@ -1,0 +1,45 @@
+{
+  "status": "passed",
+  "test_count": 26,
+  "command": "python -B -m unittest test_behavior_extended_probe test_behavior_partial_probe -v",
+  "cwd": "test-church",
+  "tests": [
+    "test_behavior_extended_probe.ExactAxiomInventories.test_candidate_still_must_be_axiom_free",
+    "test_behavior_extended_probe.ExactAxiomInventories.test_exact_oracle_dependency",
+    "test_behavior_extended_probe.ExactAxiomInventories.test_missing_duplicate_and_foreign_declarations_fail",
+    "test_behavior_extended_probe.ExactAxiomInventories.test_only_the_two_named_control_proofs_use_propext",
+    "test_behavior_extended_probe.ExactAxiomInventories.test_other_oracles_do_not_inherit_permission",
+    "test_behavior_extended_probe.ExactAxiomInventories.test_unexpected_or_missing_proof_axioms_fail",
+    "test_behavior_extended_probe.NativeLengthSourceAuthority.test_absent_duplicate_or_foreign_accepted_observations_fail",
+    "test_behavior_extended_probe.NativeLengthSourceAuthority.test_axiom_success_alone_cannot_promote_a_native_candidate_replay",
+    "test_behavior_extended_probe.NativeLengthSourceAuthority.test_exact_provider_inventory_stays_distinct_and_ordered",
+    "test_behavior_extended_probe.NativeLengthSourceAuthority.test_kernel_constants_discriminate_native_and_provider_routes",
+    "test_behavior_extended_probe.NativeLengthSourceAuthority.test_kernel_inventory_missing_duplicate_and_malformed_rows_fail",
+    "test_behavior_extended_probe.NativeLengthSourceAuthority.test_native_baseline_without_discovery_has_its_own_source_route",
+    "test_behavior_extended_probe.NativeLengthSourceAuthority.test_native_route_requires_the_exact_fragment_and_actual_owner",
+    "test_behavior_extended_probe.NativeLengthSourceAuthority.test_oracle_alias_native_extra_and_wrong_type_cannot_hide_in_implementation",
+    "test_behavior_extended_probe.RuntimeProvenance.test_changed_input_cannot_borrow_success_from_another_program",
+    "test_behavior_extended_probe.RuntimeProvenance.test_existing_partial_launcher_direct_kernel_arguments_remain_compatible",
+    "test_behavior_extended_probe.RuntimeProvenance.test_explicit_kernel_is_invoked_directly_and_both_identities_are_checked",
+    "test_behavior_extended_probe.RuntimeProvenance.test_installed_toolchain_resolution_never_invokes_the_launcher",
+    "test_behavior_extended_probe.RuntimeProvenance.test_kernel_change_or_disappearance_fails_even_with_valid_axiom_output",
+    "test_behavior_extended_probe.RuntimeProvenance.test_live_backend_and_lake_are_explicit_and_all_runtime_files_are_pinned",
+    "test_behavior_partial_probe.PartialAxiomPolicyTests.test_candidate_replay_has_its_own_two_exact_allowances",
+    "test_behavior_partial_probe.PartialAxiomPolicyTests.test_control_allowance_is_exact_and_never_covers_implementations",
+    "test_behavior_partial_probe.PartialAxiomPolicyTests.test_missing_duplicate_and_foreign_declarations_fail",
+    "test_behavior_partial_probe.PartialAxiomPolicyTests.test_observer_dependencies_cannot_leak_into_candidate",
+    "test_behavior_partial_probe.PartialAxiomPolicyTests.test_only_the_complete_exact_observer_inventory_passes",
+    "test_behavior_partial_probe.PartialInlinePredicateTests.test_all_168_equalities_are_decided_in_order_before_one_bool_equality"
+  ],
+  "log": {
+    "path": "C:\\Leant\\dist-newstyle\\priority4-live\\publication-harness-tests-v2.log",
+    "sha256": "33a52f9323a5ec788298144fe74873a3501e5df2a203c4d0ea9282e21669b2cf"
+  },
+  "source_sha256": {
+    "test-church/behavior_extended_probe.py": "a38c3ee34f4a087657ea34556f1af0f32c5ea96da7d2e03f04b6a4df554821b2",
+    "test-church/test_behavior_extended_probe.py": "f17e4a98eb4dbd08f096949f619b969581469ecb306b307cd9935e11297bedd7",
+    "test-church/behavior_partial_probe.py": "cb82c8ca6c67a40486acfca4cef0143f28e076959da56b2fe9844579f940254e",
+    "test-church/test_behavior_partial_probe.py": "4df12ce254602927888ce827058b29628ee8accd67ce3b9076a0bb9c5c78130c"
+  },
+  "scope": "Pure harness checks; separate live synthesis and GHC/kernel receipts establish executable acceptance."
+}

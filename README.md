@@ -151,9 +151,15 @@ Companion documents:
   actual False controls and independent full-type replay. Four lifecycle sessions
   cover reuse, namespace isolation, real user-state precedence, reset and backend
   death: 11 queries, four accepted replays and ten empty axiom inventories.
-  The strict build and complete 686-test suite pass. Next are broader supplied
-  fold/tree acceptance, Church behavior including all 19 explicit defaults,
+  The strict build and complete 686-test suite pass. Next are the observed
+  Church failures and remaining defaulted cells, then broader fold/tree acceptance,
   and a described global `Type 0` provider under the current guard.
+  [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
+  now includes separate-run acceptance of 12/13 extended operations in each
+  Haskell engine and 2/4 Exference explicit-default cases. Lean Exference's
+  selected first six now accept 6/6 as a composite of five historical exact
+  replays and the fresh native-length follow-up. The full 13-operation/19-default coverage
+  across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
 - **Checked conditional providers in canonical Djex.** The
   [conditional-Given implementation](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)

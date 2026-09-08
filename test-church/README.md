@@ -1,5 +1,15 @@
 # Church synthesis acceptance in Lean
 
+The [expanded behavioral coverage report](../docs/reports/2026-09-07-priority4-behavioral-coverage.md)
+records the selected six-operation Exference subset, including the independently
+replayed native `Int` length implementation. `behavior_extended_probe.py` and
+`behavior_partial_probe.py` use the canonical specifications in
+`lib/Djex/test-church` by default. Every selected cell gets a fresh session;
+accepted text is replayed at its full type with exact axiom inventories. Length
+also requires an observed native-constructor or numeric-provider route and a
+direct implementation-constant inventory. All 13 extended operations, all 19
+explicit-default counterparts, and all three engines remain in scope.
+
 The [candidate-quality guide](../docs/candidate-quality.md) explains the new
 default `balanced` profile and its legacy compatibility mode. The
 [focused quality probes](quality.md) compare policies at equal configured

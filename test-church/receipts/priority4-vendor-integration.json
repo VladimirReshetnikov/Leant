@@ -1,0 +1,59 @@
+{
+  "status": "strict build and default vendored specification preparation passed",
+  "djex_revision": "1b9db48f0f782a194b4076ae2cb3d910570746d7",
+  "build": {
+    "command": "cabal build exe:leant test:leant-synth-tests -j1 --ghc-options=-Werror",
+    "exit_code": 0,
+    "log": {
+      "path": "C:\\Leant\\dist-newstyle\\priority4-live\\vendor-corpus-build.log",
+      "sha256": "0da097e58489a87b37dadcacf934fd40b49a303b56fb9086f1f8ab643cae4c2b"
+    },
+    "djex_revision": "f5043dd935babfceacae538cb4d93934fb66661f"
+  },
+  "executables": [
+    {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+      "sha256": "3f06313ea5b01e68e05e5bf8910e7071210677bc27dbb05b2b37148874e2e21a"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+      "sha256": "ebc1156c6aec55dff996e21eee2fd253e7a78e04f569f91b2811441c716b76f0"
+    }
+  ],
+  "preparations": [
+    {
+      "suite": "extended",
+      "status": "prepared_only",
+      "candidate_inputs": 39,
+      "total_inputs": 42,
+      "raw_receipt": {
+        "path": "C:\\Leant\\dist-newstyle\\priority4-live\\default-vendor-extended-preparation\\results.json",
+        "sha256": "277e99c2462df2329febfe9ad5f64ec447647a4c9205200e83c54f870b80afad"
+      }
+    },
+    {
+      "suite": "partial",
+      "status": "prepared_only",
+      "candidate_inputs": 57,
+      "total_inputs": 60,
+      "raw_receipt": {
+        "path": "C:\\Leant\\dist-newstyle\\priority4-live\\default-vendor-partial-preparation\\results.json",
+        "sha256": "7b149271bda9b2f8454ef767a0d33e7f597ec744ff1192e06b9449044c32f485"
+      }
+    }
+  ],
+  "routing_provenance": "Normalize only the routing-reference digest to UTF-8 LF, making Windows CRLF checkouts comparable; actual file-byte hashes remain separately recorded.",
+  "validation_boundary": "26 focused Python checks and a strict executable/unit-target build. The full 686-test result and live candidate receipts remain at their recorded pre-update revisions; no fresh full unit or whole live corpus run is claimed.",
+  "publication_followup": {
+    "changes": "Receipt byte preservation and targeted Git text attributes only",
+    "production_diff_verified_empty": true,
+    "compared_paths": [
+      "src",
+      "synthesis",
+      "exference",
+      "djinn",
+      "djex.cabal",
+      "cabal.project"
+    ]
+  }
+}
