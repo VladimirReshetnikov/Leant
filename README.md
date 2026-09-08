@@ -145,9 +145,11 @@ Companion documents:
   integration suite passes in 343.79 seconds with source and executable integrity
   enforced. Native fold `map` now also passes live synthesis and exact replay;
   append and length produce correct candidates but encounter backend request failures
-  before acceptance. Next are diagnosis of startup/request-time variability,
-  Lean fold acceptance, production dictionary evidence, and broader behavioral
-  coverage; the 350-signature result above establishes
+  before acceptance. The next deliveries prioritize exact dictionary ownership
+  under nested scopes, production Lean context integration, and reliable fold
+  verification. The expanded Church behavioral matrix, including all 19
+  supplied-default cases, runs alongside those deliveries; the 350-signature
+  result above establishes
   type inhabitation. See the [current re-triage and exact evidence
   boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
 - **Checked conditional providers in canonical Djex.** The newer
@@ -156,8 +158,10 @@ Companion documents:
   assumptions, preserves kinds and shared search budgets, and prevents false
   non-inhabitation claims when class methods are omitted. Its twelve complete
   affected suites record 2,168 passing tests across complementary runs.
-  Leant's pinned `922c5558` dependency does not yet contain this increment;
-  production Lean dictionary routing remains a separate integration gate.
+  Leant's published `922c5558` dependency does not yet contain this increment.
+  The working integration and bounded local-context route have compiled, but
+  production acceptance still requires public commands, exact kernel replay,
+  and a fresh complete affected-suite run.
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked

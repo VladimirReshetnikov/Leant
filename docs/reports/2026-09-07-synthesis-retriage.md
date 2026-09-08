@@ -1,4 +1,4 @@
-# Synthesis re-triage: Leant integration and remaining capabilities
+# Synthesis re-triage: dictionary ownership, reliable checking, and coverage
 
 This 2026-09-07 update preserves the active goal to implement priorities 1–4
 from the [accepted roadmap](../../lib/Djex/docs/reports/2026-09-06-synthesis-next-priorities.md).
@@ -6,7 +6,98 @@ The shared [implementation and acceptance checklist](../../lib/Djex/docs/reports
 and [execution recommendation](../../lib/Djex/docs/reports/2026-09-07-synthesis-retriage.md)
 are maintained in the pinned Djex dependency.
 
-## Current execution recommendation
+## Current decision and next delivery gates
+
+**Complete the checked production route and its reliability gates before
+expanding the search machinery. Execute the behavioral corpus alongside that
+work.** The original priorities 1–4 remain the goal; their accepted Haskell
+elaboration, ordinary-data cases, and bounded simplification are regression
+baselines. The current canonical
+[Djex re-triage](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-07-synthesis-retriage.md)
+records the shared order, including work newer than this repository's published
+dependency.
+
+| Order | Improvement | Acceptance gate |
+| --- | --- | --- |
+| 1 | Preserve the selected dictionary through nested scopes | Repair the canonical nested-Given lowering/admission gap and conservatively refuse overlapping scopes until exact proof-selected slots survive reconstruction. Require public forced-use, sibling/overlap, full-signature GHC, and differing dictionary-payload controls. Unsupported proofs retain their original work charges. |
+| 2 | Publish the bounded production Lean context route | Integrate Djex `90c88261`, exact source metadata, checked projection and rendering. Run ordinary and named-`where` commands in Djinn, Exference and Both, then replay the exact displayed terms at their full types, with payload observations, axiom inventories and a complete affected-suite run. |
+| 3 | Reliably verify the fold candidates search already finds | Trace the actual native append/length query at unchanged limits. Identify and fix the failing request stage, preserve cancellation and owned cleanup, and rerun live folds, false controls, recovery and exact replay. Repeated fast standalone requests do not establish this gate. |
+| 4 | Execute the broader Church behavioral matrix | Preflight the additional total and all 19 supplied-default operations, then run every operation/engine cell with controlled providers, real false controls and independent exact-source replay at the full target type: original for total cases, explicitly default-adjusted for partial cases. Record timeout, falsehood and inconclusive checking separately. |
+| 5 | Extend checked capabilities from missing programs | Complete nested forall/Given interaction and duplicate slots; retain full provider schemes and universe arguments; then add method, conditional-instance and superclass evidence. Broaden supplied tree folds and accumulator programs, retaining termination and behavioral checks. |
+
+The first and third items are correctness and reliability work; the second is
+the nearest integration delivery. Source development can proceed in parallel,
+with heavy validation serialized. Corpus preflight and individual operation
+cells start now and continue through these deliveries. They do not wait for
+every richer context or recursion extension. Original priority 1's remaining
+specific selection and negative-evidence requirements stay in the shared
+completion register.
+
+The published pair at this audit is Djex
+`90c882615ae2a3a296ad963f3f8cb786d4aa614f` and Leant
+`b764e65ef77fa4822d25481ece777c4acf0cd12d`. Published Leant still pins
+Djex `922c5558`. The working integration advances that dependency and adds a
+local `Type 0` context packet, production routing and opt-in transport tracing.
+These are working changes, not a published or fully accepted capability.
+
+The refreshed strict executable/unit build succeeds, and all 51 focused tests
+pass in 8.61 seconds: 22 production context boundary, eight transport trace and
+21 renderer tests. The first run passed 50 of 51 because one older renderer
+test expected a wildcard binder to be unsupported after that form was
+deliberately added. Its correction retains a genuinely unsupported-pattern
+control and adds a positive wildcard assertion. Public-command replay and a
+fresh full affected-suite run remain pending. The earlier 647-test receipt
+below belongs to its earlier source revision and must not be reused as a
+full-suite pass for this integration.
+The [focused audit receipt](../../test-context/receipts/production-boundary-audit.json)
+retains both test runs, the strict build, the actual 51-test inventory and a
+post-run source/executable snapshot. It is not a before/after integrity receipt.
+
+The initial context packet preserves lexical names and binder visibility, but
+deliberately refuses richer universes, unrecorded constant universe arguments,
+global provider inventories without source packets, and unsupported impredicative
+selections. A declaration returning `Type 0` may still have universe arguments
+that affect its meaning. The serializer must retain them exactly or refuse the
+declaration; a result-sort check alone is insufficient. Full metadata and live
+Lean replay are requirements for extending this bounded subset.
+
+Backend diagnostics also justify a narrower next step. Raw REPL startup varies
+from about one to 25 seconds; three standalone traced requests for the exact
+length verification program all complete within the existing five-second
+guard. The earlier direct timeout without synthesis remains valid evidence.
+These observations leave the cause unresolved. The opt-in trace distinguishes
+process startup, write/flush, stdout capture, queue consumption, response framing
+and parsing. Today's request timer covers response reading after write/flush;
+instrumentation does not change that contract. A broader deadline or retry
+policy needs its own tests, including late-response isolation and an actual
+context-dependent command after recovery.
+
+Church preflight is progressing independently of live synthesis. The extended
+Lean oracle file passes with 58 declarations: 56 empty axiom inventories and
+exactly two comparison/control proofs using `propext`. These cover 11 additional
+source operations and two numeral extensions. Synthesized implementations must
+still have empty inventories; a proof allowance is not an implementation
+allowance. All 19 partial operations are source-prepared with explicit defaults,
+736 observations, 20 isolated oracle files and 491 requested inventories.
+Those partial files still need kernel execution. Neither successful oracle
+preflight nor prepared inputs count as synthesized implementations.
+
+## Other improvements, re-ranked
+
+| Idea | Disposition and promotion criterion |
+| --- | --- |
+| Native Windows Length acquisition | Next independent platform milestone after the current integration gates, or earlier for a concrete user workflow. Require bounded file acquisition, actual solver execution and independent replay; existing Length unit tests do not implement the missing native path. |
+| Search performance and scheduling | Measure unsupported contextual proof slots and the roughly 147-second Exference fold-rejection fixture. Preserve the accepted raw-slot alternation. Broader scheduling, duplicate indexing or shared subgoal storage needs a profile showing the cost and unchanged evidence and budget accounting. |
+| Failure diagnostics and capability receipts | Include precise stage and per-operation results in current deliveries. Freeze a small repeated regression matrix before expanding diagnostic infrastructure further. |
+| Provider retrieval | Promote when a realistic project exposes a useful provider excluded from the selected inventory. Measure recall, not just query time or the number of providers loaded. |
+| Isolated-worker production routing | Separate integration project: exact environment snapshots, backend parity, transcript equality, cancellation and memory acceptance must precede a speed claim. |
+| Native Lean tactic entrance or an engine rewrite in Lean | Defer broad migration. A small workflow-driven slice may retain elaborated `Expr` values and remove a translation boundary, but equivalent search coverage, budgets and behavior still require independent acceptance. |
+| Dependent/indexed search, persistent caches, equality saturation, arbitrary frontier widening and invariant discovery | Defer until a concrete missing program or measured bottleneck survives the smaller extensions above. |
+
+## Accepted baselines and earlier execution recommendation
+
+The decision table above supersedes the older fold-first order in this section.
+Historical receipts retain their original source revisions and acceptance scope.
 
 The current integration pins published Djex
 `922c55580eadec156ba9ef447b300f43e0953ed7`, after published Leant
