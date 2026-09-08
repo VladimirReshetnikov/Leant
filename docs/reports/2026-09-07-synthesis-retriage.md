@@ -9,19 +9,19 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-The [post-integration re-triage](2026-09-08-post-integration-priorities.md)
-supersedes the earlier order and coverage below. Exference now has fresh
-13/13 extended acceptance in both Haskell and Lean at separately recorded
-revisions. The refined scheduler passes the canonical 2,308-test regression;
-clean complete native integration remains a release gate. Two failed native
-unit cases pass unchanged in isolation, which does not promote the aggregate.
+The [current re-triage](2026-09-08-post-integration-priorities.md)
+supersedes the historical order and counts below. The latest full native unit
+run passes 700/701, with a recurring layered-provider deadline; clean integration
+remains a release gate. A broader scheduling experiment failed and was reverted.
+The tree accumulator is now an executed Haskell miss, and Lean's positive tree
+cells expose generated auxiliary eliminators in the provider inventory.
 
-Finish that integration gate, then alternate missing Church constructions
-with bounded Haskell frontend usability and the prepared tree accumulator.
-Keep all 19 explicit defaults, all five language/engine combinations, broader
-contextual admission and selected dictionary evidence in scope. The linked
-report gives the ordered acceptance gates and re-triages performance, provider
-retrieval, native Lean integration and other architectural ideas.
+Prioritize the specific integration failure, semantic provider filtering and
+function-carrier fold composition. Keep bounded Haskell frontend usability
+independent, and interleave remaining Church repairs. All 13 extended operations,
+all 19 explicit defaults and all five language/engine combinations remain in
+scope, along with broader contextual admission and selected dictionary evidence.
+The linked report gives exact acceptance gates and dispositions for other ideas.
 
 The remaining sections preserve historical diagnoses, counts and proposals at
 their recorded revisions. They do not override the current linked decision.

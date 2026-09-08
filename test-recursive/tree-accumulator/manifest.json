@@ -1,0 +1,101 @@
+{
+  "status": "specification_only",
+  "runtime_validation": "not run",
+  "files": [
+    {
+      "path": "case.json",
+      "bytes": 19559,
+      "sha256": "512a9168c2e0337b77dc04acd2914aaddcca171983f8f457d3c4ca5dd671d717"
+    },
+    {
+      "path": "CheckControls.hs",
+      "bytes": 199,
+      "sha256": "bee33291dda8d7ee6cac39f9987c40128692d7f06ebfbb72b3ebc33370eaedfb"
+    },
+    {
+      "path": "commands/tree_accumulator_both.commands.txt",
+      "bytes": 4915,
+      "sha256": "5f7451e04940b57bac18d1e67aec119a11bf700ca8ce5b124ddfb1150072a02a"
+    },
+    {
+      "path": "commands/tree_accumulator_both_reject_all.commands.txt",
+      "bytes": 983,
+      "sha256": "117b81d26c2c52aeba85f865127ebb93a3ab51644f40cba389c300f5cf48b759"
+    },
+    {
+      "path": "commands/tree_accumulator_djinn.commands.txt",
+      "bytes": 4933,
+      "sha256": "e4224ac175703f394ce966347001b09dc85bdae3314ed7747bfa47caba0d605c"
+    },
+    {
+      "path": "commands/tree_accumulator_djinn_reject_all.commands.txt",
+      "bytes": 985,
+      "sha256": "28de82661f2dab57a674d05f55b8a12e20ddb3b82bd625c3c72acb29d6c165c9"
+    },
+    {
+      "path": "commands/tree_accumulator_exference.commands.txt",
+      "bytes": 5005,
+      "sha256": "2d3963afe590bc927ec6da563f309743d42c9274d878bf87089bfc3cfe26e090"
+    },
+    {
+      "path": "commands/tree_accumulator_exference_reject_all.commands.txt",
+      "bytes": 993,
+      "sha256": "32e3dd35631f96531ac995086dbd5e9aa435353c5dafce5ea6ef654a9e781a89"
+    },
+    {
+      "path": "HaskellCandidateReplay.hs.in",
+      "bytes": 467,
+      "sha256": "06911dfbe50acac16011fb1e82e9de456ab872df716c417b03184fd702965856"
+    },
+    {
+      "path": "LeanCandidateReplay.lean.in",
+      "bytes": 4967,
+      "sha256": "f172a614697db32a2d0658b3bd704404520140c94897e2e00c912692dba9e6ec"
+    },
+    {
+      "path": "locate_library.py",
+      "bytes": 845,
+      "sha256": "29658743bd1af1c4820fe7531d5a3562e5dd689661ebfe2d7e39fa70c80ec122"
+    },
+    {
+      "path": "prepare.py",
+      "bytes": 14379,
+      "sha256": "bd873e95a9c86b016e0ee794dde849520b114595bf5fb8690f4ad53db1db4a1f"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3753,
+      "sha256": "30cc730c5e47f51c49865f52a70ad93e46e0d58b302f086139948b4c11fa02b9"
+    },
+    {
+      "path": "run_acceptance.py",
+      "bytes": 26378,
+      "sha256": "7f352603c967275f62d8c1988a9862b0f68b9793670268c2860816c00caec27d"
+    },
+    {
+      "path": "TreeAccumulatorControls.hs",
+      "bytes": 4252,
+      "sha256": "4811f60a367649f0a47e922ac3dc8b7f01b2762bf8b51c7ccdac6ac3d9d7602e"
+    },
+    {
+      "path": "TreeAccumulatorControls.lean",
+      "bytes": 7885,
+      "sha256": "fc6c570444c93aecd66b8a25eb773413da168f5b6388e6211b7b85fd30daa390"
+    },
+    {
+      "path": "TreeAccumulatorProbe.hs",
+      "bytes": 9820,
+      "sha256": "8848b3a487cb36d083eaab8c170699a8308356a082cac931bd993a80887600f6"
+    },
+    {
+      "path": "TreeAccumulatorProviders.hs",
+      "bytes": 345,
+      "sha256": "67e1db4c43f997dbb36c8ff71659a97b52b2f181251b51898e2b082c268ba7f0"
+    },
+    {
+      "path": "TreeAccumulatorProviders.lean",
+      "bytes": 498,
+      "sha256": "0f8b1d865e8276025031ebb976cb253b7aae838bab3a11b949ea7b84c7e63fe6"
+    }
+  ]
+}

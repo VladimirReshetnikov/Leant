@@ -1,0 +1,254 @@
+{
+  "status": "specification_only",
+  "operation": "treeAccumulateLeft",
+  "observation_count": 16,
+  "haskell_type": "forall a s. (s -> a -> s) -> s -> Tree a -> s",
+  "lean_type": "{α σ : Type} → (σ → α → σ) → σ → TreeAccumulatorFixture.Tree α → σ",
+  "haskell_fold_type": "forall a r. (a -> r) -> (r -> r -> r) -> Tree a -> r",
+  "lean_fold_type": "{α ρ : Type} → (α → ρ) → (ρ → ρ → ρ) → TreeAccumulatorFixture.Tree α → ρ",
+  "haskell_predicate": "({f} (\\state value -> (10 * state + value :: Int)) 7 (Leaf 2) == 72) && ({f} (\\state value -> (10 * state + value :: Int)) 0 (Branch (Leaf 1) (Leaf 2)) == 12) && ({f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Leaf 1) (Leaf 2)) == 712) && ({f} (\\state value -> (10 * state + value :: Int)) 37 (Branch (Leaf 1) (Leaf 2)) == 3712) && ({f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Branch (Leaf 1) (Leaf 2)) (Leaf 3)) == 7123) && ({f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Leaf 1) (Branch (Leaf 2) (Leaf 3))) == 7123) && ({f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Branch (Leaf 1) (Leaf 2)) (Branch (Leaf 3) (Leaf 4))) == 71234) && ({f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Leaf 1) (Branch (Branch (Leaf 2) (Leaf 3)) (Leaf 4))) == 71234) && ({f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Leaf 1) (Branch (Leaf 2) (Branch (Leaf 3) (Branch (Leaf 4) (Leaf 5))))) == 712345) && ({f} (\\state value -> (state * state + value :: Int)) 2 (Branch (Leaf 1) (Branch (Leaf 2) (Leaf 3))) == 732) && ({f} (\\state value -> (state * state + value :: Int)) 3 (Branch (Branch (Leaf 1) (Leaf 2)) (Leaf 3)) == 10407) && ({f} (\\state value -> (2 * state + (if value then 1 else 0) :: Int)) 3 (Branch (Leaf True) (Branch (Leaf False) (Leaf False))) == 28) && ({f} (\\state value -> state ++ [value :: Int]) [9, 8] (Branch (Leaf 1) (Branch (Leaf 2) (Leaf 3))) == [9, 8, 1, 2, 3]) && ({f} (\\state value -> state ++ [value :: Int]) [5] (Leaf 2) == [5, 2]) && ({f} (\\state value -> if (value :: Int) == 1 then not state else False) True (Leaf 1) == False) && ({f} (\\state value -> if (value :: Int) == 1 then not state else False) False (Leaf 1) == True)",
+  "lean_predicate": "({f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.leaf 2) = 72) ∧ ({f} (fun (state value : Nat) => 10 * state + value) 0 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) = 12) ∧ ({f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) = 712) ∧ ({f} (fun (state value : Nat) => 10 * state + value) 37 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) = 3712) ∧ ({f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) (TreeAccumulatorFixture.Tree.leaf 3)) = 7123) ∧ ({f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.leaf 3))) = 7123) ∧ ({f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 3) (TreeAccumulatorFixture.Tree.leaf 4))) = 71234) ∧ ({f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.leaf 3)) (TreeAccumulatorFixture.Tree.leaf 4))) = 71234) ∧ ({f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 3) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 4) (TreeAccumulatorFixture.Tree.leaf 5))))) = 712345) ∧ ({f} (fun (state value : Nat) => state * state + value) 2 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.leaf 3))) = 732) ∧ ({f} (fun (state value : Nat) => state * state + value) 3 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) (TreeAccumulatorFixture.Tree.leaf 3)) = 10407) ∧ ({f} (fun (state : Nat) (value : Bool) => 2 * state + (if value then 1 else 0)) 3 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf true) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf false) (TreeAccumulatorFixture.Tree.leaf false))) = 28) ∧ ({f} (fun (state : List Nat) (value : Nat) => state ++ [value]) [9, 8] (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.leaf 3))) = [9, 8, 1, 2, 3]) ∧ ({f} (fun (state : List Nat) (value : Nat) => state ++ [value]) [5] (TreeAccumulatorFixture.Tree.leaf 2) = [5, 2]) ∧ ({f} (fun (state : Bool) (value : Nat) => if value == 1 then !state else false) true (TreeAccumulatorFixture.Tree.leaf 1) = false) ∧ ({f} (fun (state : Bool) (value : Nat) => if value == 1 then !state else false) false (TreeAccumulatorFixture.Tree.leaf 1) = true)",
+  "observations": [
+    {
+      "name": "singleton_seed",
+      "haskell": "{f} (\\state value -> (10 * state + value :: Int)) 7 (Leaf 2) == 72",
+      "lean": "{f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.leaf 2) = 72"
+    },
+    {
+      "name": "pair_zero_seed",
+      "haskell": "{f} (\\state value -> (10 * state + value :: Int)) 0 (Branch (Leaf 1) (Leaf 2)) == 12",
+      "lean": "{f} (fun (state value : Nat) => 10 * state + value) 0 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) = 12"
+    },
+    {
+      "name": "pair_nonzero_seed",
+      "haskell": "{f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Leaf 1) (Leaf 2)) == 712",
+      "lean": "{f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) = 712"
+    },
+    {
+      "name": "pair_second_seed",
+      "haskell": "{f} (\\state value -> (10 * state + value :: Int)) 37 (Branch (Leaf 1) (Leaf 2)) == 3712",
+      "lean": "{f} (fun (state value : Nat) => 10 * state + value) 37 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) = 3712"
+    },
+    {
+      "name": "left_associated",
+      "haskell": "{f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Branch (Leaf 1) (Leaf 2)) (Leaf 3)) == 7123",
+      "lean": "{f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) (TreeAccumulatorFixture.Tree.leaf 3)) = 7123"
+    },
+    {
+      "name": "right_associated",
+      "haskell": "{f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Leaf 1) (Branch (Leaf 2) (Leaf 3))) == 7123",
+      "lean": "{f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.leaf 3))) = 7123"
+    },
+    {
+      "name": "balanced_four",
+      "haskell": "{f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Branch (Leaf 1) (Leaf 2)) (Branch (Leaf 3) (Leaf 4))) == 71234",
+      "lean": "{f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 3) (TreeAccumulatorFixture.Tree.leaf 4))) = 71234"
+    },
+    {
+      "name": "asymmetric_four",
+      "haskell": "{f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Leaf 1) (Branch (Branch (Leaf 2) (Leaf 3)) (Leaf 4))) == 71234",
+      "lean": "{f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.leaf 3)) (TreeAccumulatorFixture.Tree.leaf 4))) = 71234"
+    },
+    {
+      "name": "deep_five",
+      "haskell": "{f} (\\state value -> (10 * state + value :: Int)) 7 (Branch (Leaf 1) (Branch (Leaf 2) (Branch (Leaf 3) (Branch (Leaf 4) (Leaf 5))))) == 712345",
+      "lean": "{f} (fun (state value : Nat) => 10 * state + value) 7 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 3) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 4) (TreeAccumulatorFixture.Tree.leaf 5))))) = 712345"
+    },
+    {
+      "name": "nonlinear_state",
+      "haskell": "{f} (\\state value -> (state * state + value :: Int)) 2 (Branch (Leaf 1) (Branch (Leaf 2) (Leaf 3))) == 732",
+      "lean": "{f} (fun (state value : Nat) => state * state + value) 2 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.leaf 3))) = 732"
+    },
+    {
+      "name": "nonlinear_second_seed",
+      "haskell": "{f} (\\state value -> (state * state + value :: Int)) 3 (Branch (Branch (Leaf 1) (Leaf 2)) (Leaf 3)) == 10407",
+      "lean": "{f} (fun (state value : Nat) => state * state + value) 3 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.leaf 2)) (TreeAccumulatorFixture.Tree.leaf 3)) = 10407"
+    },
+    {
+      "name": "boolean_elements",
+      "haskell": "{f} (\\state value -> (2 * state + (if value then 1 else 0) :: Int)) 3 (Branch (Leaf True) (Branch (Leaf False) (Leaf False))) == 28",
+      "lean": "{f} (fun (state : Nat) (value : Bool) => 2 * state + (if value then 1 else 0)) 3 (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf true) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf false) (TreeAccumulatorFixture.Tree.leaf false))) = 28"
+    },
+    {
+      "name": "sequence_accumulator",
+      "haskell": "{f} (\\state value -> state ++ [value :: Int]) [9, 8] (Branch (Leaf 1) (Branch (Leaf 2) (Leaf 3))) == [9, 8, 1, 2, 3]",
+      "lean": "{f} (fun (state : List Nat) (value : Nat) => state ++ [value]) [9, 8] (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 1) (TreeAccumulatorFixture.Tree.branch (TreeAccumulatorFixture.Tree.leaf 2) (TreeAccumulatorFixture.Tree.leaf 3))) = [9, 8, 1, 2, 3]"
+    },
+    {
+      "name": "sequence_singleton",
+      "haskell": "{f} (\\state value -> state ++ [value :: Int]) [5] (Leaf 2) == [5, 2]",
+      "lean": "{f} (fun (state : List Nat) (value : Nat) => state ++ [value]) [5] (TreeAccumulatorFixture.Tree.leaf 2) = [5, 2]"
+    },
+    {
+      "name": "boolean_accumulator_true",
+      "haskell": "{f} (\\state value -> if (value :: Int) == 1 then not state else False) True (Leaf 1) == False",
+      "lean": "{f} (fun (state : Bool) (value : Nat) => if value == 1 then !state else false) true (TreeAccumulatorFixture.Tree.leaf 1) = false"
+    },
+    {
+      "name": "boolean_accumulator_false",
+      "haskell": "{f} (\\state value -> if (value :: Int) == 1 then not state else False) False (Leaf 1) == True",
+      "lean": "{f} (fun (state : Bool) (value : Nat) => if value == 1 then !state else false) false (TreeAccumulatorFixture.Tree.leaf 1) = true"
+    }
+  ],
+  "controls": [
+    {
+      "name": "reference",
+      "passes": true,
+      "haskell": "\\step seed input -> foldTree (\\value state -> step state value) (\\left right state -> right (left state)) input seed",
+      "lean": "fun step seed input => TreeAccumulatorFixture.foldTree (fun value state => step state value) (fun left right state => right (left state)) input seed"
+    },
+    {
+      "name": "ignore_tree",
+      "passes": false,
+      "haskell": "\\_ seed _ -> seed",
+      "lean": "fun _ seed _ => seed"
+    },
+    {
+      "name": "reverse_order",
+      "passes": false,
+      "haskell": "\\step seed input -> foldTree (\\value state -> step state value) (\\left right state -> left (right state)) input seed",
+      "lean": "fun step seed input => TreeAccumulatorFixture.foldTree (fun value state => step state value) (fun left right state => left (right state)) input seed"
+    },
+    {
+      "name": "left_only",
+      "passes": false,
+      "haskell": "\\step seed input -> foldTree (\\value state -> step state value) (\\left _ -> left) input seed",
+      "lean": "fun step seed input => TreeAccumulatorFixture.foldTree (fun value state => step state value) (fun left _ => left) input seed"
+    },
+    {
+      "name": "right_only",
+      "passes": false,
+      "haskell": "\\step seed input -> foldTree (\\value state -> step state value) (\\_ right -> right) input seed",
+      "lean": "fun step seed input => TreeAccumulatorFixture.foldTree (fun value state => step state value) (fun _ right => right) input seed"
+    },
+    {
+      "name": "duplicate_left",
+      "passes": false,
+      "haskell": "\\step seed input -> foldTree (\\value state -> step state value) (\\left right state -> right (left (left state))) input seed",
+      "lean": "fun step seed input => TreeAccumulatorFixture.foldTree (fun value state => step state value) (fun left right state => right (left (left state))) input seed"
+    },
+    {
+      "name": "reset_at_branches",
+      "passes": false,
+      "haskell": "\\step seed input -> foldTree (\\value state -> step state value) (\\left right _ -> right (left seed)) input seed",
+      "lean": "fun step seed input => TreeAccumulatorFixture.foldTree (fun value state => step state value) (fun left right _ => right (left seed)) input seed"
+    },
+    {
+      "name": "reset_at_leaves",
+      "passes": false,
+      "haskell": "\\step seed input -> foldTree (\\value _ -> step seed value) (\\left right state -> right (left state)) input seed",
+      "lean": "fun step seed input => TreeAccumulatorFixture.foldTree (fun value _ => step seed value) (fun left right state => right (left state)) input seed"
+    }
+  ],
+  "cells": [
+    {
+      "name": "tree_accumulator_djinn",
+      "engine": "djinn",
+      "expected": "candidate",
+      "path": "commands/tree_accumulator_djinn.commands.txt",
+      "sha256": "e4224ac175703f394ce966347001b09dc85bdae3314ed7747bfa47caba0d605c",
+      "type": "{α σ : Type} → (σ → α → σ) → σ → TreeAccumulatorFixture.Tree α → σ",
+      "predicate_sha256": "09d55c7729c739f2e65b19100aa6f0f42b4d9e97923658094d92c13dfc869402"
+    },
+    {
+      "name": "tree_accumulator_djinn_reject_all",
+      "engine": "djinn",
+      "expected": "actual_false",
+      "path": "commands/tree_accumulator_djinn_reject_all.commands.txt",
+      "sha256": "28de82661f2dab57a674d05f55b8a12e20ddb3b82bd625c3c72acb29d6c165c9",
+      "type": "{α : Type} → TreeAccumulatorFixture.Tree α → TreeAccumulatorFixture.Tree α",
+      "predicate_sha256": "60a33e6cf5151f2d52eddae9685cfa270426aa89d8dbc7dfb854606f1d1a40fe"
+    },
+    {
+      "name": "tree_accumulator_exference",
+      "engine": "exference",
+      "expected": "candidate",
+      "path": "commands/tree_accumulator_exference.commands.txt",
+      "sha256": "2d3963afe590bc927ec6da563f309743d42c9274d878bf87089bfc3cfe26e090",
+      "type": "{α σ : Type} → (σ → α → σ) → σ → TreeAccumulatorFixture.Tree α → σ",
+      "predicate_sha256": "3479e75ff16c38aebd7052e2310471ca9616066ae5991e979bf36168824956d3"
+    },
+    {
+      "name": "tree_accumulator_exference_reject_all",
+      "engine": "exference",
+      "expected": "actual_false",
+      "path": "commands/tree_accumulator_exference_reject_all.commands.txt",
+      "sha256": "32e3dd35631f96531ac995086dbd5e9aa435353c5dafce5ea6ef654a9e781a89",
+      "type": "{α : Type} → TreeAccumulatorFixture.Tree α → TreeAccumulatorFixture.Tree α",
+      "predicate_sha256": "60a33e6cf5151f2d52eddae9685cfa270426aa89d8dbc7dfb854606f1d1a40fe"
+    },
+    {
+      "name": "tree_accumulator_both",
+      "engine": "both",
+      "expected": "candidate",
+      "path": "commands/tree_accumulator_both.commands.txt",
+      "sha256": "5f7451e04940b57bac18d1e67aec119a11bf700ca8ce5b124ddfb1150072a02a",
+      "type": "{α σ : Type} → (σ → α → σ) → σ → TreeAccumulatorFixture.Tree α → σ",
+      "predicate_sha256": "b6b35d5466ca112468a8083a41c0f8afc2aac87b146d49acbe6297a840b9213f"
+    },
+    {
+      "name": "tree_accumulator_both_reject_all",
+      "engine": "both",
+      "expected": "actual_false",
+      "path": "commands/tree_accumulator_both_reject_all.commands.txt",
+      "sha256": "117b81d26c2c52aeba85f865127ebb93a3ab51644f40cba389c300f5cf48b759",
+      "type": "{α : Type} → TreeAccumulatorFixture.Tree α → TreeAccumulatorFixture.Tree α",
+      "predicate_sha256": "60a33e6cf5151f2d52eddae9685cfa270426aa89d8dbc7dfb854606f1d1a40fe"
+    }
+  ],
+  "provider_policy": {
+    "haskell_value_providers": [
+      "foldTree"
+    ],
+    "haskell_datatype": "Tree a = Leaf a | Branch (Tree a) (Tree a)",
+    "lean_value_providers": [
+      "TreeAccumulatorFixture.foldTree"
+    ],
+    "lean_constructor_providers": [
+      "TreeAccumulatorFixture.Tree.leaf",
+      "TreeAccumulatorFixture.Tree.branch"
+    ],
+    "required_in_positive_candidate": "TreeAccumulatorFixture.foldTree",
+    "generated_equality_providers": [],
+    "genSizeOf": false,
+    "oracle_modules_loaded_for_search": false
+  },
+  "limits": {
+    "haskell_djinn": {
+      "raw_candidates": 1024,
+      "choices": 100000,
+      "strategy": "Interleave"
+    },
+    "haskell_exference": {
+      "raw_candidates": 1024,
+      "steps": 100000,
+      "queue": 1024,
+      "allow_unused": true,
+      "multi_constructor_patterns": true
+    },
+    "haskell_independent_replay_seconds": 60,
+    "haskell_probe_outer_guard_seconds": 180,
+    "helper_build_outer_guard_seconds": 180,
+    "lean": {
+      "window": 1024,
+      "verify": 1024,
+      "steps": 100000,
+      "choices": 100000,
+      "provider_cap": 80,
+      "strategy": "interleave",
+      "shown": 1,
+      "command_seconds": 90,
+      "fresh_process_guard_seconds": 180
+    }
+  },
+  "preparation_bases": [
+    {
+      "path": "test-recursive/run_recursors.py",
+      "sha256": "385ce828107e81f5c687e94ad0396e1221b3919858ff5e67bd922a4d067188f0"
+    },
+    {
+      "path": "lib/Djex/test-integration/RecursorSpec.hs",
+      "sha256": "13b80337e48fbffe6491ac6c1df8f2af92d5a42d4dccfa1f9d88fed3eb6bf6cd"
+    }
+  ]
+}

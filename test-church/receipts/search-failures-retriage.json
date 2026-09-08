@@ -1,0 +1,1164 @@
+{
+  "status": "completed_retriage_not_integration_acceptance",
+  "date": "2026-09-08",
+  "scope": "Existing complete unit failure, engine timing, rejected scheduler experiment, tree acceptance failures, portable fixture validation and auxiliary-provider metadata diagnosis",
+  "revisions": {
+    "canonical_source": "50340b0793822c2c5ef3a42dd250c04e674e8274",
+    "canonical_net_identical_to": "3b075d6dea015f0986b463627a0547bc76f29895",
+    "native_working_dependency": "63a23f58d2e0f6fd1ffcd0532412f049dd29e834",
+    "native_committed_dependency": "4a4ed0fc23f76d7b82b06496e03adfadbf374f84",
+    "native_host": "16fd7051ecd671985cbd93650feaa09ea1401465"
+  },
+  "findings": {
+    "native_unit": {
+      "passed": 700,
+      "total": 701,
+      "suite_seconds": 688.55,
+      "failure": "named binary: staged combined search exceeded 30s",
+      "dependency_promotion": false
+    },
+    "layered_diagnostic": {
+      "scope": "one named-binary fixture linked against existing native unit engine objects",
+      "exference_wall_seconds": 12.8450281,
+      "exference_allocated_bytes": 12547458920,
+      "allocation_is_cumulative_not_residency": true,
+      "causal_performance_claim": false
+    },
+    "rejected_experiment": {
+      "revision": "b567d7815830e510d1735cfdffb3af85f503f0bd",
+      "revert": "50340b0793822c2c5ef3a42dd250c04e674e8274",
+      "accepted": false,
+      "terminal_outcome": "focused layered-provider test failed unchanged",
+      "raw_parent_status": "running",
+      "status_resolution": "The diagnostic wrapper did not finalize its top-level status after its exception. Its completed layered process record, exit 1 and captured test failure establish the terminal failed outcome."
+    },
+    "tree_haskell": {
+      "djinn_candidates": 95,
+      "exference_candidates": 1024,
+      "positive_matches": 0,
+      "independent_full_type_ghc": true,
+      "actual_false_observations": 1119,
+      "original_limits_preserved": true,
+      "portable_reproduction": true
+    },
+    "tree_lean": {
+      "oracle_controls": 8,
+      "empty_axiom_inventories": 17,
+      "accepted_positive_cells": 0,
+      "positive_failure": "generated constructor eliminators outside original allowed provider inventory",
+      "accepted_false_engines": [
+        "exference",
+        "both"
+      ],
+      "djinn_false_inventory_gate": "failed"
+    },
+    "portable_fixture": {
+      "haskell_full_run": "completed with bounded synthesis misses",
+      "lean_controls_only": "passed; not a new live synthesis run",
+      "initial_failures": [
+        "Cabal exec passed compiler flags to ghc-pkg",
+        "relative output paths resolved under the child working directory"
+      ],
+      "production_search_change": false
+    },
+    "auxiliary_metadata": {
+      "status": "passed",
+      "generated_auxiliaries": 2,
+      "ordinary_providers": 4,
+      "ordinary_user_elim_retained": true,
+      "production_discovery_filter_changed": false
+    }
+  },
+  "no_new_accepted_church_cells": true,
+  "expected_open_goal": "Original priorities 2-4 and broader frontend/contextual scope remain open; all 13 extended plus 19 defaults across five language/engine combinations remain required.",
+  "archive": {
+    "path": "search-failures-retriage.zip",
+    "bytes": 6149947,
+    "sha256": "d1e6fe07119b853e386f264aab75db5457157be2184f20cb0830c41403f8c501",
+    "artifact_count": 216,
+    "uncompressed_bytes": 156351314,
+    "excludes": "Compiled executables, object/interface files, unrelated diagnostic source and external runtime binaries. Runtime/source hashes remain in original receipts."
+  },
+  "artifacts": [
+    {
+      "path": "dist-newstyle/LayeredProviderTiming.hs",
+      "bytes": 3273,
+      "sha256": "3b22a6d1ba280ab23306359176cee705329029baee5199942c31043f5bd53aba"
+    },
+    {
+      "path": "dist-newstyle/auxiliary-provider-metadata-v1/AuxiliaryProviderMetadata.lean",
+      "bytes": 1257,
+      "sha256": "36b0b826ec756d6338214454bce53b19e7ac321d32c9f165c515ec8ab0bebd6c"
+    },
+    {
+      "path": "dist-newstyle/auxiliary-provider-metadata-v1/results.json",
+      "bytes": 732,
+      "sha256": "83c658ac906ffe31901b8c6e78b4c9a48e1aff150115668d60be4a14be6a9f3f"
+    },
+    {
+      "path": "dist-newstyle/auxiliary-provider-metadata-v1/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/auxiliary-provider-metadata-v1/stdout.txt",
+      "bytes": 69,
+      "sha256": "0e831e5a13d4ea55b0c2146a533f1d22dcf1fea0eabd8dd8e719c053ef25f2be"
+    },
+    {
+      "path": "dist-newstyle/install-tree-accumulator-fixture.py",
+      "bytes": 6913,
+      "sha256": "f254136d07b7f529f0bb869bc36a3567fd460fd2ee7dda11c3ac10c22f75e251"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/both.stderr.txt",
+      "bytes": 977,
+      "sha256": "9ec37b1aceed22b9fb824db94773973ce8b63ce3cbae40e2de167d7fefc8d46c"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/both.stdout.txt",
+      "bytes": 405,
+      "sha256": "82ca8bf3da2923286a97c8f7674aed038e140c50f17f280a8128b1492230d8c2"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/compile.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/compile.stdout.txt",
+      "bytes": 123,
+      "sha256": "d43236083791f3af863c4a031a9a43f41685a9dfb29a9ddbed3662bdb595988f"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/djinn.stderr.txt",
+      "bytes": 964,
+      "sha256": "d7915029c4ecb52d38b3e8de10bd5f277afd70c4ba8d8ae2533037a929c17e3e"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/djinn.stdout.txt",
+      "bytes": 198,
+      "sha256": "667fa5464373dd8242c9552c103b394bf50be0d474b63e83e6e48faee99a4361"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/exference.stderr.txt",
+      "bytes": 977,
+      "sha256": "4a1c3b56cfbbb669469eac4b7c0a28a071399b9baa4f0dc9cdf5b192feec8d8f"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/exference.stdout.txt",
+      "bytes": 412,
+      "sha256": "fe8c52b1f398e1a6dcef20ec4996782bee027562958311f84fbc39de9f7985f1"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/link.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/link.stdout.txt",
+      "bytes": 123,
+      "sha256": "b5cfef3032bcc04a497dbe784808dec96ccf33ce4e1eff350651d340c1d30c7d"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/processes.json",
+      "bytes": 16544,
+      "sha256": "83a8a9289b25943dd51a07b6bf912a49af58997c177415bad45ab7be91162337"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/results.json",
+      "bytes": 75064,
+      "sha256": "eca3638746baecdcee751aaef9384dc1fe65bf7425b771e6c6c7fb5594326439"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/stages.stderr.txt",
+      "bytes": 975,
+      "sha256": "4c956799398bfc94dc844e9045192b6c3c986ddcd8402b59c9b882b6df3ef7c9"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v4/stages.stdout.txt",
+      "bytes": 540,
+      "sha256": "d19449ffc3f78165d51d9b72e57329c17dc681e4cf222c9813fe041d8cb460c0"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/both.stderr.txt",
+      "bytes": 977,
+      "sha256": "a88d930c7d07594a57da06a547320fb5fb74c5123ece8004b969eefb017f0419"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/both.stdout.txt",
+      "bytes": 403,
+      "sha256": "14dad462dee954339a134182481a2263dfcae5c7eae844e38869a2bb14634103"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/compile.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/compile.stdout.txt",
+      "bytes": 123,
+      "sha256": "485526a08943898f117507d7e548e13a0dcb6bf87ddeadd0021962d0900d43cf"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/djinn.stderr.txt",
+      "bytes": 964,
+      "sha256": "1a038d2d8d3791b4f613b31f367091721ceda02ce7dc851f8bc04716599d55c2"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/djinn.stdout.txt",
+      "bytes": 198,
+      "sha256": "a351cf79c0e572dcf6576a9ac691790001f38e836155c52159230e98c778d9a1"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/exference.stderr.txt",
+      "bytes": 977,
+      "sha256": "82a705894e6ab4fa1920c4d3efd23a52bd418085b54e0146366ebfd8f3631c8d"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/exference.stdout.txt",
+      "bytes": 410,
+      "sha256": "3836341ef05364a5f7a4e28bb643ebd7760462f8fdef486ac3198d73d07e7b08"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/layered.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/layered.stdout.txt",
+      "bytes": 274,
+      "sha256": "9329955e842a6e8950b349e9dbcc80367987d7a77ae3dee029c2a78fd520e743"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/link.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/link.stdout.txt",
+      "bytes": 123,
+      "sha256": "345610bbf6f9165a20484518f4029a6378c6b55c7b32a086fad0d8d982015bab"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/processes.json",
+      "bytes": 18704,
+      "sha256": "49266673f09d454fee0ca94d80adec0efb89860a4caea1b8ca4b069300fd7d19"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/results.json",
+      "bytes": 79188,
+      "sha256": "3941fa1db2a1ea4c3a6ff5cc2335d849a0758455313a02bbe1699903252a307b"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/stages.stderr.txt",
+      "bytes": 977,
+      "sha256": "467dc77a4b467e79e829089f1aef781f91da5bd17aca08740d86bde3678a7da9"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/stages.stdout.txt",
+      "bytes": 537,
+      "sha256": "1acc7511f8f103f637b14a27bcafc9499f007e25deee0d2ed3b6ab83566f7e75"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/structural.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/layered-provider-timing-v5/structural.stdout.txt",
+      "bytes": 153,
+      "sha256": "d10cdd2d0766956bfc56b4e346295addfd7ee4d54684d23dcd75c9019f1dcae3"
+    },
+    {
+      "path": "dist-newstyle/package-search-retriage.py",
+      "bytes": 6984,
+      "sha256": "739228d308bddf82f49e9b0fe23acef557e5dbc40a2e56686561cd7f42ab4ea6"
+    },
+    {
+      "path": "dist-newstyle/pending-focus-reverted-integration-build-v1.log",
+      "bytes": 2014,
+      "sha256": "f2a9a6113f40eafa4901e6f0194a7c7e680a79bb77a7d9144587b044ede276f9"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/processes.json",
+      "bytes": 1120,
+      "sha256": "c25374fae35a9e64cddcdfeae73653bb82fa45d1e4f68c3001a99c4ee9379d62"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/results.json",
+      "bytes": 157160,
+      "sha256": "34deefe2170799bbc45c4370c9cd977f2b13466d2f7444bdab5c769a949d5e40"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit.stdout.txt",
+      "bytes": 421,
+      "sha256": "14d83f53d9fc7f5b809419d1723efa5f04d512d904f9013bc233629dc1575acb"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit/inventory.json",
+      "bytes": 95912,
+      "sha256": "9c5e3009fdf596b22e08f9fd2e45ed09749fd01de6af667f38f707f1b9879543"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit/list-tests.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit/list-tests.stdout.txt",
+      "bytes": 90515,
+      "sha256": "b324e65ba704ae0fc21f09264c3cae66d275aa6f969a2953b37a9b0f5645f018"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit/processes.json",
+      "bytes": 2070,
+      "sha256": "5bfe1ec73f227ce191317af1b5a3a0e5e65f3a2f969bb5bea424465ad0413f42"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit/results.json",
+      "bytes": 76893,
+      "sha256": "d91bf49a0e82c91436c800e2003d4ba93483c288756821adebbc25b29fd5e278"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit/test-names.txt",
+      "bytes": 89814,
+      "sha256": "afd17b2252bf4347044305fe439e0b6db71e424e566f1f55eeb6a54e716de3e8"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit/unit.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/polymorphic-introduction-integration-v3/unit/unit.stdout.txt",
+      "bytes": 74908,
+      "sha256": "d7dc5c0e6dc76fdfc3c333b472340de372caece09b534ce2fff818e43f5f9678"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/CheckControls.hs",
+      "bytes": 199,
+      "sha256": "bee33291dda8d7ee6cac39f9987c40128692d7f06ebfbb72b3ebc33370eaedfb"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/HaskellCandidateReplay.hs.in",
+      "bytes": 467,
+      "sha256": "06911dfbe50acac16011fb1e82e9de456ab872df716c417b03184fd702965856"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/LeanCandidateReplay.lean.in",
+      "bytes": 4967,
+      "sha256": "f172a614697db32a2d0658b3bd704404520140c94897e2e00c912692dba9e6ec"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/README.md",
+      "bytes": 12496,
+      "sha256": "e39f37004834192ac7bd6f0ed8903e9bf071c7651877cb7e02911291a961e139"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/TreeAccumulatorControls.hs",
+      "bytes": 4252,
+      "sha256": "4811f60a367649f0a47e922ac3dc8b7f01b2762bf8b51c7ccdac6ac3d9d7602e"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/TreeAccumulatorControls.lean",
+      "bytes": 7717,
+      "sha256": "df2362673030a40f64f5bd1ab9105eb28da5acc4774570b2ea36adffb250d4c9"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/TreeAccumulatorProbe.hs",
+      "bytes": 9820,
+      "sha256": "8848b3a487cb36d083eaab8c170699a8308356a082cac931bd993a80887600f6"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/TreeAccumulatorProviders.hs",
+      "bytes": 345,
+      "sha256": "67e1db4c43f997dbb36c8ff71659a97b52b2f181251b51898e2b082c268ba7f0"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/TreeAccumulatorProviders.lean",
+      "bytes": 498,
+      "sha256": "0f8b1d865e8276025031ebb976cb253b7aae838bab3a11b949ea7b84c7e63fe6"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/case.json",
+      "bytes": 20260,
+      "sha256": "ab4401e7118573b1a58cc89da4b0b031903f3b06cc3195c1d94eb58fa2d78a6c"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/commands/tree_accumulator_both.commands.txt",
+      "bytes": 4915,
+      "sha256": "5f7451e04940b57bac18d1e67aec119a11bf700ca8ce5b124ddfb1150072a02a"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/commands/tree_accumulator_both_reject_all.commands.txt",
+      "bytes": 983,
+      "sha256": "117b81d26c2c52aeba85f865127ebb93a3ab51644f40cba389c300f5cf48b759"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/commands/tree_accumulator_djinn.commands.txt",
+      "bytes": 4933,
+      "sha256": "e4224ac175703f394ce966347001b09dc85bdae3314ed7747bfa47caba0d605c"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/commands/tree_accumulator_djinn_reject_all.commands.txt",
+      "bytes": 985,
+      "sha256": "28de82661f2dab57a674d05f55b8a12e20ddb3b82bd625c3c72acb29d6c165c9"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/commands/tree_accumulator_exference.commands.txt",
+      "bytes": 5005,
+      "sha256": "2d3963afe590bc927ec6da563f309743d42c9274d878bf87089bfc3cfe26e090"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/commands/tree_accumulator_exference_reject_all.commands.txt",
+      "bytes": 993,
+      "sha256": "32e3dd35631f96531ac995086dbd5e9aa435353c5dafce5ea6ef654a9e781a89"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/manifest.json",
+      "bytes": 3073,
+      "sha256": "aa4ac28a27ed546b9e04e942551b892030c46a11fd597bfcca74d8fd841c206d"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/prepare.py",
+      "bytes": 14310,
+      "sha256": "9dd7093282efaa030df70f4b31b9b7e69aeef2477c13a689c3f30d2bc1b89148"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v1/run_acceptance.py",
+      "bytes": 25142,
+      "sha256": "f3f8032db5551d420bb8f1506fe8de008fed24fed2c8fc060f9af81ca21fb2bf"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/CheckControls.hs",
+      "bytes": 199,
+      "sha256": "bee33291dda8d7ee6cac39f9987c40128692d7f06ebfbb72b3ebc33370eaedfb"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/HaskellCandidateReplay.hs.in",
+      "bytes": 467,
+      "sha256": "06911dfbe50acac16011fb1e82e9de456ab872df716c417b03184fd702965856"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/LeanCandidateReplay.lean.in",
+      "bytes": 4967,
+      "sha256": "f172a614697db32a2d0658b3bd704404520140c94897e2e00c912692dba9e6ec"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/README.md",
+      "bytes": 12496,
+      "sha256": "e39f37004834192ac7bd6f0ed8903e9bf071c7651877cb7e02911291a961e139"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/TreeAccumulatorControls.hs",
+      "bytes": 4252,
+      "sha256": "4811f60a367649f0a47e922ac3dc8b7f01b2762bf8b51c7ccdac6ac3d9d7602e"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/TreeAccumulatorControls.lean",
+      "bytes": 7885,
+      "sha256": "fc6c570444c93aecd66b8a25eb773413da168f5b6388e6211b7b85fd30daa390"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/TreeAccumulatorProbe.hs",
+      "bytes": 9820,
+      "sha256": "8848b3a487cb36d083eaab8c170699a8308356a082cac931bd993a80887600f6"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/TreeAccumulatorProviders.hs",
+      "bytes": 345,
+      "sha256": "67e1db4c43f997dbb36c8ff71659a97b52b2f181251b51898e2b082c268ba7f0"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/TreeAccumulatorProviders.lean",
+      "bytes": 498,
+      "sha256": "0f8b1d865e8276025031ebb976cb253b7aae838bab3a11b949ea7b84c7e63fe6"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/case.json",
+      "bytes": 20260,
+      "sha256": "664b6d2cafa950178b0c4378dfe1b6ba032025adba2881619e451bc2653c7641"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/commands/tree_accumulator_both.commands.txt",
+      "bytes": 4915,
+      "sha256": "5f7451e04940b57bac18d1e67aec119a11bf700ca8ce5b124ddfb1150072a02a"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/commands/tree_accumulator_both_reject_all.commands.txt",
+      "bytes": 983,
+      "sha256": "117b81d26c2c52aeba85f865127ebb93a3ab51644f40cba389c300f5cf48b759"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/commands/tree_accumulator_djinn.commands.txt",
+      "bytes": 4933,
+      "sha256": "e4224ac175703f394ce966347001b09dc85bdae3314ed7747bfa47caba0d605c"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/commands/tree_accumulator_djinn_reject_all.commands.txt",
+      "bytes": 985,
+      "sha256": "28de82661f2dab57a674d05f55b8a12e20ddb3b82bd625c3c72acb29d6c165c9"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/commands/tree_accumulator_exference.commands.txt",
+      "bytes": 5005,
+      "sha256": "2d3963afe590bc927ec6da563f309743d42c9274d878bf87089bfc3cfe26e090"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/commands/tree_accumulator_exference_reject_all.commands.txt",
+      "bytes": 993,
+      "sha256": "32e3dd35631f96531ac995086dbd5e9aa435353c5dafce5ea6ef654a9e781a89"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/manifest.json",
+      "bytes": 3073,
+      "sha256": "bc20e5a333ec42a532b532367bf7efcbd9edf87bd6f4381d86148882a84b261a"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/prepare.py",
+      "bytes": 14543,
+      "sha256": "565a72a52648e8e24638145b92602a4fe5ba178ac6ff31c95e9a3100ac72ee1a"
+    },
+    {
+      "path": "dist-newstyle/recursor-acceptance/tree-accumulator-proposal-v2/run_acceptance.py",
+      "bytes": 25142,
+      "sha256": "f3f8032db5551d420bb8f1506fe8de008fed24fed2c8fc060f9af81ca21fb2bf"
+    },
+    {
+      "path": "dist-newstyle/run-layered-provider-timing-v4.py",
+      "bytes": 1978,
+      "sha256": "852591c5293a340f65594e06f5613860a14ffc1620c75dc93f4749b616794ba9"
+    },
+    {
+      "path": "dist-newstyle/run-layered-provider-timing-v5.py",
+      "bytes": 2817,
+      "sha256": "de2fea252db0c94eed463346d00401953f1acc96638a4268b8d12b46c7d60a18"
+    },
+    {
+      "path": "dist-newstyle/run-prepared-tree-accumulator-v2.py",
+      "bytes": 2322,
+      "sha256": "727a4f09d368ad8881739c108762c21dcc9d2f65575b7eaa4769769e3cf35ece"
+    },
+    {
+      "path": "dist-newstyle/run-prepared-tree-accumulator.py",
+      "bytes": 2267,
+      "sha256": "a3ce36752954d90782d395d484b37e5e9574c4bf16a068e635bc05e66e4d376a"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/carrier-observations.json",
+      "bytes": 782,
+      "sha256": "71aed2621478021c70cd15961ca93c0c4b3d513eab5305aebaedbd74b7e55631"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix.stdout.txt",
+      "bytes": 1533,
+      "sha256": "43eed0a7e652e065d0128511c15cb476c4f1c19cf6763f2bc0ed4a55550651d7"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-djinn-exact-ghc.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-djinn-exact-ghc.stdout.txt",
+      "bytes": 72,
+      "sha256": "e81d47291819a1f76503d14982fd41739693a2f33381907c457a5a2118e28901"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-djinn-search.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-djinn-search.stdout.txt",
+      "bytes": 32,
+      "sha256": "08098f3b128fa2d4254ae35b26717430e40ab8fc2a6a0bf1be825362305d11db"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-djinn/ExactCandidates.hs",
+      "bytes": 171629,
+      "sha256": "62a0dfc14d5e74c8c7893f70d57ee1b8a0fea485cb1c7cb38950df9f0e5ca3a5"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-djinn/candidates.json",
+      "bytes": 4030750,
+      "sha256": "3b303ce82acc3047158db19e74a112e4c2efb3338c4c1b99de25f9eb25c469e4"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-exference-exact-ghc.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-exference-exact-ghc.stdout.txt",
+      "bytes": 74,
+      "sha256": "bee8398f3ab600c89ae9fd516f65d6c442b3503bcaa5969cf8b9d7285e329455"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-exference-search.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-exference-search.stdout.txt",
+      "bytes": 34,
+      "sha256": "343e4cd70f1664c97a23391b23bb346299b69fc41bf7254a4d42bafd5eaa2c99"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-exference/ExactCandidates.hs",
+      "bytes": 2082659,
+      "sha256": "bb1141838f301ccf94e4c67192eca47b0b45308e335d3eb5193f42b3364725c3"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-exference/candidates.json",
+      "bytes": 33309448,
+      "sha256": "8b582f6f4ebc9d150d83615f0351b0a8fce9892d34aede8ef95ae65d5fb7761c"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-oracle-controls.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-oracle-controls.stdout.txt",
+      "bytes": 181,
+      "sha256": "1671c021564afbe41fcc1d6e9eabc3869fb854b1031021ad92f4bb11a5f73f33"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-probe-compile.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/haskell-probe-compile.stdout.txt",
+      "bytes": 451,
+      "sha256": "6844fcb1d8c214b012d5ad36eaf7d594fc71e1ea84645ebcd45910e1834231d4"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/lean-oracle-controls.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/lean-oracle-controls.stdout.txt",
+      "bytes": 3614,
+      "sha256": "b4b1324e12d369bc1cc50e6cbb7d31cf368221b0b4c2f56ebd73c91e61a9104b"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/lean-version.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/lean-version.stdout.txt",
+      "bytes": 104,
+      "sha256": "78caa1ebd7869026f8812677a76273f299444e5a1b610be3df495edf2cf233ca"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/processes.json",
+      "bytes": 9296,
+      "sha256": "542930e5641cf7a76445c0e42d8f70415a957bfa32dd9a96991ec13878b8a468"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/matrix/results.json",
+      "bytes": 37556231,
+      "sha256": "20e9a43b260c7c0acb6864d4757407c2a24962adafb9e1b57e6cdfa0cc713934"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/processes.json",
+      "bytes": 1359,
+      "sha256": "43be706323a2f8ac097275c0d0d74a9a9e1bd78d0c20de80cbceb7054e8263cd"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v1/results.json",
+      "bytes": 7515,
+      "sha256": "a7438b0de156ec6367f7478d916e4bf3599980d4bc7f297cac69eb3edc93fe2c"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix.stdout.txt",
+      "bytes": 1731,
+      "sha256": "43b63a61fe87f0034832ed9b63e8d79a2de7cfefa96aab6b0d02a8a693220f54"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-oracle-controls.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-oracle-controls.stdout.txt",
+      "bytes": 1236,
+      "sha256": "c1f9452cc00e90910a3aa7382794e370a6a2e0b2c7872d9af0e6ef6ac5d3678e"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_both-live.input.txt",
+      "bytes": 4936,
+      "sha256": "2c8de5b1f1117c0871ccaf4a7ee8b99a1c678ea13f29f87f739eaf96f9bc11f7"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_both-live.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_both-live.stdout.txt",
+      "bytes": 75883,
+      "sha256": "72822f3f6a6167671ed58f9fcc47e75c3f628515e778fef494206c9f7f3e2474"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_both_reject_all-live.input.txt",
+      "bytes": 1004,
+      "sha256": "1a8e5c2ed3ab346a38260e2d1dac9586d2339d8ef7aa7d5bf1514cffb3ba0249"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_both_reject_all-live.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_both_reject_all-live.stdout.txt",
+      "bytes": 106821,
+      "sha256": "75dc39004f5c6463914dd21d480105974dd3b0c546014d316469839d08c3599a"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_djinn-live.input.txt",
+      "bytes": 4954,
+      "sha256": "a6e74ca382de0a897dd9b433ebb360a903debc63e5f29b2de68cbecd6a36d8dc"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_djinn-live.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_djinn-live.stdout.txt",
+      "bytes": 19261,
+      "sha256": "54c6c7f7977f154f488e9cdd47a61d8146ce08ec20764d0365e69fe05192197e"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_djinn_reject_all-live.input.txt",
+      "bytes": 1006,
+      "sha256": "f542e9a789ec13fa2816ab4af23437eee289fd96b3ab2fc4dc6a0254eee0384b"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_djinn_reject_all-live.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_djinn_reject_all-live.stdout.txt",
+      "bytes": 57286,
+      "sha256": "dd1acfd84ee18a1837d2a3d075be8a9638725d09b160d0082d450106e241ee11"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_exference-live.input.txt",
+      "bytes": 5026,
+      "sha256": "e4d8ce418521916bb53433347f9de170f3c85f6caea2873d3fb6b5b8fb39a0b6"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_exference-live.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_exference-live.stdout.txt",
+      "bytes": 69411,
+      "sha256": "55ef3fee6fce7a5a0683bd0cda9ce62a7a252ccfbec9ccd2767d57dee9930418"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_exference_reject_all-live.input.txt",
+      "bytes": 1014,
+      "sha256": "25cf4aed53fdc41a2e93b75a7ab7bc3c6509f8affdc8be934c08914dfa747bbd"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_exference_reject_all-live.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-tree_accumulator_exference_reject_all-live.stdout.txt",
+      "bytes": 65396,
+      "sha256": "cf4214c7cd525c23b19890674cc1a83769de611e5053acadcc933d6f66cc6ec4"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-version.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/lean-version.stdout.txt",
+      "bytes": 104,
+      "sha256": "78caa1ebd7869026f8812677a76273f299444e5a1b610be3df495edf2cf233ca"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/processes.json",
+      "bytes": 9890,
+      "sha256": "7e3369c496708c2565f1b36d27e1391c21bfbfe691bbdcda5d9d4604099c56fe"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/matrix/results.json",
+      "bytes": 269227,
+      "sha256": "74a97cb40fe095b20f8c0ec1a81a162388c87b155c45e632c7af918310497eb8"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/processes.json",
+      "bytes": 1395,
+      "sha256": "b8ecb871186edaf8e19198a186a36636a3b8898986c7074309e564d92371bfdb"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-acceptance-v2/results.json",
+      "bytes": 7561,
+      "sha256": "12ccb8cfd50eb463b20e1c72553040a8d00da09fb8cd50bd96741f14c8272dfc"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v1/haskell-library-location.stderr.txt",
+      "bytes": 377,
+      "sha256": "b7efedc56f9a5e098435e61586ae2f683bf0f2b1171bb75e8c714d754c8ea826"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v1/haskell-library-location.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v1/haskell-oracle-controls.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v1/haskell-oracle-controls.stdout.txt",
+      "bytes": 181,
+      "sha256": "1671c021564afbe41fcc1d6e9eabc3869fb854b1031021ad92f4bb11a5f73f33"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v1/processes.json",
+      "bytes": 2148,
+      "sha256": "c7f0ef3a411ba5f4b48fa7f2d97d5162f785bcf09341c9967c0df4fe98a3537d"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v1/results.json",
+      "bytes": 46987,
+      "sha256": "00aaa804098d7d678fc6a3e0b9a1694bb4882e06dd06cef31b5dc4a221f0996b"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-djinn-search.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-djinn-search.stdout.txt",
+      "bytes": 32,
+      "sha256": "08098f3b128fa2d4254ae35b26717430e40ab8fc2a6a0bf1be825362305d11db"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-exference-search.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-exference-search.stdout.txt",
+      "bytes": 34,
+      "sha256": "343e4cd70f1664c97a23391b23bb346299b69fc41bf7254a4d42bafd5eaa2c99"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-library-location.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-library-location.stdout.txt",
+      "bytes": 105,
+      "sha256": "cac3c978b091687d272c2f5952057191c0f0ffebdff447a17e5766d25d92b9ba"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-oracle-controls.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-oracle-controls.stdout.txt",
+      "bytes": 181,
+      "sha256": "1671c021564afbe41fcc1d6e9eabc3869fb854b1031021ad92f4bb11a5f73f33"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-probe-compile.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/haskell-probe-compile.stdout.txt",
+      "bytes": 398,
+      "sha256": "7cbfd631dc8cf3ad0b084efb5be4752914c1b837e6e94e8beb603d7cd54de224"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/processes.json",
+      "bytes": 5759,
+      "sha256": "5c5fcc8438750e970da12b9ab9061416fd244874d55d23aa5bd283d7c9b20ddb"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v2/results.json",
+      "bytes": 51518,
+      "sha256": "91761863e8c00bab0d68902eff3f691c0c939f4ff79577c85b687317a9ae5d32"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-djinn-exact-ghc.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-djinn-exact-ghc.stdout.txt",
+      "bytes": 72,
+      "sha256": "e81d47291819a1f76503d14982fd41739693a2f33381907c457a5a2118e28901"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-djinn-search.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-djinn-search.stdout.txt",
+      "bytes": 32,
+      "sha256": "08098f3b128fa2d4254ae35b26717430e40ab8fc2a6a0bf1be825362305d11db"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-djinn/ExactCandidates.hs",
+      "bytes": 171629,
+      "sha256": "62a0dfc14d5e74c8c7893f70d57ee1b8a0fea485cb1c7cb38950df9f0e5ca3a5"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-djinn/candidates.json",
+      "bytes": 4030750,
+      "sha256": "3b303ce82acc3047158db19e74a112e4c2efb3338c4c1b99de25f9eb25c469e4"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-exference-exact-ghc.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-exference-exact-ghc.stdout.txt",
+      "bytes": 74,
+      "sha256": "bee8398f3ab600c89ae9fd516f65d6c442b3503bcaa5969cf8b9d7285e329455"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-exference-search.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-exference-search.stdout.txt",
+      "bytes": 34,
+      "sha256": "343e4cd70f1664c97a23391b23bb346299b69fc41bf7254a4d42bafd5eaa2c99"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-exference/ExactCandidates.hs",
+      "bytes": 2082659,
+      "sha256": "bb1141838f301ccf94e4c67192eca47b0b45308e335d3eb5193f42b3364725c3"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-exference/candidates.json",
+      "bytes": 33309448,
+      "sha256": "8b582f6f4ebc9d150d83615f0351b0a8fce9892d34aede8ef95ae65d5fb7761c"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-library-location.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-library-location.stdout.txt",
+      "bytes": 105,
+      "sha256": "cac3c978b091687d272c2f5952057191c0f0ffebdff447a17e5766d25d92b9ba"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-oracle-controls.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-oracle-controls.stdout.txt",
+      "bytes": 181,
+      "sha256": "1671c021564afbe41fcc1d6e9eabc3869fb854b1031021ad92f4bb11a5f73f33"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-probe-compile.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/haskell-probe-compile.stdout.txt",
+      "bytes": 418,
+      "sha256": "627d0a6d7e509154429bfd8ab10fc79daf7c490a894b19dbe4e8dbb977dae84f"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/processes.json",
+      "bytes": 8088,
+      "sha256": "884b179ed1a293a97075567c5f29616a84e96cc0a9eed8a8543529ec26774558"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-haskell-v3/results.json",
+      "bytes": 37523320,
+      "sha256": "139e3c70475389612e757e3ac8246489ca683d090177078096de99956dc7248b"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-lean-controls-v1/lean-oracle-controls.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-lean-controls-v1/lean-oracle-controls.stdout.txt",
+      "bytes": 1236,
+      "sha256": "c1f9452cc00e90910a3aa7382794e370a6a2e0b2c7872d9af0e6ef6ac5d3678e"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-lean-controls-v1/lean-version.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-lean-controls-v1/lean-version.stdout.txt",
+      "bytes": 104,
+      "sha256": "78caa1ebd7869026f8812677a76273f299444e5a1b610be3df495edf2cf233ca"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-lean-controls-v1/processes.json",
+      "bytes": 2053,
+      "sha256": "50ec028706b8f511542eff23ce4fcae1303c0cdf2ae210b51f12bd50edd5c6ea"
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-portable-lean-controls-v1/results.json",
+      "bytes": 47303,
+      "sha256": "a8c77e88e9f389229fcc0de71dfc2c2a8fbedc8afbfc59f9307c0a8bb2062298"
+    },
+    {
+      "path": "dist-newstyle/validate-polymorphic-introduction-integration-v3.py",
+      "bytes": 4667,
+      "sha256": "4711311f7b8960c3a89279311bbfc814d621d8d5f164b5ca4f0900b40a628b61"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/CheckControls.hs",
+      "bytes": 199,
+      "sha256": "bee33291dda8d7ee6cac39f9987c40128692d7f06ebfbb72b3ebc33370eaedfb"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/HaskellCandidateReplay.hs.in",
+      "bytes": 467,
+      "sha256": "06911dfbe50acac16011fb1e82e9de456ab872df716c417b03184fd702965856"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/LeanCandidateReplay.lean.in",
+      "bytes": 4967,
+      "sha256": "f172a614697db32a2d0658b3bd704404520140c94897e2e00c912692dba9e6ec"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/README.md",
+      "bytes": 3753,
+      "sha256": "30cc730c5e47f51c49865f52a70ad93e46e0d58b302f086139948b4c11fa02b9"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/TreeAccumulatorControls.hs",
+      "bytes": 4252,
+      "sha256": "4811f60a367649f0a47e922ac3dc8b7f01b2762bf8b51c7ccdac6ac3d9d7602e"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/TreeAccumulatorControls.lean",
+      "bytes": 7885,
+      "sha256": "fc6c570444c93aecd66b8a25eb773413da168f5b6388e6211b7b85fd30daa390"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/TreeAccumulatorProbe.hs",
+      "bytes": 9820,
+      "sha256": "8848b3a487cb36d083eaab8c170699a8308356a082cac931bd993a80887600f6"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/TreeAccumulatorProviders.hs",
+      "bytes": 345,
+      "sha256": "67e1db4c43f997dbb36c8ff71659a97b52b2f181251b51898e2b082c268ba7f0"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/TreeAccumulatorProviders.lean",
+      "bytes": 498,
+      "sha256": "0f8b1d865e8276025031ebb976cb253b7aae838bab3a11b949ea7b84c7e63fe6"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/case.json",
+      "bytes": 19559,
+      "sha256": "512a9168c2e0337b77dc04acd2914aaddcca171983f8f457d3c4ca5dd671d717"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/commands/tree_accumulator_both.commands.txt",
+      "bytes": 4915,
+      "sha256": "5f7451e04940b57bac18d1e67aec119a11bf700ca8ce5b124ddfb1150072a02a"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/commands/tree_accumulator_both_reject_all.commands.txt",
+      "bytes": 983,
+      "sha256": "117b81d26c2c52aeba85f865127ebb93a3ab51644f40cba389c300f5cf48b759"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/commands/tree_accumulator_djinn.commands.txt",
+      "bytes": 4933,
+      "sha256": "e4224ac175703f394ce966347001b09dc85bdae3314ed7747bfa47caba0d605c"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/commands/tree_accumulator_djinn_reject_all.commands.txt",
+      "bytes": 985,
+      "sha256": "28de82661f2dab57a674d05f55b8a12e20ddb3b82bd625c3c72acb29d6c165c9"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/commands/tree_accumulator_exference.commands.txt",
+      "bytes": 5005,
+      "sha256": "2d3963afe590bc927ec6da563f309743d42c9274d878bf87089bfc3cfe26e090"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/commands/tree_accumulator_exference_reject_all.commands.txt",
+      "bytes": 993,
+      "sha256": "32e3dd35631f96531ac995086dbd5e9aa435353c5dafce5ea6ef654a9e781a89"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/locate_library.py",
+      "bytes": 845,
+      "sha256": "29658743bd1af1c4820fe7531d5a3562e5dd689661ebfe2d7e39fa70c80ec122"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/manifest.json",
+      "bytes": 3218,
+      "sha256": "7593a661cb75e74103b3c6ee1830e6ce4accb696db50863e4f89c8faae8a3800"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/prepare.py",
+      "bytes": 14379,
+      "sha256": "bd873e95a9c86b016e0ee794dde849520b114595bf5fb8690f4ad53db1db4a1f"
+    },
+    {
+      "path": "test-recursive/tree-accumulator/run_acceptance.py",
+      "bytes": 26378,
+      "sha256": "7f352603c967275f62d8c1988a9862b0f68b9793670268c2860816c00caec27d"
+    },
+    {
+      "path": "canonical-git/b567d7815830e510d1735cfdffb3af85f503f0bd.patch",
+      "bytes": 2351,
+      "sha256": "7e1c4ad1b8ba6a4e6174eabc51cb7cfe0a7027ef16a4173e1ac586938f25d32c"
+    },
+    {
+      "path": "canonical-git/50340b0793822c2c5ef3a42dd250c04e674e8274.patch",
+      "bytes": 1915,
+      "sha256": "ef805a551872640e364a74ee615f117c720521938268f3803c4db1bd8609a96d"
+    }
+  ]
+}

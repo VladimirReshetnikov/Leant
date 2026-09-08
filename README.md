@@ -179,10 +179,11 @@ Companion documents:
   build and 2,306-test regression pass; Leant retains the separately accepted
   `4a4ed0fc` pin above. Implicit-root scoping, ordinary contextual presentation,
   derived method schemes, mixed Lean dictionary inventories and missing Church
-  constructions remain open. The revised order closes the current native
-  integration gate, then alternates missing Church constructions with bounded
-  Haskell frontend usability and supplied tree folds. Broader contextual
-  source and selected-dictionary evidence follow.
+  constructions remain open. The revised order targets the recurring native
+  integration failure, generated-provider filtering and supplied tree folds,
+  while keeping bounded Haskell frontend usability independent. Missing Church
+  constructions, broader contextual source and selected-dictionary evidence
+  retain their full acceptance requirements.
   The canonical [focused introduction change](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-focused-forall-search.md) now synthesizes
   all **13 extended Church operations in one fresh Haskell Exference run**,
   including `maybeEither`, at unchanged search limits. Exact full-signature GHC
@@ -196,8 +197,12 @@ Companion documents:
   extended corpus now passes **13/13 in one native run** at Djex `3529c465`,
   with exact full-type kernel replay and an actual False control. The
   [refinement and updated priorities](docs/reports/2026-09-08-post-integration-priorities.md)
-  retain a clean aggregate integration gate for `63a23f58`: its structural
-  regression passes, but two other unit failures only pass in isolated retries.
+  retain a clean aggregate integration gate for `63a23f58`: the latest full
+  native unit run passes **700/701**, with one recurring layered-provider deadline.
+  The supplied tree accumulator is now an executed Haskell miss; Lean's positive
+  cells fail the generated-provider inventory gate. The next deliveries target
+  those specific failures and bounded Haskell frontend usability; broad scheduler
+  tuning is deferred after a failed, reverted experiment.
   The committed dependency remains `4a4ed0fc`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).

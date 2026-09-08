@@ -1,0 +1,12 @@
+{-# LANGUAGE RankNTypes, ImpredicativeTypes, ScopedTypeVariables, TypeApplications #-}
+module Main where
+import TreeAccumulatorProviders (Tree(..), foldTree)
+import TreeAccumulatorControls (observations)
+
+candidate :: forall a s. (s -> a -> s) -> s -> Tree a -> s
+candidate = __EXACT_SYNTHESIZED_TERM__
+
+main :: IO ()
+main = do
+  print (observations candidate)
+  if all snd (observations candidate) then pure () else fail "candidate failed original finite predicate"

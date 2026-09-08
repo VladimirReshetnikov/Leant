@@ -13,6 +13,11 @@ records a fresh 13/13 Lean Exference run at Djex `3529c465`. Complete native
 integration of the refinement at `63a23f58` remains open; Leant still commits
 the accepted `4a4ed0fc` dependency.
 
+The latest [search-failure re-triage](2026-09-08-post-integration-priorities.md)
+records 700/701 native unit tests, the rejected scheduling experiment and the
+executed tree-accumulator failures. It adds no accepted Church behavioral cells
+and does not promote the working dependency.
+
 | Language and engine | Accepted subset | Remaining within that subset |
 | --- | ---: | --- |
 | Haskell Exference, fresh complete extended run | 13/13 | None within the 13 extended operations |
