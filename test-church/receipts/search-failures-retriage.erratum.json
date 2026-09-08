@@ -1,0 +1,10 @@
+{
+  "status": "acceptance_claim_corrected",
+  "original_receipt": "search-failures-retriage.json",
+  "corrected_fields": [
+    "findings.tree_lean.accepted_false_engines"
+  ],
+  "correction": "The original Exference and Both tree False commands timed out. They produced actual false observations, but no original Lean tree cell passes the full original deadline and inventory contract.",
+  "superseding_receipt": "../../test-context/receipts/semantic-auxiliary-providers.json",
+  "original_bytes_unchanged": true
+}

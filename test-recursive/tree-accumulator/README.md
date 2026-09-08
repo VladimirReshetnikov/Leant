@@ -2,8 +2,13 @@
 
 This is a manual behavioral acceptance fixture for priority 2. The initial
 recorded runs do **not** accept a synthesized accumulator in either Haskell
-engine. Lean's corrected oracle proofs pass, but no positive Lean cell passes;
-the Exference and Both False controls pass separately. See the
+engine. Lean's corrected oracle proofs pass, but no positive Lean cell passes.
+After the semantic provider filter, Djinn's False control passes; Exference
+and Both time out. Earlier receipts marked those timed-out False cells as
+passed based only on their actual rejection observations. The
+[deadline correction](../../docs/reports/2026-09-08-semantic-auxiliary-providers.md)
+supersedes those acceptance claims without changing the original captures.
+See the
 [current search report](../../docs/reports/2026-09-08-post-integration-priorities.md)
 before treating any cell as accepted. This fixture is not part of the passing
 unit-test count.
@@ -64,3 +69,8 @@ Outer process guards are separate. A timeout, exhausted pool or unsupported
 candidate remains a failed cell, never an impossibility claim. The supplied
 witness demonstrates that a state-transformer fold carrier works; a passing
 synthesized implementation need not use that exact construction.
+
+`python -B test-recursive/tree-accumulator/test_deadlines.py` checks that the
+tree runner rejects expired commands even when they already produced an actual
+False observation or an accepted prefix. This fixture's deadline gate is
+stronger than the shared parser's predicate-observation contract.

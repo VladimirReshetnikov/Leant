@@ -1,11 +1,16 @@
 # Further synthesis improvements: reproduced failures and bounded deliveries
 
-The next work should target three concrete gaps: costly layered-provider search,
-Lean's admission of generated auxiliary eliminators, and accumulator composition
-through a supplied tree fold. Keep Haskell frontend usability as an independent
-delivery. Broad scheduler tuning and new recursion architectures move down the
-list. This changes the delivery order, not the original priorities 1–4 or their
-acceptance requirements.
+The [semantic auxiliary-provider filter](2026-09-08-semantic-auxiliary-providers.md)
+is now implemented and verified through four real-kernel discovery cells and
+the public tree inventories. The remaining concrete gaps are costly layered-
+provider search, accumulator composition through a supplied fold, and bounded
+Haskell frontend usability. The original priorities 1–4 remain intact.
+
+**Tree acceptance correction:** the earlier Exference and Both False controls
+timed out. They produced actual rejection observations, but did not pass the
+fixture's full deadline contract. The linked report supersedes those pass
+labels. After filtering, only the new Djinn False cell passes; no positive tree
+cell is accepted. Original receipts remain unchanged.
 
 The [new evidence receipt](../../test-church/receipts/search-failures-retriage.json) retains the complete failed integration run,
 timing probes, rejected experiment, tree queries, candidate graphs, compiler
@@ -21,7 +26,7 @@ and does not advance Leant's committed Djex dependency.
 | A diagnostic linked to the existing unit engine objects finds the named-binary result with Djinn in about 7 ms; Exference takes 12.85 seconds and allocates **12.55 GB cumulatively**, with about 19 MB maximum residency and 1.05 seconds of GC in that process. Both takes 10.31 seconds in a separate invocation. | Substantial work occurs in the pure Haskell engine path. Cumulative allocation is not resident memory; these serial observations do not establish a speedup or prove the full-suite timeout's cause. | Profile candidate construction and forcing in this fixture before changing Lean worker counts, heap settings or global search weights. |
 | The pending-polymorphic-work scheduling experiment `b567d781` passes a focused structural test but fails the unchanged layered-provider test. Its Exference allocation is slightly higher despite a faster isolated wall time. | There is no demonstrated workload reduction or acceptance improvement. | The experiment was reverted by `50340b07`; its net source difference from published `3b075d6d` is empty. Do not reintroduce it based on isolated elapsed time. |
 | The supplied tree accumulator produces **95 Djinn and 1,024 Exference source-checked candidates**, all independently compiled and executed at the original full signature; none satisfies the 16 observations. | This is now an executed bounded synthesis miss in both Haskell engines. It is not a proof of uninhabitation. | Promote a focused fold-carrier construction investigation. Preserve the original providers, budgets and counterexamples. |
-| The corrected Lean tree oracle passes all eight controls with 17 empty axiom inventories. All three positive engine cells fail their provider-inventory gate because generated constructor `.elim` declarations appear. | Oracle validity and live synthesis acceptance are separate. No positive Lean accumulator is accepted. Exference and Both False controls pass separately; Djinn's False outcome fails the inventory gate. | Repair automatic provider admission before comparing Lean search performance or expanding its inventory. |
+| The corrected Lean tree oracle passes all eight controls with 17 empty axiom inventories. Before the filter, all three positive engine cells failed their provider-inventory gate because generated constructor `.elim` declarations appeared. | Oracle validity and live synthesis acceptance are separate. No positive Lean accumulator is accepted. Exference and Both False controls time out; Djinn's earlier False outcome fails the inventory gate. The later correction preserves those observations but invalidates the pass labels. | That admission repair is now delivered. Continue with the failed construction while preserving exact inventories and deadline classifications. |
 
 Earlier acceptance remains: canonical Djex `63a23f58` passes 2,308 tests in 15
 complete suites, all 350 signatures per Haskell engine, and a fresh 13/13 extended
@@ -35,7 +40,7 @@ its working `63a23f58` dependency remains under integration.
 | Order | Work | Concrete acceptance |
 | --- | --- | --- |
 | Release gate | **Fix the recurring layered-provider deadline.** Measure where Exference and combined search allocate and force work in the existing named-binary fixture. Inspect staged collection as well as the engine derivation; retain the requested candidate ordering and budgets. | The unchanged focused test passes reliably, followed by one clean complete 701-test run and the affected native context, method, recursor, nested-forall, whole-signature and extended behavioral matrices at the exact final dependency. Use the correct Elan-proxy/toolchain pairing for the existing recursor runner. Only then advance the committed pin. |
-| 1 | **Exclude generated auxiliary recursors semantically in Lean provider discovery.** The shared ordinary/contextual generator currently filters name components but misses constructor `.elim` declarations. Lean 4.32 marks those declarations as auxiliary recursors; test using `Lean.isAuxRecursor env n`. | Real-kernel discovery excludes the generated helpers while retaining the supplied fold, both constructors and an ordinary user function named `elim`. Re-run the unchanged positive/False tree commands with the original allowlist and check both discovery modes. This is a proposed repair, not an implemented one. |
+| 1 — delivered | **Exclude generated auxiliary recursors semantically in Lean provider discovery.** The shared generator now uses `Lean.isAuxRecursor env n`. | Four real-kernel discovery combinations pass, preserving an ordinary user `elim`; the public tree inventories satisfy the original allowlist. See the [implementation and deadline correction](2026-09-08-semantic-auxiliary-providers.md). Accumulator synthesis remains unaccepted. |
 | 2 | **Make useful function-carrier fold compositions reachable.** Trace the tree accumulator's instantiation and scheduling through a carrier such as `s → s`. Exference already has a general overapplication rule, so first distinguish an absent choice from a delayed branch. | Synthesize a matching implementation at `forall a s. (s -> a -> s) -> s -> Tree a -> s`, with the corresponding full Lean type, using only the supplied fold and constructors. Require all 16 observations, exact graph/source replay, termination and False controls in Haskell Djinn/Exference and Lean Djinn/Exference/Both. No reference implementation enters the provider set. |
 | 3 | **Finish bounded Haskell frontend usability.** Preserve written implicit-root binder order and scope, and make ordinary contextual expression/definition output independently usable. | Explicit and implicit root signatures work through ordinary queries and named-function `where` queries. The exact displayed implementation compiles at the original requested signature, including nested quantifiers and contextual parameters. This is an independent delivery; do not make all Church behavior a prerequisite. |
 | 4 | **Complete the remaining Church constructions and explicit defaults.** Djinn `maybeEither` and the observed Exference `foldl1`/native-Int `at` misses remain concrete starting points. Interleave those repairs with orders 2–3. | Preserve the full **13 extended plus all 19 explicit-default operations**, across Haskell Djinn/Exference and Lean Djinn/Exference/Both. Each accepted cell needs actual synthesis and independent checking at the existing limits. Retain timeouts, exhausted pools and unexecuted cells distinctly. |
@@ -73,14 +78,15 @@ individual identity. Use the retained exact graphs for a scope-sensitive repair.
 
 Lean's original `by decide` oracle failed to unfold the named observation
 predicate. Explicitly unfolding it before `decide` repairs those proofs without
-changing any public synthesis command or observation. The subsequent live run
-still fails all positive cells at the original inventory boundary. Adding `.elim`
+changing any public synthesis command or observation. The subsequent pre-filter live run
+failed all positive cells at the original inventory boundary. The later semantic
+filter repairs that boundary; the accumulator construction still fails. Adding `.elim`
 to a string blacklist could discard legitimate user providers; widening the
 fixture's allowlist would change the experiment. Prefer the environment's
 auxiliary-recursion metadata. A separate real-kernel diagnosis passes: both
 generated helpers have the auxiliary tag, while the fold, constructors and an
-ordinary user `elim` do not. This validates the proposed discrimination; the
-production discovery filter is still unchanged.
+ordinary user `elim` do not. This validates the metadata distinction; the
+production discovery filter is now implemented; the linked follow-up records its exact validation.
 
 ## Other ideas, re-triaged
 

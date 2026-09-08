@@ -13,8 +13,10 @@ The [current re-triage](2026-09-08-post-integration-priorities.md)
 supersedes the historical order and counts below. The latest full native unit
 run passes 700/701, with a recurring layered-provider deadline; clean integration
 remains a release gate. A broader scheduling experiment failed and was reverted.
-The tree accumulator is now an executed Haskell miss, and Lean's positive tree
-cells expose generated auxiliary eliminators in the provider inventory.
+The tree accumulator remains an executed Haskell miss. The later
+[semantic provider filter](2026-09-08-semantic-auxiliary-providers.md) repairs
+Lean's generated-eliminator admission and corrects the tree False-control
+timeout claims; it adds no accepted positive accumulator cell.
 
 Prioritize the specific integration failure, semantic provider filtering and
 function-carrier fold composition. Keep bounded Haskell frontend usability

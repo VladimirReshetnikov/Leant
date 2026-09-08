@@ -1,0 +1,721 @@
+{
+  "status": "accepted_semantic_provider_filter_not_accumulator_synthesis",
+  "date": "2026-09-08",
+  "source_base": "64d5705cbdd3cf7a3a36202d32d21f004e393c19",
+  "working_dependency": "63a23f58d2e0f6fd1ffcd0532412f049dd29e834",
+  "committed_dependency": "4a4ed0fc23f76d7b82b06496e03adfadbf374f84",
+  "implementation": "Use Lean.isAuxRecursor env n in shared ordinary/contextual automatic provider admission; retain ordinary user elim declarations.",
+  "validation": {
+    "real_kernel_discovery_cells": 4,
+    "focused_provider_tests": 5,
+    "deadline_regressions": 4,
+    "strict_native_build": true,
+    "source_distribution": {
+      "command": [
+        "cabal",
+        "sdist",
+        ".",
+        "--list-only"
+      ],
+      "status": "passed",
+      "earlier_attempt": "The leant selector chose an executable and was refused; the explicit package directory succeeds."
+    },
+    "native_tree_queries": 6,
+    "positive_inventories_exact": true,
+    "accepted_positive_cells": 0,
+    "corrected_accepted_tree_cells": [
+      "lean-tree_accumulator_djinn_reject_all"
+    ],
+    "oracle_controls": 8,
+    "empty_oracle_axiom_inventories": 17
+  },
+  "correction": {
+    "scope": "Only tree accumulator acceptance claims are reclassified here; actual predicate observations are preserved.",
+    "reason": "The shared parser checked actual False observations but the tree fixture omitted its stronger command deadline gate.",
+    "prior_receipt": "../../test-church/receipts/search-failures-retriage.json",
+    "prior_accepted_false_engines": [
+      "exference",
+      "both"
+    ],
+    "corrected_prior_accepted_cells": [],
+    "superseding_audit": {
+      "status": "passed",
+      "scope": "hash-checked transcript audit; no live synthesis rerun",
+      "audits": [
+        {
+          "receipt": "C:\\Leant\\dist-newstyle\\tree-accumulator-acceptance-v2\\matrix\\results.json",
+          "receipt_sha256": "74a97cb40fe095b20f8c0ec1a81a162388c87b155c45e632c7af918310497eb8",
+          "cells": [
+            {
+              "name": "lean-tree_accumulator_djinn",
+              "original_status": "failed",
+              "command_deadline_passed": true,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  41,
+                  0
+                ]
+              ],
+              "stdout_sha256": "54c6c7f7977f154f488e9cdd47a61d8146ce08ec20764d0365e69fe05192197e",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "name": "lean-tree_accumulator_djinn_reject_all",
+              "original_status": "failed",
+              "command_deadline_passed": true,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  196,
+                  0
+                ]
+              ],
+              "stdout_sha256": "dd1acfd84ee18a1837d2a3d075be8a9638725d09b160d0082d450106e241ee11",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "name": "lean-tree_accumulator_exference",
+              "original_status": "failed",
+              "command_deadline_passed": false,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  76,
+                  0
+                ]
+              ],
+              "stdout_sha256": "55ef3fee6fce7a5a0683bd0cda9ce62a7a252ccfbec9ccd2767d57dee9930418",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure": "synthesis command exceeded its prepared deadline"
+            },
+            {
+              "name": "lean-tree_accumulator_exference_reject_all",
+              "original_status": "passed",
+              "command_deadline_passed": false,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  255,
+                  0
+                ]
+              ],
+              "stdout_sha256": "cf4214c7cd525c23b19890674cc1a83769de611e5053acadcc933d6f66cc6ec4",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure": "synthesis command exceeded its prepared deadline"
+            },
+            {
+              "name": "lean-tree_accumulator_both",
+              "original_status": "failed",
+              "command_deadline_passed": false,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  131,
+                  0
+                ]
+              ],
+              "stdout_sha256": "72822f3f6a6167671ed58f9fcc47e75c3f628515e778fef494206c9f7f3e2474",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure": "synthesis command exceeded its prepared deadline"
+            },
+            {
+              "name": "lean-tree_accumulator_both_reject_all",
+              "original_status": "passed",
+              "command_deadline_passed": false,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  404,
+                  0
+                ]
+              ],
+              "stdout_sha256": "75dc39004f5c6463914dd21d480105974dd3b0c546014d316469839d08c3599a",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure": "synthesis command exceeded its prepared deadline"
+            }
+          ],
+          "accepted_cells": []
+        },
+        {
+          "receipt": "C:\\Leant\\dist-newstyle\\tree-accumulator-semantic-auxiliary-v1\\matrix\\results.json",
+          "receipt_sha256": "923f683cb002eeaa1396bf66a663263cde2e44947ed2f769b2b1d7b2de227a4b",
+          "cells": [
+            {
+              "name": "lean-tree_accumulator_djinn",
+              "original_status": "failed",
+              "command_deadline_passed": true,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  39,
+                  0
+                ]
+              ],
+              "stdout_sha256": "48c5a003c2fb969df2dfa5e340c363a360e6113253f2fcb15be22d007a4d2213",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "name": "lean-tree_accumulator_djinn_reject_all",
+              "original_status": "passed",
+              "command_deadline_passed": true,
+              "process_completed": true,
+              "status": "passed",
+              "counts": [
+                [
+                  0,
+                  194,
+                  0
+                ]
+              ],
+              "stdout_sha256": "1601eb5f9f26a794bc39882a33f6fbe54a12d043e6c8af03a88ac4d22cc066f6",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "name": "lean-tree_accumulator_exference",
+              "original_status": "failed",
+              "command_deadline_passed": false,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  108,
+                  0
+                ]
+              ],
+              "stdout_sha256": "f4c09a8ba42761dec6530f518f24a7be2db22772a6a1ed6556815f2d63d49128",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure": "synthesis command exceeded its prepared deadline"
+            },
+            {
+              "name": "lean-tree_accumulator_exference_reject_all",
+              "original_status": "passed",
+              "command_deadline_passed": false,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  446,
+                  0
+                ]
+              ],
+              "stdout_sha256": "3354a2c1f758bf79710339154c63225dcffee0283a6fa6cd53d21405750a96e8",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure": "synthesis command exceeded its prepared deadline"
+            },
+            {
+              "name": "lean-tree_accumulator_both",
+              "original_status": "failed",
+              "command_deadline_passed": false,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  175,
+                  1
+                ]
+              ],
+              "stdout_sha256": "ed40e5e05cfadc3a4a05e3933fa3a3e4ceaac7704723e38ede758c4955bd78fa",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure": "synthesis command exceeded its prepared deadline"
+            },
+            {
+              "name": "lean-tree_accumulator_both_reject_all",
+              "original_status": "passed",
+              "command_deadline_passed": false,
+              "process_completed": true,
+              "status": "failed",
+              "counts": [
+                [
+                  0,
+                  404,
+                  0
+                ]
+              ],
+              "stdout_sha256": "c18c8860345fb6dcd0d06d2fffb879c0891548c329ed0afa16b07ec76ce23940",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure": "synthesis command exceeded its prepared deadline"
+            }
+          ],
+          "accepted_cells": [
+            "lean-tree_accumulator_djinn_reject_all"
+          ]
+        }
+      ]
+    },
+    "evidence_boundary": "The six live queries ran once against the rebuilt filter before the harness correction. The new deadline gate was then applied to their immutable hash-checked captures; this is not a second live run."
+  },
+  "limits_unchanged": true,
+  "full_native_integration": "still incomplete; no new complete 701-test run or dependency promotion",
+  "archive": {
+    "path": "semantic-auxiliary-providers.zip",
+    "bytes": 261139,
+    "sha256": "8fd6cce6224b13e0b54e5a5bff9b55c815f51fe90eb70f634a305436d0ac6693",
+    "artifact_count": 89,
+    "excludes": "compiled binaries and object files; identities retained in original receipts"
+  },
+  "artifacts": [
+    {
+      "path": "dist-newstyle/publish-semantic-auxiliary-evidence.py",
+      "sha256": "aca7233c7da4474f5d97515148e0b14cf1e82af348d215eda6a62a3eeeee6ffb",
+      "bytes": 15710
+    },
+    {
+      "path": "dist-newstyle/run-semantic-auxiliary-tree-v1.py",
+      "sha256": "278cba58ed732d8feca952ad00cbd863512973b01126bc614b9c6e98bd5a9ed9",
+      "bytes": 2362
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-build-v1.log",
+      "sha256": "cc9b359a21b7831620247a1b72de05ff9b30b1df0e93c36a4addb0105e534c1f",
+      "bytes": 1223
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-build-v2.log",
+      "sha256": "645e17215784ce5753fabf289e81fda9072b86a451ec282b1bf63fa4fcd042f5",
+      "bytes": 719
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-focused-v1/deadline-unit.stderr.txt",
+      "sha256": "4a203f958ef9d765ff1f89816631e1bdf553b4acf1d56449f1d10ad92bb46ff3",
+      "bytes": 107
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-focused-v1/deadline-unit.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-focused-v1/processes.json",
+      "sha256": "6d76b1682447394ac898554512cf67c7b6371565804984eedcc1f3c11afc9764",
+      "bytes": 3019
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-focused-v1/provider-unit.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-focused-v1/provider-unit.stdout.txt",
+      "sha256": "4a4738c2b10166fb2822f5e330e427ebd0ab1bb41d4b9f3e37ee73a08c1dad84",
+      "bytes": 509
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-focused-v1/results.json",
+      "sha256": "0be9fc24b9ffabe5c2b70e7ff203a1261a28e12ab4fb44f73e32ef9af0adf324",
+      "bytes": 4191
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-focused-v1/source-distribution.stderr.txt",
+      "sha256": "b984a954ff162c1ecfb473a02029204c9f832ff45c4b267481dfda2dbeff0216",
+      "bytes": 160
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-focused-v1/source-distribution.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v1/build.stderr.txt",
+      "sha256": "abcfef58c23129abc330d733426ed11df3de83c8a35a92852f4d85ca9b0d794e",
+      "bytes": 2262
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v1/build.stdout.txt",
+      "sha256": "b0a95e50039154156e8720ed712d355888e721e65844cf666ffec83be27080aa",
+      "bytes": 473
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v1/processes.json",
+      "sha256": "78f9d221f2290dfb4e9c23426167bde201c0273921e146bad435b238c514e8ec",
+      "bytes": 1239
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v1/results.json",
+      "sha256": "8ae30428d05e5164a2f5950d305b38e5e7e74ddcdc1ff742e9308e7f2e186895",
+      "bytes": 17072
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/build.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/build.stdout.txt",
+      "sha256": "cf1952945f9bdd3cb0fbdd45cc7dea4d278bc2ffe33f7f054d1228fd08525ff7",
+      "bytes": 1072
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-roots-emit.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-roots-emit.stdout.txt",
+      "sha256": "4b665fe676b7b874c03a2e95ee318188b94d008386863518e4d1b1a65062327b",
+      "bytes": 55173
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-roots-kernel.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-roots-kernel.stdout.txt",
+      "sha256": "5aa3dbff8b203ebd8e0b3af2e7f1eb86941623b6374894bf87fadca1ef563ff5",
+      "bytes": 1218
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-roots-parse.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-roots-parse.stdout.txt",
+      "sha256": "439124f9c1cb103040c351c67b8ef07a0995d0b20319153dc576beebc21376cf",
+      "bytes": 58
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-roots.lean",
+      "sha256": "4b665fe676b7b874c03a2e95ee318188b94d008386863518e4d1b1a65062327b",
+      "bytes": 55173
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-roots.sexp",
+      "sha256": "9845db442f0a869801968ed597ca58e18d1a090e34f51be17a404c0f2bf31d85",
+      "bytes": 1217
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-sessions-emit.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-sessions-emit.stdout.txt",
+      "sha256": "a3c4f16428b2a8f2568f86a4a6e9b2f511c4f32af16c106216c5b84589139030",
+      "bytes": 55331
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-sessions-kernel.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-sessions-kernel.stdout.txt",
+      "sha256": "5aa3dbff8b203ebd8e0b3af2e7f1eb86941623b6374894bf87fadca1ef563ff5",
+      "bytes": 1218
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-sessions-parse.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-sessions-parse.stdout.txt",
+      "sha256": "439124f9c1cb103040c351c67b8ef07a0995d0b20319153dc576beebc21376cf",
+      "bytes": 58
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-sessions.lean",
+      "sha256": "a3c4f16428b2a8f2568f86a4a6e9b2f511c4f32af16c106216c5b84589139030",
+      "bytes": 55331
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/contextual-sessions.sexp",
+      "sha256": "9845db442f0a869801968ed597ca58e18d1a090e34f51be17a404c0f2bf31d85",
+      "bytes": 1217
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-roots-emit.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-roots-emit.stdout.txt",
+      "sha256": "ecda765d666882b50e9931c716c5f253313e89159caa662485464790e5fb76a9",
+      "bytes": 56136
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-roots-kernel.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-roots-kernel.stdout.txt",
+      "sha256": "edd0b67b8d5565e2155bd6bf3fb9ab8464bdaecd546689c9a5f0c51e12a288ab",
+      "bytes": 2136
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-roots-parse.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-roots-parse.stdout.txt",
+      "sha256": "439124f9c1cb103040c351c67b8ef07a0995d0b20319153dc576beebc21376cf",
+      "bytes": 58
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-roots.lean",
+      "sha256": "ecda765d666882b50e9931c716c5f253313e89159caa662485464790e5fb76a9",
+      "bytes": 56136
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-roots.sexp",
+      "sha256": "d384c6aa88a956add0a34891ae1c0b590cdd2f8e9c9edb2f9f6107f82a5b8878",
+      "bytes": 2135
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-sessions-emit.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-sessions-emit.stdout.txt",
+      "sha256": "cb3569304a00389f046fcb41743326164b80219458ae147a5f84305cbc97a22d",
+      "bytes": 56294
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-sessions-kernel.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-sessions-kernel.stdout.txt",
+      "sha256": "edd0b67b8d5565e2155bd6bf3fb9ab8464bdaecd546689c9a5f0c51e12a288ab",
+      "bytes": 2136
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-sessions-parse.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-sessions-parse.stdout.txt",
+      "sha256": "439124f9c1cb103040c351c67b8ef07a0995d0b20319153dc576beebc21376cf",
+      "bytes": 58
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-sessions.lean",
+      "sha256": "cb3569304a00389f046fcb41743326164b80219458ae147a5f84305cbc97a22d",
+      "bytes": 56294
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/ordinary-sessions.sexp",
+      "sha256": "d384c6aa88a956add0a34891ae1c0b590cdd2f8e9c9edb2f9f6107f82a5b8878",
+      "bytes": 2135
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/processes.json",
+      "sha256": "b234416a7718de987f855cdc66f57c79d1772b5d4c2668d2d4ae7c393fe5b81f",
+      "bytes": 13962
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-inventory-v2/results.json",
+      "sha256": "66b62357af6d2c714674f48a0e5eae19537c0023128f1910141f93b3db56d306",
+      "bytes": 32230
+    },
+    {
+      "path": "dist-newstyle/semantic-auxiliary-sdist-v2.log",
+      "sha256": "47f32db864c40d7ae581db7af127c380edb3cae0699ce443e4b2745e31eb5c33",
+      "bytes": 7275
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix.stdout.txt",
+      "sha256": "a09d8ac028ea38aee3015a85757d88c3b5aba53465b798234d3fa820d999a923",
+      "bytes": 1729
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-oracle-controls.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-oracle-controls.stdout.txt",
+      "sha256": "c1f9452cc00e90910a3aa7382794e370a6a2e0b2c7872d9af0e6ef6ac5d3678e",
+      "bytes": 1236
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_both-live.input.txt",
+      "sha256": "2c8de5b1f1117c0871ccaf4a7ee8b99a1c678ea13f29f87f739eaf96f9bc11f7",
+      "bytes": 4936
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_both-live.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_both-live.stdout.txt",
+      "sha256": "ed40e5e05cfadc3a4a05e3933fa3a3e4ceaac7704723e38ede758c4955bd78fa",
+      "bytes": 86654
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_both_reject_all-live.input.txt",
+      "sha256": "1a8e5c2ed3ab346a38260e2d1dac9586d2339d8ef7aa7d5bf1514cffb3ba0249",
+      "bytes": 1004
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_both_reject_all-live.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_both_reject_all-live.stdout.txt",
+      "sha256": "c18c8860345fb6dcd0d06d2fffb879c0891548c329ed0afa16b07ec76ce23940",
+      "bytes": 106821
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_djinn-live.input.txt",
+      "sha256": "a6e74ca382de0a897dd9b433ebb360a903debc63e5f29b2de68cbecd6a36d8dc",
+      "bytes": 4954
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_djinn-live.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_djinn-live.stdout.txt",
+      "sha256": "48c5a003c2fb969df2dfa5e340c363a360e6113253f2fcb15be22d007a4d2213",
+      "bytes": 17690
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_djinn_reject_all-live.input.txt",
+      "sha256": "f542e9a789ec13fa2816ab4af23437eee289fd96b3ab2fc4dc6a0254eee0384b",
+      "bytes": 1006
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_djinn_reject_all-live.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_djinn_reject_all-live.stdout.txt",
+      "sha256": "1601eb5f9f26a794bc39882a33f6fbe54a12d043e6c8af03a88ac4d22cc066f6",
+      "bytes": 56058
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_exference-live.input.txt",
+      "sha256": "e4d8ce418521916bb53433347f9de170f3c85f6caea2873d3fb6b5b8fb39a0b6",
+      "bytes": 5026
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_exference-live.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_exference-live.stdout.txt",
+      "sha256": "f4c09a8ba42761dec6530f518f24a7be2db22772a6a1ed6556815f2d63d49128",
+      "bytes": 79074
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_exference_reject_all-live.input.txt",
+      "sha256": "25cf4aed53fdc41a2e93b75a7ab7bc3c6509f8affdc8be934c08914dfa747bbd",
+      "bytes": 1014
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_exference_reject_all-live.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-tree_accumulator_exference_reject_all-live.stdout.txt",
+      "sha256": "3354a2c1f758bf79710339154c63225dcffee0283a6fa6cd53d21405750a96e8",
+      "bytes": 114736
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-version.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/lean-version.stdout.txt",
+      "sha256": "78caa1ebd7869026f8812677a76273f299444e5a1b610be3df495edf2cf233ca",
+      "bytes": 104
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/processes.json",
+      "sha256": "dd40b0b54fe48eba857604dc7c788f99b25f2fbb769738030bc2698f6848efa8",
+      "bytes": 10035
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/matrix/results.json",
+      "sha256": "923f683cb002eeaa1396bf66a663263cde2e44947ed2f769b2b1d7b2de227a4b",
+      "bytes": 356411
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/processes.json",
+      "sha256": "f3fab65dabbd838c4d96f642b8c7043859c242d36607cc6ac14c966031bca066",
+      "bytes": 1386
+    },
+    {
+      "path": "dist-newstyle/tree-accumulator-semantic-auxiliary-v1/results.json",
+      "sha256": "df628406ac2e1c752715415648dfd40bf7abaa7c2fd0aedc169127881b6dfbce",
+      "bytes": 7548
+    },
+    {
+      "path": "dist-newstyle/tree-deadline-audit-v1/results.json",
+      "sha256": "bc01f3456af5ca946191cf8a444e7396a445b3440d365bf72ab0ef0eb5659673",
+      "bytes": 7853
+    },
+    {
+      "path": "src/Leant/Synth/Fragment.hs",
+      "sha256": "8e97aea2ff616b7433df5bad1155940ea41f630506cb1679ecad14fd3833e030",
+      "bytes": 132004
+    },
+    {
+      "path": "test-context/ProviderInventoryProbe.hs",
+      "sha256": "ac852ebd998b0b826e8798960db5e2afc6226e999b38aaa73fc79edf803d53a5",
+      "bytes": 2787
+    },
+    {
+      "path": "test-context/run_provider_inventory.py",
+      "sha256": "00ead0fbd925497d955871475fd451f88dbc30fad9100e93ef94bb1ae09f9fe1",
+      "bytes": 4223
+    },
+    {
+      "path": "test-recursive/tree-accumulator/audit_deadlines.py",
+      "sha256": "ed7af7c8bc1ce5c212b0ab4f3e7f1d22210d0045332baafa22342570bd897cc7",
+      "bytes": 3555
+    },
+    {
+      "path": "test-recursive/tree-accumulator/manifest.json",
+      "sha256": "55b868374ee3e24d1f3074a25f39e1dbc0dcab4732b8ef2d3bfdd2b36e979a6f",
+      "bytes": 3523
+    },
+    {
+      "path": "test-recursive/tree-accumulator/run_acceptance.py",
+      "sha256": "85557a165d88b522a2c72d8db6e6e542813c89a93cafae21a0beba7b63b3a487",
+      "bytes": 26858
+    },
+    {
+      "path": "test-recursive/tree-accumulator/test_deadlines.py",
+      "sha256": "ffbddad84bcf2cb564c2c4b7d026e3a8b410892472b5a102a8f39487d91c85f7",
+      "bytes": 1347
+    }
+  ]
+}

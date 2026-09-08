@@ -79,3 +79,25 @@ dictionary around a compound application. Making the compound term explicit
 with `@(let ...)` preserves its checked partial-application type. Both formerly
 failing cases now pass the full independent replay. The retained successful
 receipt is [renderer-replay.json](receipts/renderer-replay.json).
+
+## Auxiliary provider discovery
+
+`run_provider_inventory.py` compiles the current production discovery generator,
+emits its actual Lean programs, executes them with a separate Lean kernel, and
+parses each resulting inventory with the production Haskell parser. Four cells
+cover ordinary and contextual source modes through namespace roots and explicit
+session declarations. Each must retain exactly a generic fold, two constructors,
+and an ordinary user function named `elim`, while excluding both generated
+constructor eliminators. The explicit-session cases also name those generated
+helpers, so a session declaration cannot bypass the semantic exclusion.
+
+```powershell
+python -B test-context/run_provider_inventory.py --output dist-newstyle/provider-inventory-check
+```
+
+The selected Cabal project and vendored Djex library must already be built. This
+is a real-kernel provider-discovery regression, separate from candidate synthesis
+and the complete native unit suite. The runner retains emitted source, exact
+inventories, process captures and source/kernel hashes; use a fresh output
+directory. See the [implementation report](../docs/reports/2026-09-08-semantic-auxiliary-providers.md)
+for public tree-query validation and remaining behavioral failures.

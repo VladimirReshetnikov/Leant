@@ -1692,6 +1692,9 @@ providerProgramWithSourceMode exactSource cap sessionNames query = unlines $
   , "       \"ctorElim\", \"ctorElimType\", \"ctorIdx\", \"sizeOf_spec\","
   , "       \"injEq\", \"inj\", \"eq_def\", \"decEq\"]"
   , "    let keep (n : Name) : Bool :="
+  -- Constructor-specific .elim helpers carry this semantic tag. Filtering the
+  -- suffix itself would also discard ordinary user declarations named elim.
+  , "      !Lean.isAuxRecursor env n &&"
   , "      !n.isInternalDetail &&"
   , "      !n.components.any fun c => match c with"
   , "        | .str _ s => s.startsWith \"it!\" || aux.contains s"

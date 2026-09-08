@@ -22,11 +22,19 @@ Category:      Development
 Build-Type:    Simple
 Extra-Source-Files:
   test-context/*.py
+  test-context/ProviderInventoryProbe.hs
   test-context/README.md
   test-behavioral/*.py
   test-behavioral/README.md
   test-recursive/*.py
   test-recursive/README.md
+  test-recursive/tree-accumulator/*.py
+  test-recursive/tree-accumulator/*.hs
+  test-recursive/tree-accumulator/*.lean
+  test-recursive/tree-accumulator/*.in
+  test-recursive/tree-accumulator/*.json
+  test-recursive/tree-accumulator/README.md
+  test-recursive/tree-accumulator/commands/*.txt
   test-church/check-provider-discovery.hs
   test-church/*.py
   test-church/README.md

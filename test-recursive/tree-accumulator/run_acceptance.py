@@ -27,6 +27,14 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def require_completed_live_query(transcript):
+    # The shared observation parser establishes actual False observations,
+    # even in a cancelled search. This fixture additionally requires the
+    # command to finish within its deadline, for positive and negative cells.
+    if re.search(r"(?m)^the engine did not finish within [0-9]+s\b", transcript):
+        raise TimeoutError("synthesis command exceeded its prepared deadline")
+
+
 def hashes(paths):
     return {str(path.resolve()): runtime.sha256(path)
             for path in sorted(set(map(Path, paths)), key=str)}
@@ -302,6 +310,7 @@ def main():
             require(len(names) == len(set(names)) and set(names) <= allowed, "provider inventory acquired an unrelated value")
             require("provider inventory unavailable:" not in transcript, "provider inventory unavailable")
             row["provider_inventory"] = provider_rows
+            require_completed_live_query(transcript)
             parsed = existing.parse_output(transcript, [case])[0]
             row["synthesis"] = parsed
             if case["expected"] == "no_candidate":

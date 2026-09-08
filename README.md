@@ -199,8 +199,11 @@ Companion documents:
   [refinement and updated priorities](docs/reports/2026-09-08-post-integration-priorities.md)
   retain a clean aggregate integration gate for `63a23f58`: the latest full
   native unit run passes **700/701**, with one recurring layered-provider deadline.
-  The supplied tree accumulator is now an executed Haskell miss; Lean's positive
-  cells fail the generated-provider inventory gate. The next deliveries target
+  The [semantic provider filter](docs/reports/2026-09-08-semantic-auxiliary-providers.md)
+  now excludes generated auxiliary eliminators while retaining ordinary user
+  `elim` functions. Four real-kernel discovery checks and the public tree
+  inventories pass. The accumulator remains an executed synthesis miss;
+  Exference/Both timeouts are failed cells, including their False controls. The next deliveries target
   those specific failures and bounded Haskell frontend usability; broad scheduler
   tuning is deferred after a failed, reverted experiment.
   The committed dependency remains `4a4ed0fc`. The full 13-operation/19-default coverage
