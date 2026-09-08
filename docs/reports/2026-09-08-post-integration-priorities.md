@@ -1,5 +1,10 @@
 # Further synthesis improvements: reproduced failures and bounded deliveries
 
+> Historical checkpoint: the [later fold-carrier re-triage](2026-09-08-tree-carrier-retriage.md) supersedes the delivery order below. It records a successful
+> experimental Haskell Exference tree cell, an unchanged native release
+> gate, and four failed permanent regression cases. The experiment has
+> not been promoted to production; the earlier receipts remain intact.
+
 The [semantic auxiliary-provider filter](2026-09-08-semantic-auxiliary-providers.md)
 is now implemented and verified through four real-kernel discovery cells and
 the public tree inventories. The remaining concrete gaps are costly layered-

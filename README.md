@@ -202,10 +202,15 @@ Companion documents:
   The [semantic provider filter](docs/reports/2026-09-08-semantic-auxiliary-providers.md)
   now excludes generated auxiliary eliminators while retaining ordinary user
   `elim` functions. Four real-kernel discovery checks and the public tree
-  inventories pass. The accumulator remains an executed synthesis miss;
-  Exference/Both timeouts are failed cells, including their False controls. The next deliveries target
-  those specific failures and bounded Haskell frontend usability; broad scheduler
-  tuning is deferred after a failed, reverted experiment.
+  inventories pass. Published Lean accumulator synthesis remains an executed miss;
+  Exference/Both timeouts are failed cells, including their False controls. A
+  [new canonical Haskell experiment](docs/reports/2026-09-08-tree-carrier-retriage.md) produces
+  two Exference tree candidates passing all 16 observations at the original bounds,
+  with 1,024 contradictory controls rejecting. Its 92 private engine tests pass,
+  but three typed-rendering failures and a GHC bytecode replay panic leave the
+  permanent regression open. Finishing that experiment is next; the recurring
+  native layered-provider deadline remains the release gate. Exact Haskell output
+  remains an independent delivery. Broad scheduler tuning stays deferred.
   The committed dependency remains `4a4ed0fc`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).

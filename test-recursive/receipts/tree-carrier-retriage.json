@@ -1,0 +1,330 @@
+{
+  "status": "completed_retriage",
+  "scope": "baseline diagnosis and uncommitted Haskell Exference experiment; no production promotion",
+  "djex_base_commit": "c5706436c129edd841fd025b28bfb07fafda8927",
+  "leant_base_commit": "51d68f2bc3505a8ccbb506121338898ac5c68794",
+  "experiment_source_sha256": "ff2db2ca0ad37f8d6e074f72838fdc7fe7c805a083587e9e6db79a4d95a6a457",
+  "experiment_test_sha256": "c7d412279962cbe20b22e5d4ffd66940c612a340ac2bf999606becfc423a3eab",
+  "findings": {
+    "baseline_trace": {
+      "same_candidate_bytes": true,
+      "branch_created_step": 2,
+      "branch_pruned_step": 1120,
+      "branch_explored": false
+    },
+    "experimental_haskell_exference": {
+      "accepted_indices": [
+        160,
+        556
+      ],
+      "observations_per_candidate": 16,
+      "candidate_count": 1024,
+      "false_observation_count": 1024,
+      "false_passed_indices": [],
+      "oracle_controls": 8,
+      "original_limits_preserved": true
+    },
+    "private_engine_tests": {
+      "passed": 92,
+      "failed": 0
+    },
+    "supplied_recursors": {
+      "passed": 5,
+      "failed": 4,
+      "list_typed_renderer_failures": 3,
+      "tree_replay_ghc_bytecode_panic": 1
+    },
+    "experiment_complete_regressions": "not_run",
+    "experiment_native_integration": "not_run",
+    "production_promoted": false
+  },
+  "artifact_archive": {
+    "path": "tree-carrier-retriage.zip",
+    "sha256": "fb4a055886a0e62dfe1a8b75d9dd332a718446869ae310116021aa40cbc297e4",
+    "bytes": 4737101,
+    "count": 56,
+    "binaries_included": false
+  },
+  "artifacts": [
+    {
+      "path": "baseline-trace/Exference.instrumented-v2.hs",
+      "sha256": "45ffd68281a1de0e30f3b2d88527f683b8c8ed567dc34284bbf312e1aa74068b",
+      "bytes": 152990
+    },
+    {
+      "path": "baseline-trace/Exference.instrumented.hs",
+      "sha256": "8317d0b7e6007cd04b228f961d3c7acf642ef6a1f59da676ed6f8cc4606a96cc",
+      "bytes": 152984
+    },
+    {
+      "path": "baseline-trace/Exference.original.hs",
+      "sha256": "18193319fc03b5a14d7f1992174ea46027523a2e13443becb46e6c08ade3563f",
+      "bytes": 153458
+    },
+    {
+      "path": "baseline-trace/build-v2.log",
+      "sha256": "3180f01d2dd157b4f6c46b704b68d405ccf579c8f3bb09f4395cd020322eccf4",
+      "bytes": 1459
+    },
+    {
+      "path": "baseline-trace/build.log",
+      "sha256": "15b31f102b2667cd7b8f1939e5d68dc35108040c55b2651c6ccdee9d7b22613f",
+      "bytes": 1366
+    },
+    {
+      "path": "baseline-trace/exference-trace.stderr.txt",
+      "sha256": "f04975cef9a6ba28c27f2575b71033326a1bed8d91ab321bfa25e72787237ec7",
+      "bytes": 2616
+    },
+    {
+      "path": "baseline-trace/exference-trace.stdout.txt",
+      "sha256": "343e4cd70f1664c97a23391b23bb346299b69fc41bf7254a4d42bafd5eaa2c99",
+      "bytes": 34
+    },
+    {
+      "path": "baseline-trace/exference/candidates.json",
+      "sha256": "8b582f6f4ebc9d150d83615f0351b0a8fce9892d34aede8ef95ae65d5fb7761c",
+      "bytes": 33309448
+    },
+    {
+      "path": "baseline-trace/probe-build.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "baseline-trace/probe-build.stdout.txt",
+      "sha256": "23b8021de928f6e749287ca98fe169e16d5a5862d2a6d347598dbb0f61941366",
+      "bytes": 399
+    },
+    {
+      "path": "baseline-trace/processes.json",
+      "sha256": "36c109989a0601636139d3b3b6edd145ebde3874bb4f7429b5ce5213196d0d9a",
+      "bytes": 2324
+    },
+    {
+      "path": "baseline-trace/results.json",
+      "sha256": "2150bc48b508d99c41b7408f7fd13ef985f1b44c6778139d10854641570f2b21",
+      "bytes": 4264
+    },
+    {
+      "path": "baseline-trace/sources.json",
+      "sha256": "dcf517af70926dd85885eacd6201f05d6a0ae0a1dc7e445ecd92c3cd0b1d7e08",
+      "bytes": 430
+    },
+    {
+      "path": "diagnostic-drivers/prepare-tree-carrier-trace.py",
+      "sha256": "d844f8397340422c91c832c4acc73c0880d98ff0fc0c54ffbc01092910010fad",
+      "bytes": 4962
+    },
+    {
+      "path": "diagnostic-drivers/run-tree-carrier-trace.py",
+      "sha256": "85c4e68667bafdba4cafcf16790066b62ef1a50449556b0807f85a70f9bbbba7",
+      "bytes": 2576
+    },
+    {
+      "path": "diagnostic-drivers/tree-arrow-introduction-build-v1.log",
+      "sha256": "a458e438bc325eb0f2d8196e1b7799c27644bab746f989f616dc180fdff5f9ec",
+      "bytes": 1475
+    },
+    {
+      "path": "diagnostic-drivers/tree-arrow-regression-build-v1.log",
+      "sha256": "fd48b3375a2cf562dc4466e40294cd1cbb1e2dbe0d2ac61d4f56d4b84cca704d",
+      "bytes": 2393
+    },
+    {
+      "path": "experimental-acceptance/haskell-exference-exact-ghc.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "experimental-acceptance/haskell-exference-exact-ghc.stdout.txt",
+      "sha256": "59b45a6d3cd1a128bacfa20017c087bdfc6332b9872afe149ed24253c3c23fdf",
+      "bytes": 81
+    },
+    {
+      "path": "experimental-acceptance/haskell-exference-search.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "experimental-acceptance/haskell-exference-search.stdout.txt",
+      "sha256": "343e4cd70f1664c97a23391b23bb346299b69fc41bf7254a4d42bafd5eaa2c99",
+      "bytes": 34
+    },
+    {
+      "path": "experimental-acceptance/haskell-exference/ExactCandidates.hs",
+      "sha256": "2cdc79ea23edb6a8dbe9723c18e8f27833b8f7f9b36a6a3a14eb702815ad2ff8",
+      "bytes": 2214011
+    },
+    {
+      "path": "experimental-acceptance/haskell-exference/candidates.json",
+      "sha256": "a7ecf9dca4fa2c419bd5bd3e53ecf2ac3a099756abf38ed1031285f481c29d77",
+      "bytes": 36898846
+    },
+    {
+      "path": "experimental-acceptance/haskell-library-location.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "experimental-acceptance/haskell-library-location.stdout.txt",
+      "sha256": "59fbfb3d5cab23bae778707011a5f9c7d82b586ac88fd5ae393d3c4405c2a0c6",
+      "bytes": 208
+    },
+    {
+      "path": "experimental-acceptance/haskell-oracle-controls.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "experimental-acceptance/haskell-oracle-controls.stdout.txt",
+      "sha256": "1671c021564afbe41fcc1d6e9eabc3869fb854b1031021ad92f4bb11a5f73f33",
+      "bytes": 181
+    },
+    {
+      "path": "experimental-acceptance/haskell-probe-compile.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "experimental-acceptance/haskell-probe-compile.stdout.txt",
+      "sha256": "3605ff6419d23bef1bd05c3910a2def9dab21274572c9d0e6da6c1872467733f",
+      "bytes": 413
+    },
+    {
+      "path": "experimental-acceptance/processes.json",
+      "sha256": "fc25a12b84a26832e80226642e0cd0f7700861200eacd8fb295f539c619e59dd",
+      "bytes": 5826
+    },
+    {
+      "path": "experimental-acceptance/results.json",
+      "sha256": "2264c5ff457e3d1adb0d9491e7942a9246aa658633482aa75a2106ed267e2f5c",
+      "bytes": 37166431
+    },
+    {
+      "path": "experimental-source/Exference.hs",
+      "sha256": "ff2db2ca0ad37f8d6e074f72838fdc7fe7c805a083587e9e6db79a4d95a6a457",
+      "bytes": 153924
+    },
+    {
+      "path": "experimental-source/RecursorSpec.hs",
+      "sha256": "c7d412279962cbe20b22e5d4ffd66940c612a340ac2bf999606becfc423a3eab",
+      "bytes": 17838
+    },
+    {
+      "path": "experimental-source/uncommitted.patch",
+      "sha256": "bc2aaf1713da3af2e64ed8c9907b228a00bf02777d3fe023662d30e8a509f042",
+      "bytes": 11268
+    },
+    {
+      "path": "failed-focused-regression/private-engine.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "failed-focused-regression/private-engine.stdout.txt",
+      "sha256": "861e6393d4c1eecdbc0a5742d01dd3140714ecb77d48bc076530f95b944fb0ba",
+      "bytes": 8351
+    },
+    {
+      "path": "failed-focused-regression/processes.json",
+      "sha256": "66d1a15362c98bd5674aa18d9846476b832d1ef74345b8528da70a94698fa360",
+      "bytes": 2161
+    },
+    {
+      "path": "failed-focused-regression/results.json",
+      "sha256": "1953f0621e6bca47cd95391035a8e25e04d1c3ff1a9f7246027826c2e379fdbe",
+      "bytes": 3974
+    },
+    {
+      "path": "failed-focused-regression/supplied-recursors.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "failed-focused-regression/supplied-recursors.stdout.txt",
+      "sha256": "4944ee8be6a686407b33519d567288c1a17816dc0fe761f043eff69c87136b26",
+      "bytes": 4179993
+    },
+    {
+      "path": "fixture/CheckControls.hs",
+      "sha256": "bee33291dda8d7ee6cac39f9987c40128692d7f06ebfbb72b3ebc33370eaedfb",
+      "bytes": 199
+    },
+    {
+      "path": "fixture/HaskellCandidateReplay.hs.in",
+      "sha256": "06911dfbe50acac16011fb1e82e9de456ab872df716c417b03184fd702965856",
+      "bytes": 467
+    },
+    {
+      "path": "fixture/LeanCandidateReplay.lean.in",
+      "sha256": "f172a614697db32a2d0658b3bd704404520140c94897e2e00c912692dba9e6ec",
+      "bytes": 4967
+    },
+    {
+      "path": "fixture/README.md",
+      "sha256": "50b09e8ac1f09debd7270b0658b4db2b9ce3a04c3a5d25dd97a5e7f19cb6fc62",
+      "bytes": 4365
+    },
+    {
+      "path": "fixture/TreeAccumulatorControls.hs",
+      "sha256": "4811f60a367649f0a47e922ac3dc8b7f01b2762bf8b51c7ccdac6ac3d9d7602e",
+      "bytes": 4252
+    },
+    {
+      "path": "fixture/TreeAccumulatorControls.lean",
+      "sha256": "fc6c570444c93aecd66b8a25eb773413da168f5b6388e6211b7b85fd30daa390",
+      "bytes": 7885
+    },
+    {
+      "path": "fixture/TreeAccumulatorProbe.hs",
+      "sha256": "8848b3a487cb36d083eaab8c170699a8308356a082cac931bd993a80887600f6",
+      "bytes": 9820
+    },
+    {
+      "path": "fixture/TreeAccumulatorProviders.hs",
+      "sha256": "67e1db4c43f997dbb36c8ff71659a97b52b2f181251b51898e2b082c268ba7f0",
+      "bytes": 345
+    },
+    {
+      "path": "fixture/TreeAccumulatorProviders.lean",
+      "sha256": "0f8b1d865e8276025031ebb976cb253b7aae838bab3a11b949ea7b84c7e63fe6",
+      "bytes": 498
+    },
+    {
+      "path": "fixture/audit_deadlines.py",
+      "sha256": "ed7af7c8bc1ce5c212b0ab4f3e7f1d22210d0045332baafa22342570bd897cc7",
+      "bytes": 3555
+    },
+    {
+      "path": "fixture/case.json",
+      "sha256": "512a9168c2e0337b77dc04acd2914aaddcca171983f8f457d3c4ca5dd671d717",
+      "bytes": 19559
+    },
+    {
+      "path": "fixture/locate_library.py",
+      "sha256": "29658743bd1af1c4820fe7531d5a3562e5dd689661ebfe2d7e39fa70c80ec122",
+      "bytes": 845
+    },
+    {
+      "path": "fixture/manifest.json",
+      "sha256": "55b868374ee3e24d1f3074a25f39e1dbc0dcab4732b8ef2d3bfdd2b36e979a6f",
+      "bytes": 3523
+    },
+    {
+      "path": "fixture/prepare.py",
+      "sha256": "bd873e95a9c86b016e0ee794dde849520b114595bf5fb8690f4ad53db1db4a1f",
+      "bytes": 14379
+    },
+    {
+      "path": "fixture/run_acceptance.py",
+      "sha256": "85557a165d88b522a2c72d8db6e6e542813c89a93cafae21a0beba7b63b3a487",
+      "bytes": 26858
+    },
+    {
+      "path": "fixture/test_deadlines.py",
+      "sha256": "ffbddad84bcf2cb564c2c4b7d026e3a8b410892472b5a102a8f39487d91c85f7",
+      "bytes": 1347
+    }
+  ]
+}
