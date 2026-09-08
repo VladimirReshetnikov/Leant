@@ -9,22 +9,30 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-**September 8 re-triage: fix constraint-only provider instantiation next, then
-the missing Church construction paths.** The global-method prototype has a
-small reproducible failure; two simple search-ranking experiments have failed
-their behavioral gate and were restored. This changes delivery order, not the
-scope of original priorities 1–4.
+**September 8 re-triage: integrate the accepted constraint-only engine
+increment, then address the missing Church construction paths.** Canonical
+Djex's [new inference and Haskell rendering milestone](https://github.com/VladimirReshetnikov/Djex/blob/4a4ed0fc23f76d7b82b06496e03adfadbf374f84/docs/reports/2026-09-08-constraint-only-provider-inference.md)
+passes a strict build and all 2,304 tests in 15 complete suites. Four public
+API cases synthesize global/local constrained providers in both engines and
+replay their exact full types with distinct dictionary payloads. Its remaining
+Haskell frontend gates are loaded-provider admission/source-scheme closure and
+implicit-root behavioral scoping. Leant still pins `a44f7057`; this documentation
+update does not change the dependency or accept the working global prototype.
+Two simple search-ranking experiments failed their behavioral gate and were
+restored. The scope of original priorities 1–4 is unchanged.
 
 Priority 1's supported-fragment Haskell elaboration remains accepted. The
 published local `Type 0` context route passes its 39-cell matrix; the latest
 published Leant graph integration passes nine native cells and all 686 unit
 tests. These results belong to their recorded revisions. The newer global
-provider prototype builds but fails all six focused positive cases, while
-seven negative controls pass. It has no full-suite or native-method acceptance.
+provider prototype's last run, before the new engine increment, built but
+failed all six focused positives, while seven negative controls passed. It
+needs a rebuild against the new dependency and has no full-suite or native
+method acceptance for that increment.
 
 | Order | Delivery | Required acceptance |
 | --- | --- | --- |
-| 1 | Infer a method's type arguments from its lexical class assumptions (priority 3) | Keep the forced `Ctx.C.out : {α : Type} → [Ctx.C α] → Nat` fixture and its goal `∀ (α : Type), [Ctx.C α] → Nat`. Infer only fresh provider parameters; preserve exact source schemes, scopes, provider ownership and dictionary evidence. First close the six focused positives, then ordinary/where × Djinn/Exference/Both native replay, payload-sensitive observations, actual False controls, discovery/cache isolation, the existing local-context matrix and the complete unit suite. |
+| 1 | Integrate the accepted engine inference through complete frontend provider schemes (priority 3) | Keep the forced `Ctx.C.out : {α : Type} → [Ctx.C α] → Nat` fixture and its goal `∀ (α : Type), [Ctx.C α] → Nat`. Infer only fresh provider parameters; preserve exact source schemes, scopes, provider ownership and dictionary evidence. First close the six focused positives, then ordinary/where × Djinn/Exference/Both native replay, payload-sensitive observations, actual False controls, discovery/cache isolation, the existing local-context matrix and the complete unit suite. |
 | 2 | Make missing Church constructions reachable within the existing limits (priority 4) | Diagnose `maybeEither` branch admission and `foldl1`'s flexible-goal construction separately from rendering. Require a generic rule change supported by a concrete failed derivation, followed by the original live queries, exact full-signature replay and unchanged false controls. Keep reference witnesses out of provider inventories. Extend the remaining total/defaulted cells with each accepted change. |
 | 3 | Accept a supplied tree fold with an accumulator (priority 2; independent of steps 1–2) | Use the prepared polymorphic `foldTree`/constructor inventory and order-sensitive observations in both Haskell engines and all three Lean modes. Require full-type behavior, termination-checked replay, actual False controls and the original limits. The fixture is prepared, not executed; reliable native verification is already an accepted foundation. |
 | 4 | Preserve selected dictionary identity, then extend evidence derivation (priority 3) | Keep overlap guards until a forced equal-predicate outer/inner fixture retains the selected introduction and ordered slot, including distinct payload behavior in Haskell and Lean. Follow with conditional providers and superclass projections as separately checked extensions. A unique type substitution does not identify a dictionary occurrence. |
@@ -38,6 +46,14 @@ cells alongside relevant increments; do not redefine completion around an
 easier batch. Heavy runtime acceptance remains serialized.
 
 ## What changed in this re-triage
+
+The [canonical engine acceptance report](https://github.com/VladimirReshetnikov/Djex/blob/4a4ed0fc23f76d7b82b06496e03adfadbf374f84/docs/reports/2026-09-08-constraint-only-provider-inference.md) supersedes the
+engine failure diagnosis below with unique coherent Given inference, scoped
+Haskell rendering, and complete regression results. It retains ambiguity and
+dictionary-ownership guards. The linked receipt also preserves failed direct
+CLI diagnostics: explicit preflight success is not loaded-provider synthesis
+acceptance. The earlier Leant fixture failures below remain historical results
+against the older dependency, pending a fresh integration run.
 
 The [diagnostic receipt](https://github.com/VladimirReshetnikov/Djex/blob/12ec0a2002a4e15b48aae1bfbbbd887a1fd431af/test-church/receipts/synthesis-retriage-diagnostics.json) embeds selected process captures, the failed
 method fixture, tested heuristic diffs and source hashes. It is a diagnostic

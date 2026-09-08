@@ -159,9 +159,17 @@ Companion documents:
   cover reuse, namespace isolation, real user-state precedence, reset and backend
   death: 11 queries, four accepted replays and ten empty axiom inventories.
   The strict build and complete 686-test suite pass at that accepted revision.
-  The next milestone is a global method whose type parameter appears only in
-  its class constraint: the prototype builds, but all six focused positive
-  cases fail and seven negative controls pass. It remains unaccepted. Then
+  Canonical Djex now [infers constraint-only provider parameters](https://github.com/VladimirReshetnikov/Djex/blob/4a4ed0fc23f76d7b82b06496e03adfadbf374f84/docs/reports/2026-09-08-constraint-only-provider-inference.md)
+  from unique coherent lexical class assumptions in both engines. Its strict
+  build and all 2,304 tests in 15 complete suites pass; four public Haskell API
+  cases retain full signatures and distinguish actual dictionary payloads.
+  This checkout still pins the previously accepted `a44f7057` dependency.
+  The next milestone is integrating the new engine increment with the global
+  method prototype. Its last run, before this increment, failed all six focused
+  positives while seven negative controls passed. Native method replay,
+  discovery/cache isolation, and full regression acceptance remain required.
+  Loaded Haskell provider admission and implicit-root behavioral scoping are
+  separately documented frontend gaps. Then
   address missing Church construction paths and remaining defaulted cells;
   supplied tree folds are an independent delivery. Two Exference ranking
   experiments still yielded 256 false `maybeEither` candidates and were restored.
