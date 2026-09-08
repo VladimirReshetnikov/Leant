@@ -173,9 +173,13 @@ Companion documents:
   701 boundary tests pass. Cache acceptance uses an explicit 32-candidate window
   and 512-record diagnostic capture; the original four-candidate search still
   misses its required implementation, and product defaults are unchanged.
-  Next come Haskell loaded-provider admission and implicit-root scoping, Lean
-  mixed inventories containing dictionary constructors, and missing Church
-  constructions. Supplied tree folds remain an independent delivery.
+  Canonical Djex now [retains loaded Haskell provider schemes](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-loaded-contextual-providers.md)
+  and accepts explicit-`forall` behavioral method queries in both engines, with
+  independent displayed-source replay and actual False controls. Its strict
+  build and 2,306-test regression pass; Leant retains the separately accepted
+  `4a4ed0fc` pin above. Implicit-root scoping, ordinary contextual presentation,
+  derived method schemes, mixed Lean dictionary inventories and missing Church
+  constructions remain open. Supplied tree folds remain an independent delivery.
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
   now includes separate-run acceptance of 12/13 extended operations in each
   Haskell engine and 2/4 Exference explicit-default cases. Lean Exference's
