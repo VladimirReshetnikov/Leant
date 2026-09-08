@@ -18,7 +18,7 @@ is complete. Priorities 2–4 retain their original requirements.
 
 | Order | Delivery | Required acceptance |
 | --- | --- | --- |
-| 1 | Make native verification repeatable and correlate requests with candidates | Use the recorded append/length workloads and unchanged bounds. Correlate each exact candidate, verification stage and backend request through recovery; distinguish kernel work, scheduling, transport waits and deadline handling before selecting a fix. Require positive/False controls, exact full-type replay, cancellation, owned cleanup and recovery of a context-dependent command. No transport fix follows from timing alone. |
+| 1 | Reuse the exact empty user environment for native verification | Apply the request-correlated diagnosis without borrowing synthesis helpers or changing the real user state. Require the original append/length positive and False workloads at unchanged bounds, exact full-type kernel replay, empty-session reuse and namespace isolation, reset invalidation, and backend retirement/reconstruction. Initial setup and active-query recovery must retain their distinct deadline boundaries. |
 | 2 | Execute broader Church behavior independently | Run additional totals and all 19 explicit-default counterparts in both Haskell engines and all three Lean modes. Require controlled providers, actual False controls and independent exact full-signature replay. Record success, timeout and inconclusive outcomes per cell. These cells need not wait for native fold repair. |
 | 3 | Admit one described global contextual provider | Extend the existing `Type 0` route with one fully described global provider while retaining the current non-overlap guard. Preserve complete source metadata, exact owned graph/renderer evidence and payload-sensitive replay; do not broaden instances or universes as part of this increment. |
 | 4 | Preserve selected dictionary identity before relaxing overlap guards | Carry the selected introduction occurrence and ordered slot through lowering and reconstruction. Require a forced equal-predicate outer/inner fixture whose faithful scoped capture preserves distinct payload behavior in Haskell and Lean replay. Graph IDs or successful compilation alone are insufficient. Methods, superclass evidence and further provider schemes remain separate extensions. |
@@ -69,8 +69,21 @@ Writes, queue operations and parsing take milliseconds, but the longer response
 waits do not identify a transport defect. Candidate 4's negative-decision check
 is associated with the first timeout only by sequential inference: trace v1
 records no request roles or payload tags. Its replay records the actual launcher
-command, not a resolved kernel-executable hash. Repeatable native acceptance
-and precise request correlation remain open.
+command, not a resolved kernel-executable hash. This historical event-only trace
+predates the request-correlated diagnosis below.
+
+The newer [request-correlated diagnosis](2026-09-07-empty-environment-diagnosis.md)
+passes its strict build, all 14 focused controls and the complete 686-test suite
+(357.63 seconds). Its failed append baseline has complete payload capture. The
+same exact candidate command times out after 5.008023501 seconds without `env`
+and completes in 0.0223364 seconds with a materialized empty root; decoded
+payloads differ only by `env: 2`. Source confirms repeated header/import
+initialization. The matched append control passes in 24.85 seconds with exact
+kernel replay, and its actual False control passes in 10.19 seconds. The latter
+trace retains 128 requests and explicitly omits 187, so its diagnostic capture
+remains incomplete. The [receipt](../../test-recursive/receipts/request-correlation.json)
+preserves all boundaries. Production root reuse, isolation, reset and backend
+recovery remain the next acceptance gate.
 
 Both partial Church oracle preflights pass: 20 Lean files with 491 exact
 inventories (487 empty and four named observer/proof allowances), and 63 Haskell
@@ -91,7 +104,7 @@ error is repairable.
 
 | Idea | Promotion criterion |
 | --- | --- |
-| Exact accepted-candidate provenance and reproducible replay | Retain the accepted 39-cell/680-test boundaries, non-forcing diagnostics and direct kernel pinning. Add exact request-role/candidate correlation for the native reliability work; defer a general tracing framework. |
+| Exact accepted-candidate provenance and reproducible replay | Retain the accepted 39-cell/680-test boundaries, non-forcing diagnostics and direct kernel pinning. Retain bounded request capture and its whole-record omission accounting. Use the matched empty-environment diagnosis for the next fix; defer a general tracing framework. |
 | Routing-test maintenance | When touching a routing boundary, replace brittle source-text counts with executable routing or boundary controls where practical. Preserve coverage; this is incremental maintenance, not a separate cleanup milestone. |
 | Tree folds and accumulator programs | Extend after native verification is reliable, independently of dictionary work. Select a missing program with exact supplied-provider inventory, full-signature behavior and termination checking. |
 | Native Windows Length acquisition | Promote for a concrete Windows workflow. Require bounded acquisition, actual solver execution and independent replay; existing refusal behavior and Length tests do not implement the missing acquisition route. |

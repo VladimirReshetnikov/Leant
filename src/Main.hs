@@ -117,6 +117,10 @@ import Leant.Synth.Engine
   , detailedCandidateGroupVariants
   , detailedCandidateGroupVerificationVariants
   , detailedVerificationVariantText
+  , detailedVerificationVariantOrdinal
+  , detailedVerificationVariantRoute
+  , detailedVerificationVariantSourceAuthority
+  , candidateSourceAuthorityEngine
   , forceDetailedOutcome
   , forceDetailedSynthCursorStep
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
@@ -234,6 +238,7 @@ import Leant.Synth.Length.Where
   )
 import Leant.Synth.Observability
   ( LeantObservations
+  , CandidateRenderingRoute (RouteTypedCandidate)
   , VerificationFailureClass (..)
   , leantObservationCodeEntries
   )
@@ -745,7 +750,8 @@ backendDied st = do
       { rsBackend = Nothing, rsLastSorry = Nothing })
 
 -- Opt-in transport metadata is exported only at command/lifecycle boundaries,
--- outside Backend.request's timer. No source or response payload is retained.
+-- outside Backend.request's timer. Source-bearing request records require a
+-- second explicit local opt-in; response payloads are never retained here.
 -- The bounded trace survives backend replacement so request ownership remains
 -- visible. Synchronous file failures cannot replace the command's outcome.
 snapshotBackendTrace :: St -> IO ()
@@ -759,13 +765,14 @@ snapshotBackendTrace st = void $ tryIOError $ do
           , ("request_id", maybe JNull JInt $ backendTraceRequestId event)
           , ("stage", JStr $ show $ backendTraceStage event)
           ]
-        payload = JObj
+        payload = JObj $
           [ ("format", JStr "leant-backend-trace-v1")
           , ("clock", JStr "monotonic nanoseconds; insertion order may differ across threads")
           , ("capacity", JInt $ toInteger $ backendTraceCapacity snapshot)
           , ("dropped_events", JInt $ backendTraceDroppedEvents snapshot)
           , ("events", JArr $ map eventJson $ backendTraceEvents snapshot)
-          ]
+          ] ++ [("request_capture", capture)
+               | Just capture <- [backendTraceRequestCapture snapshot]]
     void $ writeFileUtf8Atomic path (encodeJson payload ++ "\n")
 
 -- Run a command in an exact backend-local environment. Nothing env = fresh
@@ -2433,6 +2440,7 @@ runBehavioralSynth st query = do
     observations <- newIORef []
     let initial = BehavioralRun query deadline observations
     syntax <- runBehavioralCommand st initial True (behavioralSyntaxProgram query)
+      (Just $ behavioralTraceAnnotation "syntax" (behavioralType query) Nothing)
     case syntax >>= behavioralCheckedResponse of
       Left failure -> reject failure
       Right () -> case resolveSynthCommandGoal state (behavioralType query) of
@@ -2443,6 +2451,7 @@ runBehavioralSynth st query = do
                 active = initial { behavioralRunQuery = checkedQuery }
             preflight <- runBehavioralCommand st active False
               (behavioralPreflightProgram checkedQuery)
+              (Just $ behavioralTraceAnnotation "preflight" translatedGoal Nothing)
             case preflight >>= behavioralCheckedResponse of
               Left failure -> reject failure
               Right () -> case startupLengthAssessmentRequest
@@ -2476,8 +2485,8 @@ behavioralCheckedResponse response
 -- a read from the shared protocol stream. A timed-out backend is retired and
 -- its session is replayed by the established recovery path before reuse.
 runBehavioralCommand
-  :: St -> BehavioralRun -> Bool -> String -> IO (Either String JValue)
-runBehavioralCommand st active synthesisEnvironment code = do
+  :: St -> BehavioralRun -> Bool -> String -> Maybe JValue -> IO (Either String JValue)
+runBehavioralCommand st active synthesisEnvironment code annotation = do
   before <- behavioralRequestSeconds st active
   case before of
     Nothing -> pure (Left "the synthesis deadline has no time for another check")
@@ -2496,7 +2505,8 @@ runBehavioralCommand st active synthesisEnvironment code = do
               case seconds of
                 Nothing -> pure (Left "the synthesis deadline has no time for another check")
                 Just limit -> do
-                  result <- request backend (Just limit) (commandPayload environment code)
+                  result <- requestWithTraceAnnotation backend (Just limit)
+                    (commandPayload environment code) annotation
                   case result of
                     Right response -> pure (Right response)
                     Left RequestTimeout -> do
@@ -2509,6 +2519,27 @@ runBehavioralCommand st active synthesisEnvironment code = do
                     Left (BadResponse failure) -> do
                       snapshotBackendTrace st
                       pure (Left $ "bad response: " ++ failure)
+
+-- Built lazily at the actual callback and forced only by explicit bounded
+-- request capture. A compatibility survivor can carry a deferred lookup over
+-- an opposing Both lane; diagnostics must never demand that optional recovery.
+-- These fields identify an invocation, not a graph or kernel certificate.
+behavioralTraceAnnotation :: String -> String -> Maybe DetailedVerificationVariant -> JValue
+behavioralTraceAnnotation role goal candidate = JObj
+  [ ("role", JStr role)
+  , ("requested_type", JStr goal)
+  , ("candidate", maybe JNull (JStr . detailedVerificationVariantText) candidate)
+  , ("renderer_ordinal", maybe JNull
+      (JInt . toInteger . detailedVerificationVariantOrdinal) candidate)
+  , ("route", maybe JNull (JStr . show . detailedVerificationVariantRoute) candidate)
+  , ("owner_engine", maybe JNull owner candidate)
+  ]
+ where
+  owner variant = case detailedVerificationVariantRoute variant of
+    RouteTypedCandidate -> maybe JNull
+      (JStr . synthEngineName . candidateSourceAuthorityEngine)
+      (detailedVerificationVariantSourceAuthority variant)
+    _ -> JNull
 
 behavioralRequestSeconds :: St -> BehavioralRun -> IO (Maybe Int)
 behavioralRequestSeconds st active = do
@@ -4217,6 +4248,7 @@ synthVerifyBehavioral active successQuota st goal groups = do
     result <- runBehavioralCommand st active False
       (candidateVerificationProgram (goal ++ "\n")
         (detailedVerificationVariantText variant ++ "\n"))
+      (Just $ behavioralTraceAnnotation "type-verification" goal $ Just variant)
     case result of
       Left failure -> debugRequestFailure "type-verification" variant failure
       Right _ -> pure ()
@@ -4231,16 +4263,16 @@ synthVerifyBehavioral active successQuota st goal groups = do
 
   assessVariant variant = proveBehavioralBy $ \method negatePredicate -> do
     let query = (behavioralRunQuery active) { behavioralType = goal }
+        role = (if negatePredicate then "negative-" else "positive-")
+          ++ case method of
+            BehavioralDecide -> "decide"
+            BehavioralSimp -> "simp"
     result <- runBehavioralCommand st active False
       (behavioralProofProgram method negatePredicate query
         $ detailedVerificationVariantText variant)
+      (Just $ behavioralTraceAnnotation role goal $ Just variant)
     case result of
-      Left failure -> debugRequestFailure
-        ((if negatePredicate then "negative-" else "positive-")
-          ++ case method of
-            BehavioralDecide -> "decide"
-            BehavioralSimp -> "simp")
-        variant failure
+      Left failure -> debugRequestFailure role variant failure
       Right _ -> pure ()
     pure $ case result of
       Left failure -> Left failure
@@ -5907,7 +5939,9 @@ run opts = do
       backendTrace <- case tracePath of
         Just path | not (null path) -> do
           absolute <- makeAbsolute path
-          trace <- newBackendTrace 16384
+          captureRequests <- (== Just "1") <$> lookupEnv "LEANT_BACKEND_TRACE_REQUESTS"
+          trace <- (if captureRequests then newBackendTraceWithRequests
+                    else newBackendTrace) 16384
           pure $ Just (absolute, trace)
         _ -> pure Nothing
       st <- newIORef ReplState

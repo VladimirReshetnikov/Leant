@@ -220,6 +220,8 @@ Reports are listed oldest first.
 - 2026-08-20 — [Backend process-tree lifecycle prerequisite](2026-08-20-backend-process-tree-lifecycle.md)
 - 2026-08-20 — [Private isolated Lean backend pair foundation](2026-08-20-isolated-backend-pair-foundation.md)
 
+- 2026-09-07 — [Exact request correlation and empty-session verification](2026-09-07-empty-environment-diagnosis.md)
+
 ## Standalone PDF reports
 
 Longer typeset surveys live in their own subdirectories:

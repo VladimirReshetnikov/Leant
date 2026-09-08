@@ -19,10 +19,12 @@ module Leant.Backend
   , BackendTraceStage (..)
   , BackendTraceSnapshot (..)
   , newBackendTrace
+  , newBackendTraceWithRequests
   , readBackendTrace
   , spawnBackendWithTrace
   , killBackend
   , request
+  , requestWithTraceAnnotation
   , RequestError (..)
   ) where
 
@@ -45,6 +47,7 @@ import Control.Concurrent.MVar
 import Control.Exception
   ( IOException
   , SomeException
+  , evaluate
   , finally
   , mask
   , mask_
@@ -120,7 +123,7 @@ import System.Posix.Signals
   )
 #endif
 
-import Leant.Json (JValue, encodeJson, parseJson)
+import Leant.Json (JValue (..), encodeJson, parseJson)
 
 -- | How to spawn the Lean REPL: the @lake@ executable, the repl executable
 -- to run under @lake env@, and the project directory to run it in.
@@ -166,12 +169,44 @@ data RequestError
   | BadResponse String
   deriving (Show)
 
--- | Optional transport observation. No source text, JSON payloads, file IO,
--- or additional threads are retained. A caller may export snapshots outside
--- the request path. Capacity is clamped to 0..16384; older events are dropped
--- with an explicit count. Diagnostic clocks and bookkeeping add small overhead
--- when enabled and do not move the existing response-read timeout boundary.
-newtype BackendTrace = BackendTrace (IORef BackendTraceState)
+-- | Optional transport observation. The ordinary constructor retains no
+-- source text or payloads. Request capture requires a separate explicit opt-in.
+-- Neither mode adds file IO or threads to the request path. Event capacity is
+-- clamped to 0..16384; older events are dropped with an explicit count. Clocks
+-- and bookkeeping do not move the existing response-read timeout boundary.
+data BackendTrace = BackendTrace
+  !(IORef BackendTraceState) !(Maybe (IORef TraceRequestCapture))
+
+-- Private, strict UTF-8 copies cannot retain a lazy candidate/source environment.
+-- Only whole records are admitted, independently of the transport event ring.
+data TraceRequestCapture = TraceRequestCapture
+  { capturedRequestBytes :: !Int
+  , capturedRequestRows :: !(Seq.Seq TraceRequestRecord)
+  , omittedRequestRows :: !Integer
+  , omittedRequestPayloads :: !Integer
+  , omittedRequestAnnotations :: !Integer
+  , omittedRequestBytes :: !Integer
+  , omittedRequestEncoding :: !Integer
+  }
+
+data TraceRequestRecord = TraceRequestRecord
+  { capturedBackendId :: !Integer
+  , capturedRequestId :: !Integer
+  , capturedRequestStarted :: !Word64
+  , capturedRequestCompleted :: !Word64
+  , capturedRequestPayload :: !ByteString.ByteString
+  , capturedRequestAnnotation :: !(Maybe ByteString.ByteString)
+  }
+
+data TraceRequestOmission
+  = RequestRowLimit | RequestPayloadLimit | RequestAnnotationLimit | RequestByteLimit
+  | RequestInvalidUnicode
+
+requestRowLimit, requestPayloadLimit, requestAnnotationLimit, requestByteLimit :: Int
+requestRowLimit = 128
+requestPayloadLimit = 256 * 1024
+requestAnnotationLimit = 8 * 1024
+requestByteLimit = 4 * 1024 * 1024
 
 data BackendTraceState = BackendTraceState
   { traceCapacity :: !Int
@@ -229,46 +264,64 @@ data BackendTraceSnapshot = BackendTraceSnapshot
   { backendTraceCapacity :: !Int
   , backendTraceDroppedEvents :: !Integer
   , backendTraceEvents :: [BackendTraceEvent]
+  -- | Optional canonical-JSON request records; absent with 'newBackendTrace'.
+  -- UTF-8 byte lengths exclude protocol framing and are not physical pipe bytes.
+  , backendTraceRequestCapture :: Maybe JValue
   }
   deriving (Eq, Show)
 
 newBackendTrace :: Int -> IO BackendTrace
-newBackendTrace capacity = BackendTrace <$> newIORef BackendTraceState
-  { traceCapacity = max 0 (min 16384 capacity)
-  , traceDropped = 0
-  , traceNextBackend = 1
-  , traceNextRequest = 1
-  , traceEvents = Seq.empty
-  }
+newBackendTrace = newBackendTraceWithCapture Nothing
+
+-- | Explicit local diagnostic opt-in: at most 128 whole requests, 256 KiB per
+-- payload, 8 KiB per annotation and 4 MiB total retained UTF-8. These limits
+-- affect observation only, never the request or synthesis admission policy.
+newBackendTraceWithRequests :: Int -> IO BackendTrace
+newBackendTraceWithRequests capacity = do
+  capture <- newIORef $ TraceRequestCapture 0 Seq.empty 0 0 0 0 0
+  newBackendTraceWithCapture (Just capture) capacity
+
+newBackendTraceWithCapture :: Maybe (IORef TraceRequestCapture) -> Int -> IO BackendTrace
+newBackendTraceWithCapture capture capacity = do
+  reference <- newIORef BackendTraceState
+    { traceCapacity = max 0 (min 16384 capacity)
+    , traceDropped = 0
+    , traceNextBackend = 1
+    , traceNextRequest = 1
+    , traceEvents = Seq.empty
+    }
+  pure $ BackendTrace reference capture
 
 -- | In insertion order. Concurrent capture/request timestamps need not be
 -- sorted: an event can be preempted between reading the clock and insertion.
 -- Reading a snapshot does not clear or otherwise change the trace.
 readBackendTrace :: BackendTrace -> IO BackendTraceSnapshot
-readBackendTrace (BackendTrace reference) = do
+readBackendTrace (BackendTrace reference capture) = do
   state <- readIORef reference
+  requests <- mapM (fmap traceRequestCaptureJson . readIORef) capture
   pure BackendTraceSnapshot
     { backendTraceCapacity = traceCapacity state
     , backendTraceDroppedEvents = traceDropped state
     , backendTraceEvents = toList $ traceEvents state
+    , backendTraceRequestCapture = requests
     }
 
 newTraceLink :: Maybe BackendTrace -> IO (Maybe BackendTraceLink)
 newTraceLink Nothing = pure Nothing
-newTraceLink (Just trace@(BackendTrace reference)) = do
+newTraceLink (Just trace@(BackendTrace reference _)) = do
   identifier <- atomicModifyIORef' reference $ \state ->
     (state { traceNextBackend = traceNextBackend state + 1 }, traceNextBackend state)
   pure $ Just $ BackendTraceLink trace identifier
 
 newTraceRequest :: Maybe BackendTraceLink -> IO (Maybe Integer)
 newTraceRequest Nothing = pure Nothing
-newTraceRequest (Just (BackendTraceLink (BackendTrace reference) _)) =
+newTraceRequest (Just (BackendTraceLink (BackendTrace reference _) _)) =
   Just <$> atomicModifyIORef' reference (\state ->
     (state { traceNextRequest = traceNextRequest state + 1 }, traceNextRequest state))
 
 recordTrace :: Maybe BackendTraceLink -> Maybe Integer -> BackendTraceStage -> IO ()
 recordTrace Nothing _ _ = pure ()
-recordTrace (Just (BackendTraceLink (BackendTrace reference) identifier)) requestId stage = do
+recordTrace (Just (BackendTraceLink (BackendTrace reference _) identifier)) requestId stage = do
   observed <- getMonotonicTimeNSec
   let event = BackendTraceEvent observed identifier requestId stage
   atomicModifyIORef' reference $ \state ->
@@ -279,6 +332,113 @@ recordTrace (Just (BackendTraceLink (BackendTrace reference) identifier)) reques
           | otherwise = traceEvents state Seq.|> event
     in (state { traceEvents = retained
               , traceDropped = traceDropped state + if full then 1 else 0 }, ())
+
+-- A disabled capture path neither reads another IORef nor evaluates an
+-- annotation. An enabled capture shares the exact encoded String used to send,
+-- copying only a bounded prefix while deciding whether the whole row fits.
+captureTraceRequest
+  :: Maybe BackendTraceLink -> Maybe Integer -> Maybe JValue -> String -> IO ()
+captureTraceRequest
+    (Just (BackendTraceLink (BackendTrace _ (Just reference)) backendId))
+    (Just requestId) annotation encoded = do
+  initial <- readIORef reference
+  case fullCapture initial of
+    Just omission -> omit omission
+    Nothing -> do
+      started <- getMonotonicTimeNSec
+      prepared <- evaluate $ do
+        body <- boundedTraceUtf8 RequestPayloadLimit requestPayloadLimit encoded
+        label <- case annotation of
+          Nothing -> Right Nothing
+          Just value -> Just <$>
+            boundedTraceUtf8 RequestAnnotationLimit requestAnnotationLimit (encodeJson value)
+        let bytes = ByteString.length body + maybe 0 ByteString.length label
+        bytes `seq` Right (body, label, bytes)
+      case prepared of
+        Left omission -> omit omission
+        Right (body, label, bytes) -> do
+          completed <- getMonotonicTimeNSec
+          let row = TraceRequestRecord backendId requestId started completed body label
+          row `seq` atomicModifyIORef' reference (\state ->
+            -- Recheck admission atomically: one trace can observe distinct
+            -- backends concurrently. No concurrent insertion can exceed a cap.
+            case fullCapture state of
+              Just omission -> (omitTraceRequest omission state, ())
+              Nothing
+                | capturedRequestBytes state + bytes > requestByteLimit ->
+                    (omitTraceRequest RequestByteLimit state, ())
+                | otherwise ->
+                    (state
+                      { capturedRequestBytes = capturedRequestBytes state + bytes
+                      , capturedRequestRows = capturedRequestRows state Seq.|> row
+                      }, ()))
+ where
+  omit omission = atomicModifyIORef' reference $ \state ->
+    (omitTraceRequest omission state, ())
+  fullCapture state
+    | Seq.length (capturedRequestRows state) >= requestRowLimit = Just RequestRowLimit
+    | capturedRequestBytes state >= requestByteLimit = Just RequestByteLimit
+    | otherwise = Nothing
+captureTraceRequest _ _ _ _ = pure ()
+
+-- At most limit+1 characters are inspected, even when the source is longer.
+-- Checking the strict UTF-8 length also rejects multibyte overflow. A successful
+-- result contains the entire canonical string, never a truncated prefix.
+-- Reject isolated surrogates explicitly: Text.pack would replace them, which
+-- would misrepresent the original String as an exact canonical request.
+boundedTraceUtf8
+  :: TraceRequestOmission -> Int -> String -> Either TraceRequestOmission ByteString.ByteString
+boundedTraceUtf8 overflow limit source =
+  let prefix = take (limit + 1) source
+      bytes = TextEncoding.encodeUtf8 $ Text.pack prefix
+      surrogate character = character >= '\xD800' && character <= '\xDFFF'
+  in if any surrogate prefix then Left RequestInvalidUnicode
+       else if ByteString.length bytes > limit then Left overflow else Right bytes
+
+omitTraceRequest :: TraceRequestOmission -> TraceRequestCapture -> TraceRequestCapture
+omitTraceRequest omission state = case omission of
+  RequestRowLimit -> state { omittedRequestRows = omittedRequestRows state + 1 }
+  RequestPayloadLimit -> state { omittedRequestPayloads = omittedRequestPayloads state + 1 }
+  RequestAnnotationLimit -> state { omittedRequestAnnotations = omittedRequestAnnotations state + 1 }
+  RequestByteLimit -> state { omittedRequestBytes = omittedRequestBytes state + 1 }
+  RequestInvalidUnicode -> state { omittedRequestEncoding = omittedRequestEncoding state + 1 }
+
+-- Snapshot conversion is outside request sending and response waiting. JSON
+-- strings preserve the exact canonical text for local extraction and hashing;
+-- annotation_json is null for genuinely unlabelled startup/replay requests.
+traceRequestCaptureJson :: TraceRequestCapture -> JValue
+traceRequestCaptureJson state = JObj
+  [ ("format", JStr "leant-backend-request-capture-v1")
+  , ("encoding", JStr "canonical encodeJson UTF-8 without protocol framing")
+  , ("row_limit", JInt $ toInteger requestRowLimit)
+  , ("payload_byte_limit", JInt $ toInteger requestPayloadLimit)
+  , ("annotation_byte_limit", JInt $ toInteger requestAnnotationLimit)
+  , ("total_byte_limit", JInt $ toInteger requestByteLimit)
+  , ("retained_bytes", JInt $ toInteger $ capturedRequestBytes state)
+  , ("omitted_records", JInt $ sum $ map snd omissions)
+  , ("omissions", JObj [(reason, JInt count) | (reason, count) <- omissions])
+  , ("requests", JArr $ map recordJson $ toList $ capturedRequestRows state)
+  ]
+ where
+  omissions =
+    [ ("row_limit", omittedRequestRows state)
+    , ("payload_byte_limit", omittedRequestPayloads state)
+    , ("annotation_byte_limit", omittedRequestAnnotations state)
+    , ("total_byte_limit", omittedRequestBytes state)
+    , ("invalid_unicode", omittedRequestEncoding state)
+    ]
+  text = JStr . Text.unpack . TextEncoding.decodeUtf8
+  recordJson row = JObj
+    [ ("backend_id", JInt $ capturedBackendId row)
+    , ("request_id", JInt $ capturedRequestId row)
+    , ("capture_started_ns", JInt $ toInteger $ capturedRequestStarted row)
+    , ("capture_completed_ns", JInt $ toInteger $ capturedRequestCompleted row)
+    , ("payload_utf8_bytes", JInt $ toInteger $ ByteString.length $ capturedRequestPayload row)
+    , ("annotation_utf8_bytes", JInt $ toInteger $
+        maybe 0 ByteString.length $ capturedRequestAnnotation row)
+    , ("payload_json", text $ capturedRequestPayload row)
+    , ("annotation_json", maybe JNull text $ capturedRequestAnnotation row)
+    ]
 
 -- Discovery -----------------------------------------------------------------
 
@@ -766,14 +926,24 @@ runCleanupPreservingPrimaryFailure primaryAction cleanupAction =
 -- | Send one request and read the blank-line-delimited JSON response.
 request :: Backend -> Maybe Int {-^ timeout, seconds -} -> JValue
         -> IO (Either RequestError JValue)
-request backend timeoutSecs payload = do
+request backend timeoutSecs payload =
+  requestWithTraceAnnotation backend timeoutSecs payload Nothing
+
+-- | Same request/response path, with optional local diagnostic metadata. The
+-- annotation is deliberately lazy and ignored unless request capture is enabled.
+-- Request IDs are allocated here, so callers cannot invent or reuse ownership.
+requestWithTraceAnnotation
+  :: Backend -> Maybe Int -> JValue -> Maybe JValue -> IO (Either RequestError JValue)
+requestWithTraceAnnotation backend timeoutSecs payload annotation = do
   identifier <- newTraceRequest $ beTrace backend
   let observe = recordTrace (beTrace backend) identifier
+      encoded = encodeJson payload
       perform = do
         observe $ TraceRequestStarted timeoutSecs
         sendResult <- try $ do
+          captureTraceRequest (beTrace backend) identifier annotation encoded
           observe TraceWriteStarted
-          hPutStr (beIn backend) (encodeJson payload ++ "\n\n")
+          hPutStr (beIn backend) (encoded ++ "\n\n")
           observe TraceWriteCompleted
           hFlush (beIn backend)
           observe TraceFlushCompleted

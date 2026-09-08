@@ -5,7 +5,7 @@ module BackendTraceSpec (main, backendTraceTests, runBackendTraceHelper) where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException, bracket, try)
-import Control.Monad (unless)
+import Control.Monad (replicateM_, unless)
 import Data.List (isInfixOf)
 import System.Directory (getCurrentDirectory)
 import System.Environment (getArgs, getExecutablePath)
@@ -140,10 +140,170 @@ backendTraceTests = testGroup "opt-in backend transport trace"
       [(backendTraceBackendId event, backendTraceRequestId event) |
         event <- backendTraceEvents snapshot,
         backendTraceStage event == TraceResponseParsed] @?= [(1, Just 1), (2, Just 2)]
+  , testCase "request snapshots own exact canonical payloads and replacement IDs" $ do
+      trace <- newBackendTraceWithRequests 512
+      let exactPayload = JObj [("cmd", JStr "unicode λ\nquoted \"value\""), ("env", JInt 7)]
+          firstLabel = JObj [("role", JStr "positive-decide"), ("candidate", JStr "first")]
+          secondLabel = JObj [("role", JStr "negative-decide"), ("candidate", JStr "second")]
+      withBackend (Just trace) "reflect" $ \backend ->
+        expectReceived exactPayload =<< requestWithTraceAnnotation backend (Just 5) exactPayload (Just firstLabel)
+      withBackend (Just trace) "reflect" $ \backend ->
+        expectReceived exactPayload =<< requestWithTraceAnnotation backend (Just 5) exactPayload (Just secondLabel)
+      snapshot <- readBackendTrace trace
+      capture <- requireCapture snapshot
+      rows <- requireRows capture
+      length rows @?= 2
+      map (jLookup "payload_json") rows @?= replicate 2 (Just $ JStr $ encodeJson exactPayload)
+      map (jLookup "annotation_json") rows
+        @?= map (Just . JStr . encodeJson) [firstLabel, secondLabel]
+      let payloadBytes = toInteger (length $ encodeJson exactPayload) + 1 -- λ is two UTF-8 bytes.
+          annotationBytes = map (toInteger . length . encodeJson) [firstLabel, secondLabel]
+      map (jLookup "payload_utf8_bytes") rows @?= replicate 2 (Just $ JInt payloadBytes)
+      map (jLookup "annotation_utf8_bytes") rows @?= map (Just . JInt) annotationBytes
+      jLookup "retained_bytes" capture @?= Just (JInt $ 2 * payloadBytes + sum annotationBytes)
+      map (\row -> (jLookup "backend_id" row, jLookup "request_id" row)) rows
+        @?= [(Just $ JInt 1, Just $ JInt 1), (Just $ JInt 2, Just $ JInt 2)]
+      jLookup "omitted_records" capture @?= Just (JInt 0)
+      mapM_ (\row -> do
+        let identifier = jLookup "request_id" row >>= jInt
+            stages = [(backendTraceStage event, toInteger $ backendTraceMonotonicNanoseconds event)
+                     | event <- backendTraceEvents snapshot, backendTraceRequestId event == identifier]
+        case (lookup (TraceRequestStarted $ Just 5) stages,
+              jLookup "capture_started_ns" row >>= jInt,
+              jLookup "capture_completed_ns" row >>= jInt,
+              lookup TraceWriteStarted stages) of
+          (Just start, Just captureStart, Just captureEnd, Just writeStart) ->
+            assertBool "capture clocks escaped the request/send boundary" $
+              start <= captureStart && captureStart <= captureEnd && captureEnd <= writeStart
+          other -> assertFailure $ "missing correlation clocks: " ++ show other) rows
+      -- Exercise full serialization, not just a lazy snapshot constructor.
+      parseJson (encodeJson capture) @?= Right capture
+  , testCase "disabled request capture never demands an annotation" $ do
+      withBackend Nothing "echo" $ \backend ->
+        expectOk =<< requestWithTraceAnnotation backend (Just 5) payload
+          (error "disabled tracing evaluated metadata")
+      trace <- newBackendTrace 256
+      withBackend (Just trace) "echo" $ \backend ->
+        expectOk =<< requestWithTraceAnnotation backend (Just 5) payload
+          (Just $ error "event-only tracing evaluated metadata")
+      snapshot <- readBackendTrace trace
+      backendTraceRequestCapture snapshot @?= Nothing
+      assertBool "event-only tracing stopped observing requests" $
+        TraceResponseParsed `elem` map backendTraceStage (backendTraceEvents snapshot)
+  , testCase "oversized or unrepresentable UTF-8 omits the whole row only" $ do
+      trace <- newBackendTraceWithRequests 256
+      withBackend (Just trace) "echo" $ \backend -> do
+        -- Under the character limit but over the UTF-8 byte limit.
+        expectOk =<< requestWithTraceAnnotation backend (Just 5)
+          (JObj [("cmd", JStr $ replicate 90000 '界')])
+          (Just $ error "oversized payload evaluated its unnecessary annotation")
+        expectOk =<< requestWithTraceAnnotation backend (Just 5) payload
+          (Just $ JStr $ replicate 8192 'x')
+        expectOk =<< requestWithTraceAnnotation backend (Just 5) payload
+          (Just $ JStr ['\xD800'])
+        expectOk =<< request backend (Just 5) payload
+      capture <- readBackendTrace trace >>= requireCapture
+      rows <- requireRows capture
+      length rows @?= 1
+      map (jLookup "request_id") rows @?= [Just $ JInt 4]
+      map (jLookup "annotation_json") rows @?= [Just JNull]
+      map (jLookup "payload_json") rows @?= [Just $ JStr $ encodeJson payload]
+      jLookup "omitted_records" capture @?= Just (JInt 3)
+      (jLookup "omissions" capture >>= jLookup "payload_byte_limit") @?= Just (JInt 1)
+      (jLookup "omissions" capture >>= jLookup "annotation_byte_limit") @?= Just (JInt 1)
+      (jLookup "omissions" capture >>= jLookup "invalid_unicode") @?= Just (JInt 1)
+  , testCase "full row capacity preserves requests without demanding omitted metadata" $ do
+      trace <- newBackendTraceWithRequests 0
+      withBackend (Just trace) "echo" $ \backend -> do
+        replicateM_ 128 $ expectOk =<< request backend (Just 5) payload
+        expectOk =<< requestWithTraceAnnotation backend (Just 5) payload
+          (error "row-full capture evaluated metadata")
+      snapshot <- readBackendTrace trace
+      backendTraceEvents snapshot @?= []
+      capture <- requireCapture snapshot
+      rows <- requireRows capture
+      length rows @?= 128
+      map (jLookup "request_id") rows @?= map (Just . JInt) [1 .. 128]
+      jLookup "retained_bytes" capture @?= Just (JInt $ 128 * toInteger (length $ encodeJson payload))
+      jLookup "omitted_records" capture @?= Just (JInt 1)
+      (jLookup "omissions" capture >>= jLookup "row_limit") @?= Just (JInt 1)
+      second <- readBackendTrace trace >>= requireCapture
+      capture @?= second
+  , testCase "aggregate capture bound admits whole exact-size payloads only" $ do
+      trace <- newBackendTraceWithRequests 0
+      let exactSizePayload = JStr $ replicate (256 * 1024 - 2) 'x'
+      withBackend (Just trace) "echo" $ \backend -> do
+        replicateM_ 16 $ expectOk =<< request backend (Just 5) exactSizePayload
+        expectOk =<< requestWithTraceAnnotation backend (Just 5) payload
+          (error "byte-full capture evaluated metadata")
+      capture <- readBackendTrace trace >>= requireCapture
+      rows <- requireRows capture
+      length rows @?= 16
+      map (jLookup "payload_utf8_bytes") rows @?= replicate 16 (Just $ JInt $ 256 * 1024)
+      map (jLookup "payload_json") rows @?= replicate 16 (Just $ JStr $ encodeJson exactSizePayload)
+      jLookup "retained_bytes" capture @?= Just (JInt $ 4 * 1024 * 1024)
+      jLookup "omitted_records" capture @?= Just (JInt 1)
+      (jLookup "omissions" capture >>= jLookup "total_byte_limit") @?= Just (JInt 1)
+  , testCase "late output cannot donate a timed-out request's label to replacement" $ do
+      trace <- newBackendTraceWithRequests 512
+      let failedLabel = JObj [("role", JStr "negative-decide"), ("candidate", JStr "failed")]
+          nextLabel = JObj [("role", JStr "positive-simp"), ("candidate", JStr "next")]
+      withBackend (Just trace) "late" $ \backend -> do
+        expectTimeout =<< requestWithTraceAnnotation backend (Just 1) payload (Just failedLabel)
+        arrived <- timeout 3000000 $ waitForLateLine trace
+        arrived @?= Just ()
+      withBackend (Just trace) "echo" $ \backend -> do
+        -- Startup/replay remains unlabelled; no failed callback context is inherited.
+        expectOk =<< request backend (Just 5) payload
+        expectOk =<< requestWithTraceAnnotation backend (Just 5) payload (Just nextLabel)
+      snapshot <- readBackendTrace trace
+      capture <- requireCapture snapshot
+      rows <- requireRows capture
+      map (\row -> (jLookup "backend_id" row, jLookup "request_id" row)) rows
+        @?= [(Just $ JInt 1, Just $ JInt 1), (Just $ JInt 2, Just $ JInt 2),
+             (Just $ JInt 2, Just $ JInt 3)]
+      map (jLookup "annotation_json") rows
+        @?= [Just $ JStr $ encodeJson failedLabel, Just JNull, Just $ JStr $ encodeJson nextLabel]
+      let events = backendTraceEvents snapshot
+          timedOut = [backendTraceMonotonicNanoseconds event | event <- events,
+            backendTraceBackendId event == 1, backendTraceRequestId event == Just 1,
+            backendTraceStage event == TraceRequestTimedOut]
+          late = [backendTraceMonotonicNanoseconds event | event <- events,
+            backendTraceBackendId event == 1, backendTraceStage event == TraceStdoutLineRead False]
+      assertBool "late output was not actually later than the request timeout" $
+        case (timedOut, late) of ([ended], first : _) -> ended < first; _ -> False
+      assertBool "capture output acquired a guessed request owner" $ all
+        ((== Nothing) . backendTraceRequestId)
+        [event | event <- events, backendTraceStage event == TraceStdoutLineRead False]
+      assertBool "the timed-out request acquired a parsed response" $ null
+        [event | event <- events, backendTraceRequestId event == Just 1,
+         backendTraceStage event == TraceResponseParsed]
   ]
  where
   startsWith (actual : _) expected = actual @?= expected
   startsWith [] _ = assertFailure "trace is empty"
+
+expectReceived :: JValue -> Either RequestError JValue -> Assertion
+expectReceived sent response = case response of
+  Right value -> value @?= JObj [("received", JStr $ encodeJson sent ++ "\n")]
+  Left failure -> assertFailure $ "unexpected reflecting transport failure: " ++ show failure
+
+requireCapture :: BackendTraceSnapshot -> IO JValue
+requireCapture snapshot = case backendTraceRequestCapture snapshot of
+  Just capture -> pure capture
+  Nothing -> assertFailure "explicit request capture is absent" >> pure JNull
+
+requireRows :: JValue -> IO [JValue]
+requireRows capture = case jLookup "requests" capture >>= jArray of
+  Just rows -> pure rows
+  Nothing -> assertFailure "request capture has no row array" >> pure []
+
+waitForLateLine :: BackendTrace -> IO ()
+waitForLateLine trace = do
+  snapshot <- readBackendTrace trace
+  if any ((== TraceStdoutLineRead False) . backendTraceStage) (backendTraceEvents snapshot)
+    then pure ()
+    else threadDelay 1000 >> waitForLateLine trace
 
 payload :: JValue
 payload = JObj [("cmd", JStr "payload must not be logged")]
@@ -188,7 +348,10 @@ runBackendTraceHelper ["env", argument]
         else if mode == "invalid"
           then hPutStr stdout "{bad}\n\n" >> hFlush stdout
           else do
-            hPutStr stdout "{\"ok\":true}\n"
+            if mode == "late" then threadDelay 1250000 else pure ()
+            hPutStr stdout $ (if mode == "reflect"
+              then encodeJson $ JObj [("received", JStr message)]
+              else "{\"ok\":true}") ++ "\n"
             hFlush stdout
             if "split" `isInfixOf` message then threadDelay 10000000 else pure ()
             hPutStr stdout "\n"

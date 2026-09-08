@@ -175,16 +175,29 @@ Append's first timed-out request receives its first subsequent producer stdout
 line about 466 milliseconds after the five-second timeout. Trace v1 records
 backend/request ownership and transport stages but no request payload or purpose;
 mapping that request to the candidate's negative-decision check is explicitly
-an inference from sequential execution. The next diagnostic must correlate
-actual request payloads and verification roles before choosing a fix. This
+an inference from sequential execution. This historical trace is superseded
+for request correlation by the
+[new empty-environment diagnosis](../docs/reports/2026-09-07-empty-environment-diagnosis.md). This
 evidence does not establish a transport defect or justify increasing deadlines.
 
 For local timing diagnostics, set `LEANT_BACKEND_TRACE` to a fresh JSON file
 path before starting Leant. The opt-in trace retains at most 16,384 events,
 reports dropped events, and is written at command and backend lifecycle
 boundaries. It includes monotonic timestamps and process/request identities,
-but no source or response payloads. Concurrent event insertion order can differ
-from timestamp order; stdout-capture events have no inferred request identity.
+but no source or response payloads by default. Concurrent event insertion order
+can differ from timestamp order; stdout-capture events have no inferred request
+identity.
+
+Additionally set `LEANT_BACKEND_TRACE_REQUESTS=1` to capture exact canonical
+UTF-8 request JSON and callback annotations under their actual backend/request
+ids. Both settings are required. Capture is limited to 128 records, 256 KiB per
+payload, 8 KiB per annotation and 4 MiB total, with explicit whole-record omission
+counts. Disabled capture does not demand extra snapshots. Canonical JSON is not
+a claim about physical pipe byte encoding. The [diagnostic receipt](receipts/request-correlation.json)
+records the strict build, 14 focused controls and all 686 unit tests passing,
+the complete failed append baseline, and the matched empty-session control.
+The control's actual False rejection passes while its trace exceeds the row
+cap; these are distinct outcomes. Production root reuse is still pending.
 
 The supplied family declares fresh FoldFixture.Seq, Tree, and Count datatypes,
 their equality instances, and two structurally recursive fold definitions.

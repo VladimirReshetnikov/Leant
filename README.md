@@ -146,13 +146,16 @@ Companion documents:
   dictionary selection, methods and superclass evidence remain open.
   Canonical Djex's supported-fragment Haskell elaboration completes original
   priority 1; priorities 2–4 retain their broader requirements.
-  Native fold `map` and the recorded `length` query pass live synthesis and
-  exact replay. [Native request traces](test-recursive/receipts/native-request-traces.json)
-  preserve append's failed positive and False-control runs; they do not justify
-  a transport fix. Next are reliable native verification with exact
-  candidate/request correlation, broader Church behavior including all 19
-  explicit-default cases, and one described global `Type 0` provider under
-  the current guard. See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
+  The [request-correlated diagnosis](docs/reports/2026-09-07-empty-environment-diagnosis.md)
+  identifies repeated empty-user-environment initialization as the next native
+  verification fix. An identical candidate check timed out after 5.008 seconds
+  without an environment id and completed in 22.336 ms with a materialized empty
+  root. The matched append control passes exact replay and actual False rejection;
+  production root reuse remains pending. The diagnostic strict build, 14 focused
+  controls and all 686 unit tests pass. Next are exact empty-root reuse with
+  isolation/recovery checks, broader Church behavior including all 19 explicit
+  defaults, and one described global `Type 0` provider under the current guard.
+  See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
 - **Checked conditional providers in canonical Djex.** The
   [conditional-Given implementation](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)
   and [guarded nested-Given increment](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/docs/reports/2026-09-07-djinn-nested-givens.md)
