@@ -147,6 +147,20 @@ source/executable hashes are retained. This isolates direct request cost; it
 does not reproduce the preceding synthesis workload or pass the live five-second
 acceptance gate.
 
+A later [five-second direct control](receipts/native-preparation-diagnostic.json)
+also times out with no synthesis preparation or search. Startup separately
+takes 91 seconds; the identical type request then reaches its five-second
+limit. Shared source/input and program hashes match the earlier fast run.
+The attempted prepared control fails before its required preflight type error,
+so it cannot establish a preparation effect. Request/startup variability remains
+unresolved, and these measurements do not justify attributing the failure to
+Djinn search.
+
+The [direct stdout](receipts/native-direct-5s.stdout.txt) and
+[attempted prepared stdout](receipts/native-prepared-5s.stdout.txt) retain
+the startup durations and exact timeout responses; their bytes match the
+process hashes in the diagnostic receipt.
+
 The supplied family declares fresh FoldFixture.Seq, Tree, and Count datatypes,
 their equality instances, and two structurally recursive fold definitions.
 Automatic SizeOf generation is disabled on these datatype declarations so

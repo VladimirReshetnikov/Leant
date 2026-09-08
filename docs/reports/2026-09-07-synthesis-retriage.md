@@ -37,13 +37,20 @@ are also accepted in this dependency. The live Given matrix covers five
 Exference roles, three Djinn roles, and three leakage controls. Djinn's forced
 constrained local/global applications and sibling-scope search control remain
 outside that accepted matrix. No instance or superclass derivation is implied.
-The **unpublished canonical Djex conditional-Given pilot** now passes strict
-library/private/integration builds, all 81 private tests including 26 new
-conditional-kind and proof controls, and the unchanged 14-case Given target in
-26.09 seconds. The target includes forced Djinn local/global use and sibling-
-scope rejection. Broader regressions, budget controls, and direct-erasure
-controls remain pending. These bounded results do not enlarge the published
-`922c5558` dependency or establish production Lean context handling.
+Canonical Djex now publishes the
+[conditional-Given increment](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)
+in `90c882615ae2a3a296ad963f3f8cb786d4aa614f`. It passes strict builds,
+all 92 private tests including 26 conditional-kind/proof and eleven direct-
+erasure controls, the sixteen-test Given target in 23.56 seconds, and ten
+permanent production budget tests. Forced Djinn local/global use and sibling-
+scope rejection are accepted. The
+[aggregate receipt](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/test-integration/receipts/conditional-givens-checkpoint.json)
+records 2,168 passing tests across twelve complementary complete suites,
+including all 432 Length tests. Only three test files changed between the
+initial run and complete corrected reruns; production source stayed identical.
+This is not one unfiltered twelve-suite invocation. Leant remains pinned to
+`922c5558` and does not yet include this increment. These Haskell results do
+not establish production Lean context handling.
 
 The new direct Lean context renderer passes a strict GHC build, all 21 focused
 tests, and independent Lean 4.32.0 replay of seven exact rendered implementations.
@@ -57,7 +64,7 @@ prepare its exact metadata or use this route. The first replay exposed implicit
 dictionary introduction around compound applications; the corrected renderer
 makes the compound application explicit before replay.
 
-Two correctness and delivery blockers precede expansion of the matrix.
+Lean request reliability precedes expansion of the fold matrix.
 The fresh [native-fold run](../../test-recursive/receipts/native-folds-incomplete.json)
 accepts map, but append exhausts its raw window and generalized length reaches
 the command deadline. Both correct terms already occur in the debug stream
@@ -89,20 +96,32 @@ synthesis workload or constitute five-second live acceptance. It makes the
 difference between isolated requests and requests during synthesis the next
 diagnostic target; an inherently expensive standalone term is not established.
 
-Canonical Djex's contextual audit also found that omitted class methods can
-invalidate a source-level non-inhabitation claim, even after exhaustive search
-of the projected body. Its prepared fix suppresses negative evidence for
-retained qualifications and separately supplied contexts, while preserving
-positive checking and unconstrained refutations. Publication requires the
-root/nested method regressions and affected suites; this is a correctness gate,
-not a claim that method synthesis is implemented.
+The subsequent [five-second control](../../test-recursive/receipts/native-preparation-diagnostic.json)
+narrows that inference: a fresh session with no synthesis preparation or search
+also times out on the identical type-verification program after 5.028 seconds.
+Its startup probe separately takes 91 seconds. All thirteen shared source/input
+hashes and the exact program hash match the earlier fast direct-request run.
+The prepared comparison cell never reaches its required intentional preflight
+type error, so it does not establish an effect of serializer preparation.
+Synthesis workload is therefore not necessary for this failure. Investigate
+startup and request-time variability, including the process/IO boundary, before
+attributing the problem to search or changing production limits; complete
+ambient-environment equality was not recorded by these diagnostics.
+
+Canonical Djex's published correction also suppresses source-level negative
+evidence when retained qualifications or separately supplied contexts can
+expose class methods omitted by search. Positive checking and unconstrained
+refutations remain available. Root/nested method regressions and the affected
+suites pass. This correction does not implement method synthesis, and Leant's
+`922c5558` dependency does not yet contain it. Carry this correctness fix into
+the next dependency integration.
 
 The delivery order after these gates is:
 
 | Order | Next deliverable | Acceptance boundary |
 | --- | --- | --- |
 | 1 | Complete supplied-fold composition in Lean | Resolve the observed verification-request failures; independently check generic provider termination, full candidate types, behavior, and axioms; then expand list/tree folds and accumulator programs. Haskell map/append/generalized length are already accepted. |
-| 2 | Complete lexical-Given production synthesis | Finish, regression-test, and publish the Djinn Given increment, including budget/direct-erasure controls, then integrate it with Lean source metadata/preparation/routing. Extend methods, conditional instances, superclasses, and contextual certificate association. Isolated renderer and bounded pilot results do not establish this production route. |
+| 2 | Complete lexical-Given production synthesis | Integrate the validated canonical Djinn Given increment and negative-evidence correction with Lean source metadata/preparation/routing. Extend forced nested uses and actual duplicate-slot association, then methods, partial constrained instantiation, conditional instances, superclasses, and contextual certificate association. The isolated renderer and Haskell acceptance do not establish this production route. |
 | 3 | Broaden Church behavior alongside these deliveries | Execute the prepared extended total and all-nineteen supplied-default fixtures, with controlled provider inventories, oracle preflight, fresh processes, false controls, and exact full-signature replay. Preparation alone is not accepted behavior. |
 
 Production Lean context handling needs versioned source metadata preserving

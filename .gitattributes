@@ -13,3 +13,7 @@ cabal.project   text eol=lf
 *.cmd           text eol=crlf
 
 *.pdf           binary
+
+# Preserve the raw child bytes, including CRLF, hashed by these receipts.
+test-recursive/receipts/native-direct-5s.stdout.txt -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+test-recursive/receipts/native-prepared-5s.stdout.txt -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
