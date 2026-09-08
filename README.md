@@ -147,14 +147,15 @@ Companion documents:
   the final integration suite remain pending. The earlier configured 647-test
   suite passes in 343.79 seconds on its recorded source revision. Native fold `map` now also passes live synthesis and exact replay;
   append and length produce correct candidates but encounter backend request failures
-  before acceptance. The next deliveries prioritize the final guarded
-  nested-Given increment, bounded production context integration, and reliable
-  fold verification. Full proof-selected dictionary transport follows before
-  overlap guards are relaxed. The expanded Church behavioral matrix, including
-  all 19 supplied-default cases, runs alongside these deliveries. Its Lean
-  partial-oracle preflight passes 19 of 20 files; the remaining `at` inline
-  predicate needs repair. Preflight and the 350-signature inhabitation result
-  remain separate from behavioral synthesis. See the
+  before acceptance. Next, validate the working integration of the accepted
+  canonical nested-Given guard and bounded production contexts, preserve Haskell failure samples across
+  elaboration timeouts, and repair live fold verification. Both partial oracle
+  preflights pass: 20 Lean files with 491 inventories (487 empty, four allowlisted
+  observer/proofs), and 63 Haskell controls. Expanded live behavioral acceptance
+  for the additional totals and all 19 supplied-default cases remains open.
+  Preflight and the 350-signature inhabitation result remain separate from behavioral
+  synthesis. Full proof-selected dictionary transport follows before overlap
+  guards are relaxed. See the
   [current re-triage and exact evidence
   boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
 - **Checked conditional providers in canonical Djex.** The newer
@@ -164,10 +165,17 @@ Companion documents:
   non-inhabitation claims when class methods are omitted. Its twelve complete
   affected suites record 2,168 passing tests across complementary runs.
   Leant's published `922c5558` dependency does not yet contain this increment.
-  The working integration and exact emitted serializer compile; the first
-  Djinn public-command subset passes. Publication still requires the final
-  scope guard, both command forms in every engine mode, exact candidate/engine
-  association, a pinned replay kernel, and a fresh complete affected-suite run.
+  The subsequent [guarded nested-Given increment](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/docs/reports/2026-09-07-djinn-nested-givens.md)
+  is now accepted in canonical Djex: 106 private and 147 facade tests pass,
+  including 24 contextual cases and GHC witnesses. Leant's working dependency
+  is now `38435709bf4e70c4b53c541c462b0bbd35837bf2`; the published gitlink remains
+  `922c5558`, and validation of the new integration is pending. Its earlier working integration and exact emitted serializer
+  compile; the first Djinn public-command subset passes. The prepared stronger
+  acceptance path now pins the actual kernel and retains each displayed
+  candidate's own graph, renderer and engine. All 14 production-runner, 12
+  extended-corpus and six partial pure controls pass. The new strict build,
+  52 focused tests, expected full 678-test inventory and 39 ordinary/where live
+  contextual cells remain pending; none of those gates is closed by pure tests.
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked
