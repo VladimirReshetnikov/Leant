@@ -141,16 +141,21 @@ Companion documents:
   24 exact displayed terms pass independent Lean replay, with 48 empty axiom
   inventories and three actual false controls. The isolated dictionary renderer
   also passes seven full-signature replays with distinct dictionary payloads;
-  production contextual routing remains pending. The full configured 647-test
-  integration suite passes in 343.79 seconds with source and executable integrity
-  enforced. Native fold `map` now also passes live synthesis and exact replay;
+  the bounded working production route now also passes three public Djinn
+  behavioral queries, exact full-type replay with 24 empty inventories, and an
+  actual false control. Ordinary queries, Exference/Both, metadata refusals and
+  the final integration suite remain pending. The earlier configured 647-test
+  suite passes in 343.79 seconds on its recorded source revision. Native fold `map` now also passes live synthesis and exact replay;
   append and length produce correct candidates but encounter backend request failures
-  before acceptance. The next deliveries prioritize exact dictionary ownership
-  under nested scopes, production Lean context integration, and reliable fold
-  verification. The expanded Church behavioral matrix, including all 19
-  supplied-default cases, runs alongside those deliveries; the 350-signature
-  result above establishes
-  type inhabitation. See the [current re-triage and exact evidence
+  before acceptance. The next deliveries prioritize the final guarded
+  nested-Given increment, bounded production context integration, and reliable
+  fold verification. Full proof-selected dictionary transport follows before
+  overlap guards are relaxed. The expanded Church behavioral matrix, including
+  all 19 supplied-default cases, runs alongside these deliveries. Its Lean
+  partial-oracle preflight passes 19 of 20 files; the remaining `at` inline
+  predicate needs repair. Preflight and the 350-signature inhabitation result
+  remain separate from behavioral synthesis. See the
+  [current re-triage and exact evidence
   boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
 - **Checked conditional providers in canonical Djex.** The newer
   [conditional-Given implementation](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)
@@ -159,9 +164,10 @@ Companion documents:
   non-inhabitation claims when class methods are omitted. Its twelve complete
   affected suites record 2,168 passing tests across complementary runs.
   Leant's published `922c5558` dependency does not yet contain this increment.
-  The working integration and bounded local-context route have compiled, but
-  production acceptance still requires public commands, exact kernel replay,
-  and a fresh complete affected-suite run.
+  The working integration and exact emitted serializer compile; the first
+  Djinn public-command subset passes. Publication still requires the final
+  scope guard, both command forms in every engine mode, exact candidate/engine
+  association, a pinned replay kernel, and a fresh complete affected-suite run.
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked
