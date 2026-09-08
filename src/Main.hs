@@ -141,6 +141,7 @@ import Leant.Synth.Engine
 import Leant.Synth.Engine.Parallel (runParallelEitherPairOrdered)
 import Leant.Synth.Behavioral
   ( BehavioralVerdict (..)
+  , BehavioralProofMethod (..)
   , behavioralSyntaxProgram
   , behavioralPreflightProgram
   , behavioralProofProgram
@@ -4130,6 +4131,9 @@ synthVerifyBehavioral active successQuota st goal groups = do
     result <- runBehavioralCommand st active False
       (candidateVerificationProgram (goal ++ "\n")
         (detailedVerificationVariantText variant ++ "\n"))
+    case result of
+      Left failure -> debugRequestFailure "type-verification" variant failure
+      Right _ -> pure ()
     pure $ case result of
       Left _ -> VariantRejected BackendRequestFailure
       Right response
@@ -4144,6 +4148,14 @@ synthVerifyBehavioral active successQuota st goal groups = do
     result <- runBehavioralCommand st active False
       (behavioralProofProgram method negatePredicate query
         $ detailedVerificationVariantText variant)
+    case result of
+      Left failure -> debugRequestFailure
+        ((if negatePredicate then "negative-" else "positive-")
+          ++ case method of
+            BehavioralDecide -> "decide"
+            BehavioralSimp -> "simp")
+        variant failure
+      Right _ -> pure ()
     pure $ case result of
       Left failure -> Left failure
       Right response
@@ -4153,6 +4165,23 @@ synthVerifyBehavioral active successQuota st goal groups = do
         | isNothing (respEnv response) ->
             Left "Lean returned no checked command environment"
         | otherwise -> Right True
+
+  -- Keep the exact transport/deadline reason in debug output before the
+  -- verifier maps it to its existing coarse failure class. Quoted strings
+  -- keep multiline candidate/response text within one diagnostic row.
+  debugRequestFailure stage variant failure = do
+    debug <- synthDebugEnabled st
+    when debug $ do
+      now <- getCurrentTime
+      let remaining = case behavioralRunDeadline active of
+            Nothing -> "unlimited"
+            Just deadline -> show
+              (max 0 (floor (diffUTCTime deadline now) :: Integer))
+      emitLn st =<< cDim st
+        ("debug behavioral request failure: stage=" ++ stage
+          ++ "; remaining-command-seconds=" ++ remaining
+          ++ "; candidate=" ++ show (detailedVerificationVariantText variant)
+          ++ "; reason=" ++ show failure)
 
 completionCandidates :: St -> String -> IO [String]
 completionCandidates st prefix = do

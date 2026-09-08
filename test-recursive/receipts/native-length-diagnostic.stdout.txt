@@ -1,0 +1,223 @@
+no Lake project; using the backend's own project (C:\Users\vresh\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\lean_interact\cache\augustepoiroux\repl\repl_v1.3.18_lean-toolchain-v4.32.0)
+starting Lean backend...
+backend responding (1s)
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> :set synth-library off
+synth library: off
+λ> :set synth-classical off
+synth classical: off
+λ> :set synth-providers off
+synth providers: off
+λ> :set synth-debug on
+synth debug: on
+λ> :set synth-ranking balanced
+synth ranking: balanced
+λ> :set synth-shown 1
+synth shown: 1
+λ> :set synth-djinn-strategy interleave
+synth djinn-strategy: interleave
+λ> :set synth-provider-cap 80
+synth provider cap: 80
+λ> :set synth-window 1024
+synth window: 1024
+λ> :set synth-verify 1024
+synth verify: 1024
+λ> :set synth-steps 100000
+synth steps: 100000
+λ> :set synth-budget 100000
+synth budget: 100000
+λ> :set synth-timeout 90
+synth timeout: 90s
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth recursor_djinn_native_length : {α τ : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → τ → (τ → τ) → List α → τ where (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [] = 0) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [11] = 1) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [11, 29] = 2) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [11, 29, 37, 41, 53] = 5) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Bool ρ) 0 Nat.succ [true, false, true] = 3) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) true Bool.not [11, 29] = true) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) true Bool.not [11, 29, 37] = false)
+preparing synthesis environment (session imports + Lean)...
+debug fragment: FAll False "s0" (FAll False "s1" (FArr (FAll True "s2" (FArr (FArr (FVar "s0") (FArr (FVar "s2") (FVar "s2"))) (FArr (FVar "s2") (FArr (FParamRec True "List" "List s0" [FVar "s0"] [("List.nil",[]),("List.cons",[FVar "s0",FAtom False "List s0"])]) (FVar "s2"))))) (FArr (FVar "s1") (FArr (FArr (FVar "s1") (FVar "s1")) (FArr (FParamRec True "List" "List s0" [FVar "s0"] [("List.nil",[]),("List.cons",[FVar "s0",FAtom False "List s0"])]) (FVar "s1"))))))
+debug 1: fun _ x _ _ => x
+debug 2: fun f x g y => f _ (fun _ => g) x y
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=71; candidate="fun f x g y => f _ (fun _ => g) x y"; reason="decision timed out after 5s; the backend was retired for session replay"
+debug 3: fun _ x f _ => f x
+starting Lean backend...
+debug 4: fun f x _ y => f _ (fun _ z => z) x y
+debug 5: fun _ x f _ => f (f x)
+debug 6: fun f x _ => f _ (fun _ _ => x) x
+debug 7: fun f x g y => g (f _ (fun _ => g) x y)
+debug behavioral request failure: stage=negative-decide; remaining-command-seconds=28; candidate="fun f x g y => g (f _ (fun _ => g) x y)"; reason="decision timed out after 5s; the backend was retired for session replay"
+debug 8: fun _ x f _ => f (f (f x))
+starting Lean backend...
+debug 9: fun f x g => f _ (fun _ _ => g x) x
+debug 10: fun _ x f _ => f (f (f (f x)))
+debug 11: fun f x g => f _ (fun _ => g) (g x)
+debug 12: fun f x g => f _ (fun _ y => y) (g x)
+debug behavioral request failure: stage=negative-decide; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ y => y) (g x)"; reason="decision timed out after 2s; the backend was retired for session replay"
+debug 13: fun f x _ y => f _ (fun _ a => a) (f _ (fun _ b => b) (fun _ => x) y) y y
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x _ y => f _ (fun _ a => a) (f _ (fun _ b => b) (fun _ => x) y) y y"; reason="the synthesis deadline has no time for another check"
+debug 14: fun f x g => f _ (fun _ _ => x) (g x)
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ _ => x) (g x)"; reason="the synthesis deadline has no time for another check"
+debug 15: fun _ x f y => f ((fun _ => x) y)
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun _ x f y => f ((fun _ => x) y)"; reason="the synthesis deadline has no time for another check"
+debug 16: fun f x _ y => f _ (fun _ a => a) (f _ (fun _ b => b) (fun _ => x) y) y x
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x _ y => f _ (fun _ a => a) (f _ (fun _ b => b) (fun _ => x) y) y x"; reason="the synthesis deadline has no time for another check"
+debug 17: fun f x g => f _ (fun _ y => g (g y)) x
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ y => g (g y)) x"; reason="the synthesis deadline has no time for another check"
+debug 18: fun f x g => f _ (fun _ _ => g (g x)) x
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ _ => g (g x)) x"; reason="the synthesis deadline has no time for another check"
+debug 19: fun _ x f _ => f (f (f (f (f x))))
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun _ x f _ => f (f (f (f (f x))))"; reason="the synthesis deadline has no time for another check"
+debug 20: fun f x g => f _ (fun _ _ => g x) (g x)
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ _ => g x) (g x)"; reason="the synthesis deadline has no time for another check"
+debug 21: fun f x g => f _ (fun _ => g) (g (g x))
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ => g) (g (g x))"; reason="the synthesis deadline has no time for another check"
+debug 22: fun f x g y => g (f _ (fun _ z => z) x y)
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g y => g (f _ (fun _ z => z) x y)"; reason="the synthesis deadline has no time for another check"
+debug 23: fun f x g => f _ (fun _ y => y) (g (g x))
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ y => y) (g (g x))"; reason="the synthesis deadline has no time for another check"
+debug 24: fun f x g => f _ (fun _ _ => x) (g (g x))
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ _ => x) (g (g x))"; reason="the synthesis deadline has no time for another check"
+debug 25: fun f x g y => g (f _ (fun _ _ => x) x y)
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g y => g (f _ (fun _ _ => x) x y)"; reason="the synthesis deadline has no time for another check"
+debug 26: fun _ x f _ => f (f (f (f (f (f x)))))
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun _ x f _ => f (f (f (f (f (f x)))))"; reason="the synthesis deadline has no time for another check"
+debug 27: fun f x _ y => f _ (fun _ a => a) (fun _ => x) y y
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x _ y => f _ (fun _ a => a) (fun _ => x) y y"; reason="the synthesis deadline has no time for another check"
+debug 28: fun f x g => f _ (fun _ y => g (g (g y))) x
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ y => g (g (g y))) x"; reason="the synthesis deadline has no time for another check"
+debug 29: fun f x g y => f _ (fun _ h => h) g y x
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g y => f _ (fun _ h => h) g y x"; reason="the synthesis deadline has no time for another check"
+debug 30: fun f x g => f _ (fun _ _ => g (g (g x))) x
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ _ => g (g (g x))) x"; reason="the synthesis deadline has no time for another check"
+debug 31: fun f x _ y => f _ (fun _ _ _ => x) (fun _ => x) y y
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x _ y => f _ (fun _ _ _ => x) (fun _ => x) y y"; reason="the synthesis deadline has no time for another check"
+debug 32: fun f x g => f _ (fun _ y => g (g y)) (g x)
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ y => g (g y)) (g x)"; reason="the synthesis deadline has no time for another check"
+debug 33: fun f x g => f _ (fun _ _ => g (g x)) (g x)
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ _ => g (g x)) (g x)"; reason="the synthesis deadline has no time for another check"
+debug 34: fun _ x f _ => f (f (f (f (f (f (f x))))))
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun _ x f _ => f (f (f (f (f (f (f x))))))"; reason="the synthesis deadline has no time for another check"
+debug 35: fun f x _ y => f _ (fun _ a => a) (fun b => b) y x
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x _ y => f _ (fun _ a => a) (fun b => b) y x"; reason="the synthesis deadline has no time for another check"
+debug 36: fun f x g => f _ (fun _ _ => g x) (g (g x))
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ _ => g x) (g (g x))"; reason="the synthesis deadline has no time for another check"
+debug 37: fun f x g => f _ (fun _ => g) (g (g (g x)))
+debug behavioral request failure: stage=type-verification; remaining-command-seconds=0; candidate="fun f x g => f _ (fun _ => g) (g (g (g x)))"; reason="the synthesis deadline has no time for another check"
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-candidate-verified=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+debug metric: typed-candidate-rendered=1
+debug metric: lean-variant-attempted=1
+debug metric: lean-verification-failure.backend-request=1
+the engine did not finish within 90s — no answer, not a verdict
+(bounded hypothesis instantiation can widen the search a lot; :set synth-timeout N chooses another number of seconds, or 0 to wait indefinitely)
+supplied behavioral assertion: 0 passed, 9 falsified, 2 inconclusive (checks concern only the supplied assertion)
+behavioral check inconclusive: decision timed out after 5s; the backend was retired for session replay
+λ> :quit

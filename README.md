@@ -143,7 +143,9 @@ Companion documents:
   also passes seven full-signature replays with distinct dictionary payloads;
   production contextual routing remains pending. The full configured 647-test
   integration suite passes in 343.79 seconds with source and executable integrity
-  enforced. Next are Lean fold acceptance, production dictionary evidence,
+  enforced. Native fold `map` now also passes live synthesis and exact replay;
+  append and length produce correct candidates but encounter backend request failures
+  before acceptance. Next are verification recovery, Lean fold acceptance, production dictionary evidence,
   and broader behavioral coverage; the 350-signature result above establishes
   type inhabitation. See the [current re-triage and exact evidence
   boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
@@ -533,10 +535,16 @@ tracks that boundary separately from forthcoming recursors, contextual
 dictionaries, and broader Church coverage.
 
 The [supplied-fold acceptance fixture](test-recursive/README.md#supplied-folds-and-rank-n-recursor-arguments)
-is included with an initial diagnostic receipt. A live native Djinn `map`
-candidate and false rejection were observed, but a settings-label check stopped
-independent kernel replay. The validator correction passes eighteen Python
-tests; fresh fold acceptance remains pending.
+now records a fresh native Djinn run after the settings-validator correction.
+`map` passes live synthesis and independent replay; append exhausts its raw
+window and generalized length reaches the command deadline. Both missing
+operations already have correct candidates in the debug stream: independent
+Lean replay accepts their exact terms, original assertions, and wrong-result
+controls with eleven empty axiom inventories. Their live failures occur at the
+backend request boundary. The [incomplete live receipt](test-recursive/receipts/native-folds-incomplete.json)
+and [separate witness replay](test-recursive/receipts/native-fold-witnesses.json)
+retain that distinction. The false-control run records eleven falsifications
+and one inconclusive check, so the full fold acceptance gate remains open.
 
 This checks the assertion as written: finite examples do not establish a
 universal algorithmic specification. The existing `--where List.length ... --`

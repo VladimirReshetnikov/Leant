@@ -57,11 +57,51 @@ prepare its exact metadata or use this route. The first replay exposed implicit
 dictionary introduction around compound applications; the corrected renderer
 makes the compound application explicit before replay.
 
-The delivery order is now:
+Two correctness and delivery blockers precede expansion of the matrix.
+The fresh [native-fold run](../../test-recursive/receipts/native-folds-incomplete.json)
+accepts map, but append exhausts its raw window and generalized length reaches
+the command deadline. Both correct terms already occur in the debug stream
+and pass [independent witness replay](../../test-recursive/receipts/native-fold-witnesses.json)
+at the original signatures and predicates; all eleven inventories, including
+wrong-result controls, are empty. Their live failures are backend-request
+failures during type verification. Diagnose request timing and recovery before
+raising search defaults. The false control has eleven falsifications and one
+inconclusive check, so it does not pass the strict acceptance gate.
+
+A subsequent [focused diagnostic run](../../test-recursive/receipts/native-length-diagnostic.json)
+preserves the request's original error instead of only its aggregate class.
+Length's correct group-2 term times out during type verification after five
+seconds, with 71 seconds still available to the command. The backend had
+responded at startup and had not restarted before this candidate. Later
+failures include exhausted command time and decision timeouts, which must
+remain separate causes. Debug output now records the stage, exact candidate,
+remaining command time, and original request error; ordinary output and all
+limits are unchanged. The strict executable build passes. This diagnostic
+run is incomplete acceptance, with unchanged source/executable hashes.
+
+The [isolated direct-request diagnostic](../../test-recursive/receipts/native-request-timing.json)
+then submits the exact length verification and both decision programs in fresh
+Leant processes with an explicit 60-second request guard. All expected responses
+arrive: type checking takes 0.736 seconds, positive decision 0.790 seconds, and
+the expected rejection of the negative decision 0.782 seconds, excluding startup.
+Sources and executable remain unchanged. This does not reproduce the preceding
+synthesis workload or constitute five-second live acceptance. It makes the
+difference between isolated requests and requests during synthesis the next
+diagnostic target; an inherently expensive standalone term is not established.
+
+Canonical Djex's contextual audit also found that omitted class methods can
+invalidate a source-level non-inhabitation claim, even after exhaustive search
+of the projected body. Its prepared fix suppresses negative evidence for
+retained qualifications and separately supplied contexts, while preserving
+positive checking and unconstrained refutations. Publication requires the
+root/nested method regressions and affected suites; this is a correctness gate,
+not a claim that method synthesis is implemented.
+
+The delivery order after these gates is:
 
 | Order | Next deliverable | Acceptance boundary |
 | --- | --- | --- |
-| 1 | Replay and broaden supplied-fold composition in Lean | Independently check generic provider termination, full candidate types, behavior, and axioms; then expand list/tree folds and accumulator programs. Haskell map/append/generalized length are already accepted. |
+| 1 | Complete supplied-fold composition in Lean | Resolve the observed verification-request failures; independently check generic provider termination, full candidate types, behavior, and axioms; then expand list/tree folds and accumulator programs. Haskell map/append/generalized length are already accepted. |
 | 2 | Complete lexical-Given production synthesis | Finish, regression-test, and publish the Djinn Given increment, including budget/direct-erasure controls, then integrate it with Lean source metadata/preparation/routing. Extend methods, conditional instances, superclasses, and contextual certificate association. Isolated renderer and bounded pilot results do not establish this production route. |
 | 3 | Broaden Church behavior alongside these deliveries | Execute the prepared extended total and all-nineteen supplied-default fixtures, with controlled provider inventories, oracle preflight, fresh processes, false controls, and exact full-signature replay. Preparation alone is not accepted behavior. |
 

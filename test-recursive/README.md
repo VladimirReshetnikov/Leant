@@ -112,8 +112,40 @@ fold-synthesis matrix. In the [initial settings receipt](receipts/recursor-setti
 native Djinn `map` produced a live candidate and the false control rejected
 candidates, but a wrong provider-cap acknowledgement label in the validator
 stopped processing before independent kernel replay. The shared validator fix
-passes eighteen Python tests. Fresh fold acceptance remains pending, and the
-failed receipt is preserved unchanged.
+passes eighteen Python tests; that failed receipt is preserved unchanged.
+
+The [fresh native Djinn receipt](receipts/native-folds-incomplete.json) accepts
+`map` through live synthesis and exact independent replay. Append exhausts its
+1,024 raw slots, generalized length reaches the 90-second command deadline,
+and the false control has eleven falsifications plus one inconclusive check.
+All source, executable, command, and provider-definition hashes remain unchanged.
+The matrix therefore remains incomplete.
+
+The needed append and length terms already occur in the captured debug stream,
+but receive backend-request failures during type verification. A separate
+[witness replay](receipts/native-fold-witnesses.json) checks those exact terms,
+their original full signatures and predicates, and two earlier wrong-result
+controls. All eleven inventories are empty. The editable
+[Lean source](NativeFoldWitnesses.lean) reproduces this diagnostic boundary;
+it does not count either term as a live accepted synthesis result. Resolve
+request handling before changing search caps or enlarging this matrix.
+
+The [focused length diagnostic](receipts/native-length-diagnostic.json) uses
+the same bounds and now records the original failure reason: the correct
+group-2 term times out at type verification's five-second request limit with
+71 seconds left in the command. The backend was already responding and had
+not restarted before that request. The debug trace distinguishes this from
+later exhausted-deadline failures. This is an incomplete acceptance run, with
+source and executable hashes unchanged.
+
+The [direct-request timing diagnostic](receipts/native-request-timing.json)
+submits the same length verification and positive/negative decision programs
+in three fresh Leant sessions with an explicit 60-second request limit. Their
+command durations are 0.736, 0.790, and 0.782 seconds, excluding startup; the
+negative program receives the expected Lean rejection. Exact program text and
+source/executable hashes are retained. This isolates direct request cost; it
+does not reproduce the preceding synthesis workload or pass the live five-second
+acceptance gate.
 
 The supplied family declares fresh FoldFixture.Seq, Tree, and Count datatypes,
 their equality instances, and two structurally recursive fold definitions.

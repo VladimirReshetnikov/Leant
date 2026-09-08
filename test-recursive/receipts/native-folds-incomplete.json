@@ -1,0 +1,365 @@
+{
+  "status": "failed",
+  "runner_sha256": "afd5f6ff7826039c3151feb2c9fae226fbfceee8226a93e098ec64a0308b0e1a",
+  "cases": [
+    {
+      "operation": "map",
+      "type": "{α β : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → (α → β) → List α → List β",
+      "required_providers": [],
+      "predicate": "({f} (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [] = ([] : List Bool)) ∧ ({f} (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11] = [true]) ∧ ({f} (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11, 29, 37, 41, 53] = [true, false, false, false, false]) ∧ ({f} (fun ρ => @List.foldr Bool ρ) (fun b : Bool => if b then (7 : Nat) else 11) [true, false, true] = [7, 11, 7])",
+      "engine": "djinn",
+      "family": "native",
+      "name": "recursor_djinn_native_map",
+      "expected": "candidate",
+      "command": ":synth recursor_djinn_native_map : {α β : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → (α → β) → List α → List β where (recursor_djinn_native_map (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [] = ([] : List Bool)) ∧ (recursor_djinn_native_map (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11] = [true]) ∧ (recursor_djinn_native_map (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11, 29, 37, 41, 53] = [true, false, false, false, false]) ∧ (recursor_djinn_native_map (fun ρ => @List.foldr Bool ρ) (fun b : Bool => if b then (7 : Nat) else 11) [true, false, true] = [7, 11, 7])",
+      "commands_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_map.commands.txt",
+      "commands_sha256": "563823096e1ed9f44305d9297d075ccd119709921b29292fc80bbe3142ffc94a"
+    },
+    {
+      "operation": "append",
+      "type": "{α : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → List α → List α → List α",
+      "required_providers": [],
+      "predicate": "({f} (fun ρ => @List.foldr Nat ρ) [] [] = ([] : List Nat)) ∧ ({f} (fun ρ => @List.foldr Nat ρ) [] [11, 29] = [11, 29]) ∧ ({f} (fun ρ => @List.foldr Nat ρ) [11, 29] [] = [11, 29]) ∧ ({f} (fun ρ => @List.foldr Nat ρ) [11, 29] [37, 41, 53] = [11, 29, 37, 41, 53]) ∧ ({f} (fun ρ => @List.foldr Bool ρ) [true, false] [true] = [true, false, true])",
+      "engine": "djinn",
+      "family": "native",
+      "name": "recursor_djinn_native_append",
+      "expected": "candidate",
+      "command": ":synth recursor_djinn_native_append : {α : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → List α → List α → List α where (recursor_djinn_native_append (fun ρ => @List.foldr Nat ρ) [] [] = ([] : List Nat)) ∧ (recursor_djinn_native_append (fun ρ => @List.foldr Nat ρ) [] [11, 29] = [11, 29]) ∧ (recursor_djinn_native_append (fun ρ => @List.foldr Nat ρ) [11, 29] [] = [11, 29]) ∧ (recursor_djinn_native_append (fun ρ => @List.foldr Nat ρ) [11, 29] [37, 41, 53] = [11, 29, 37, 41, 53]) ∧ (recursor_djinn_native_append (fun ρ => @List.foldr Bool ρ) [true, false] [true] = [true, false, true])",
+      "commands_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_append.commands.txt",
+      "commands_sha256": "29e2b332b3a65b5c52c07e99e78536c9fa0bb2f2be89180954e98dc279ccc1c6"
+    },
+    {
+      "operation": "length",
+      "type": "{α τ : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → τ → (τ → τ) → List α → τ",
+      "required_providers": [],
+      "predicate": "({f} (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [] = 0) ∧ ({f} (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [11] = 1) ∧ ({f} (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [11, 29] = 2) ∧ ({f} (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [11, 29, 37, 41, 53] = 5) ∧ ({f} (fun ρ => @List.foldr Bool ρ) 0 Nat.succ [true, false, true] = 3) ∧ ({f} (fun ρ => @List.foldr Nat ρ) true Bool.not [11, 29] = true) ∧ ({f} (fun ρ => @List.foldr Nat ρ) true Bool.not [11, 29, 37] = false)",
+      "engine": "djinn",
+      "family": "native",
+      "name": "recursor_djinn_native_length",
+      "expected": "candidate",
+      "command": ":synth recursor_djinn_native_length : {α τ : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → τ → (τ → τ) → List α → τ where (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [] = 0) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [11] = 1) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [11, 29] = 2) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) 0 Nat.succ [11, 29, 37, 41, 53] = 5) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Bool ρ) 0 Nat.succ [true, false, true] = 3) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) true Bool.not [11, 29] = true) ∧ (recursor_djinn_native_length (fun ρ => @List.foldr Nat ρ) true Bool.not [11, 29, 37] = false)",
+      "commands_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_length.commands.txt",
+      "commands_sha256": "79c6352c0776e2ffde058eb5b56e0b4123b1036add6c101271f474586af59cf5"
+    },
+    {
+      "engine": "djinn",
+      "family": "native",
+      "operation": "reject_all",
+      "name": "recursor_djinn_native_reject_all",
+      "type": "Nat → Nat",
+      "predicate": "False",
+      "expected": "no_candidate",
+      "required_providers": [],
+      "command": ":synth recursor_djinn_native_reject_all : Nat → Nat where False",
+      "commands_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_reject_all.commands.txt",
+      "commands_sha256": "432feca4b07657ae7e334cbf29f4906e0abb91c128356e100d2b6d640c4a8c4c"
+    }
+  ],
+  "selected": {
+    "engines": [
+      "djinn"
+    ],
+    "families": [
+      "native"
+    ],
+    "operations": [
+      "append",
+      "length",
+      "map"
+    ]
+  },
+  "settings": {
+    "window": 1024,
+    "steps": 100000,
+    "budget": 100000,
+    "provider_cap": 80,
+    "timeout": 90,
+    "process_timeout": 180,
+    "strategy": "interleave",
+    "shown": 1,
+    "debug": true,
+    "library": false,
+    "classical": false
+  },
+  "datatype_declarations": [
+    "namespace FoldFixture",
+    "set_option genSizeOf false in inductive Seq (α : Type) where | nil : Seq α | cons : α → Seq α → Seq α deriving DecidableEq",
+    "set_option genSizeOf false in inductive Tree (α : Type) where | leaf : α → Tree α | branch : Tree α → Tree α → Tree α deriving DecidableEq",
+    "set_option genSizeOf false in inductive Count where | zero : Count | succ : Count → Count deriving DecidableEq",
+    "end FoldFixture"
+  ],
+  "declared_generic_providers": {
+    "FoldFixture.foldSeq": "def FoldFixture.foldSeq {α ρ : Type} (step : α → ρ → ρ) (zero : ρ) : FoldFixture.Seq α → ρ | .nil => zero | .cons x xs => step x (FoldFixture.foldSeq step zero xs)",
+    "FoldFixture.foldTree": "def FoldFixture.foldTree {α ρ : Type} (leaf : α → ρ) (branch : ρ → ρ → ρ) : FoldFixture.Tree α → ρ | .leaf x => leaf x | .branch l r => branch (FoldFixture.foldTree leaf branch l) (FoldFixture.foldTree leaf branch r)"
+  },
+  "allowed_discovered_providers": [
+    "FoldFixture.Count.succ",
+    "FoldFixture.Count.zero",
+    "FoldFixture.Seq.cons",
+    "FoldFixture.Seq.nil",
+    "FoldFixture.Tree.branch",
+    "FoldFixture.Tree.leaf",
+    "FoldFixture.foldSeq",
+    "FoldFixture.foldTree",
+    "FoldFixture.instDecidableEqCount",
+    "FoldFixture.instDecidableEqSeq",
+    "FoldFixture.instDecidableEqTree"
+  ],
+  "provider_definition_checks": {
+    "native": {
+      "status": "passed",
+      "declarations": [
+        "List.foldr"
+      ],
+      "source_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\native-fold-definitions.lean",
+      "source_sha256": "b10653eef9ddb2c5a32125d0da906f2399af24cdcb66b103b76d98115e8aadea",
+      "kernel_replay": {
+        "source_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\native-fold-definitions.lean",
+        "source_sha256": "b10653eef9ddb2c5a32125d0da906f2399af24cdcb66b103b76d98115e8aadea",
+        "source_unchanged": true,
+        "status": "passed",
+        "axiom_inventories": {
+          "List.foldr": []
+        }
+      }
+    }
+  },
+  "scope": "finite recursive behavior via supplied terminating folds; exact source/kernel replay; no recursive-call synthesis or universal-law claim",
+  "source_hashes": {
+    "test-recursive\\run_recursors.py": "afd5f6ff7826039c3151feb2c9fae226fbfceee8226a93e098ec64a0308b0e1a",
+    "test-church\\behavior_probe.py": "c891f561faf266fc1e96e79f98b97ca14559177beda8b6a1da38e4fa3d2dcbfe",
+    "test-church\\run_corpus.py": "a6a8034272ce50cdafd1dcfd6a4a3cdfab3ddbd58a1c4eb26ef3cebf64f6873a",
+    "lib\\Djex\\test-church\\behavior_runtime.py": "610aba95c2be827c72b2756c6b88b074166921b733523a3d40c1c23d99a3007a",
+    "src\\Main.hs": "d659096d8861bc0ef5c26ed69849cfbcefe928b53d96886448bd6ba8d0a90ba8",
+    "src\\Leant\\Synth\\Engine.hs": "79da48d921eae864aa58950c7aea4c1b152c1549bf85e0e27cf5c314a0d03818",
+    "src\\Leant\\Synth\\Fragment.hs": "9c550fc6095dafacee2e025bcbc75940c404d649a42d5fd8f308df651b56ac30",
+    "src\\Leant\\Synth\\Render.hs": "ec2bce85d3e03504e71f7ee7a92f8f4fce72d85adc55e2af10d4e4e742beae55",
+    "src\\Leant\\Synth\\Behavioral.hs": "79faad0b7e5e0e6e24f50fb662c26dcc5ea4a37460a59c7aea40b8b4db489ea0",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Core.hs": "fbec5bc69e47147f489e6776af135fce24c884fdb4cf4b7234c7f93fc57c39b7",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\Environment.hs": "7096a8e6c34b2b4f51ffc0d7816a63db7240ca647a33eb4a68554018961e5907",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\TypeFormula.hs": "f5da803c559f48ae67c46b6443db0761874c1554baa6ea7c7d701c3c51166e03",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\Instantiation.hs": "49b874dc6d0e0e747ef400833ff784846c92c262fe9bbd6273259b1af9a47195",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\LJT.hs": "970c2fa05a9cf8537de3a09076b14477986aa9e3cbf979bc280b176a07885ac2",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\Exference.hs": "b6a5d1b03a23fc878eeb0a252a37b9f0c5571a4ac46c5871e4abe676ae0d7fb8",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\ExpressionCheck.hs": "0bf2b7a276c7fd167dfeff6694470025e23c3e61bc1feb7a941620c30316a856"
+  },
+  "results": [
+    {
+      "name": "recursor_djinn_native_map",
+      "engine": "djinn",
+      "family": "native",
+      "operation": "map",
+      "status": "passed",
+      "provider_debug_lines": [],
+      "provider_inventory": [],
+      "synthesis": {
+        "operation": "map",
+        "type": "{α β : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → (α → β) → List α → List β",
+        "required_providers": [],
+        "predicate": "({f} (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [] = ([] : List Bool)) ∧ ({f} (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11] = [true]) ∧ ({f} (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11, 29, 37, 41, 53] = [true, false, false, false, false]) ∧ ({f} (fun ρ => @List.foldr Bool ρ) (fun b : Bool => if b then (7 : Nat) else 11) [true, false, true] = [7, 11, 7])",
+        "engine": "djinn",
+        "family": "native",
+        "name": "recursor_djinn_native_map",
+        "expected": "candidate",
+        "command": ":synth recursor_djinn_native_map : {α β : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → (α → β) → List α → List β where (recursor_djinn_native_map (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [] = ([] : List Bool)) ∧ (recursor_djinn_native_map (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11] = [true]) ∧ (recursor_djinn_native_map (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11, 29, 37, 41, 53] = [true, false, false, false, false]) ∧ (recursor_djinn_native_map (fun ρ => @List.foldr Bool ρ) (fun b : Bool => if b then (7 : Nat) else 11) [true, false, true] = [7, 11, 7])",
+        "commands_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_map.commands.txt",
+        "commands_sha256": "563823096e1ed9f44305d9297d075ccd119709921b29292fc80bbe3142ffc94a",
+        "status": "candidate",
+        "candidate": "fun f g x => f _ (fun y => .cons (g y)) (.nil) x",
+        "observations": {
+          "passed": 1,
+          "falsified": 5,
+          "inconclusive": 0
+        },
+        "output": "recursor_djinn_native_map : {α β : Type} → (∀ ρ : Type, (α → ρ → ρ) → ρ → List α → ρ) → (α → β) → List α → List β where (recursor_djinn_native_map (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [] = ([] : List Bool)) ∧ (recursor_djinn_native_map (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11] = [true]) ∧ (recursor_djinn_native_map (fun ρ => @List.foldr Nat ρ) (fun n : Nat => n == 11) [11, 29, 37, 41, 53] = [true, false, false, false, false]) ∧ (recursor_djinn_native_map (fun ρ => @List.foldr Bool ρ) (fun b : Bool => if b then (7 : Nat) else 11) [true, false, true] = [7, 11, 7])\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FAll False \"s1\" (FArr (FAll True \"s2\" (FArr (FArr (FVar \"s0\") (FArr (FVar \"s2\") (FVar \"s2\"))) (FArr (FVar \"s2\") (FArr (FParamRec True \"List\" \"List s0\" [FVar \"s0\"] [(\"List.nil\",[]),(\"List.cons\",[FVar \"s0\",FAtom False \"List s0\"])]) (FVar \"s2\"))))) (FArr (FArr (FVar \"s0\") (FVar \"s1\")) (FArr (FParamRec True \"List\" \"List s0\" [FVar \"s0\"] [(\"List.nil\",[]),(\"List.cons\",[FVar \"s0\",FAtom False \"List s0\"])]) (FParamRec True \"List\" \"List s1\" [FVar \"s1\"] [(\"List.nil\",[]),(\"List.cons\",[FVar \"s1\",FAtom False \"List s1\"])])))))\ndebug 1: fun _ _ _ => .nil\ndebug 1: fun _ _ _ => List.nil\ndebug 2: fun _ f x => (fun a => match a with | .nil => (.nil) | .cons b _ => .cons (f b) (.nil)) x\ndebug 2: fun _ f x => (fun a => match a with | List.nil => List.nil | List.cons b _ => List.cons (f b) List.nil) x\nstarting Lean backend...\ndebug 3: fun _ _ x => (fun a => match a with | .nil => (.nil) | .cons _ b => (fun _ => .nil) b) x\ndebug 3: fun _ _ x => (fun a => match a with | List.nil => List.nil | List.cons _ b => (fun _ => List.nil) b) x\nstarting Lean backend...\nstarting Lean backend...\ndebug 4: fun f _ x => f _ (fun _ y => y) (.nil) x\ndebug 4: fun f _ x => f _ (fun _ y => y) List.nil x\nstarting Lean backend...\nstarting Lean backend...\ndebug 5: fun f _ x => f _ (fun _ _ => .nil) (.nil) x\ndebug 5: fun f _ x => f _ (fun _ _ => List.nil) List.nil x\ndebug 6: fun f g x => f _ (fun y => .cons (g y)) (.nil) x\ndebug 6: fun f g x => f _ (fun y => List.cons (g y)) List.nil x\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=2\ndebug metric: lean-candidate-verified=2\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=2\ndebug metric: lean-verification-failure.backend-request=2\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=2\ndebug metric: lean-verification-failure.backend-request=2\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=2\ndebug metric: lean-verification-failure.backend-request=1\ndebug metric: lean-candidate-verified=1\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=2\ndebug metric: lean-candidate-verified=2\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\n  it1  fun f g x => f _ (fun y => .cons (g y)) (.nil) x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 5 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      },
+      "kernel_replay": {
+        "source_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_map.lean",
+        "source_sha256": "69a1fbd587fdccd2511ee87bc721cea30a332e89a0b6757c6ebf9babb9d9c0d1",
+        "source_unchanged": true,
+        "status": "passed",
+        "axiom_inventories": {
+          "List.foldr": [],
+          "FoldReplay.accepted": [],
+          "FoldReplay.accepted_passes": []
+        }
+      }
+    },
+    {
+      "name": "recursor_djinn_native_append",
+      "engine": "djinn",
+      "family": "native",
+      "operation": "append",
+      "status": "failed",
+      "provider_debug_lines": [],
+      "provider_inventory": [],
+      "failure": "expected one behaviorally accepted output for recursor_djinn_native_append: []"
+    },
+    {
+      "name": "recursor_djinn_native_length",
+      "engine": "djinn",
+      "family": "native",
+      "operation": "length",
+      "status": "failed",
+      "provider_debug_lines": [],
+      "provider_inventory": [],
+      "failure": "expected one behaviorally accepted output for recursor_djinn_native_length: []"
+    },
+    {
+      "name": "recursor_djinn_native_reject_all",
+      "engine": "djinn",
+      "family": "native",
+      "operation": "reject_all",
+      "status": "failed",
+      "provider_debug_lines": [],
+      "provider_inventory": [],
+      "failure": "where False did not establish actual predicate rejection"
+    }
+  ],
+  "executable": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+  "executable_sha256": "c62a689d021d9c3a552b3c5da0581bc2bf49c308ecaf8a866db454e1ec94cf44",
+  "accepted_candidate_count": 1,
+  "false_control_count": 0,
+  "executable_unchanged": true,
+  "sources_unchanged": true,
+  "commands_unchanged": true,
+  "provider_definitions_unchanged": true,
+  "processes": [
+    {
+      "label": "native-fold-definitions",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\native-fold-definitions.lean"
+      ],
+      "process_timeout_seconds": 180,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T00:34:05Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\native-fold-definitions.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\native-fold-definitions.stderr.txt",
+      "owned_root_pid": 26144,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 3.030600800004322,
+      "finished_utc": "2026-09-08T00:34:08Z",
+      "stdout_sha256": "fd974e14fd87150ec34a6385bd35e8127c6447312db438ab6c87854cde95dc45",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "recursor_djinn_native_map-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain"
+      ],
+      "process_timeout_seconds": 180,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T00:34:08Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_map-live.input.txt",
+      "input_sha256": "563823096e1ed9f44305d9297d075ccd119709921b29292fc80bbe3142ffc94a",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_map-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_map-live.stderr.txt",
+      "owned_root_pid": 26116,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 97.24430810002377,
+      "finished_utc": "2026-09-08T00:35:46Z",
+      "stdout_sha256": "16bc954f73513a03177fd1de0e194ba2b3c933229abb0f6df162c1ae219b610c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "recursor_djinn_native_map-kernel",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_map.lean"
+      ],
+      "process_timeout_seconds": 180,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T00:35:46Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_map-kernel.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_map-kernel.stderr.txt",
+      "owned_root_pid": 36340,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.3098817000281997,
+      "finished_utc": "2026-09-08T00:35:47Z",
+      "stdout_sha256": "6f84b3a127f7a7e27044a9a9be9f2f93969ddef46792de0b7303b077aa3663cf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "recursor_djinn_native_append-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain"
+      ],
+      "process_timeout_seconds": 180,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T00:35:47Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_append-live.input.txt",
+      "input_sha256": "29e2b332b3a65b5c52c07e99e78536c9fa0bb2f2be89180954e98dc279ccc1c6",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_append-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_append-live.stderr.txt",
+      "owned_root_pid": 38328,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 124.5755229999777,
+      "finished_utc": "2026-09-08T00:37:52Z",
+      "stdout_sha256": "8045c19e33c124fcadd0ba9a8d88c6552f3cb837f6159bdd2ca05d54da516ea2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "recursor_djinn_native_length-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain"
+      ],
+      "process_timeout_seconds": 180,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T00:37:52Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_length-live.input.txt",
+      "input_sha256": "79c6352c0776e2ffde058eb5b56e0b4123b1036add6c101271f474586af59cf5",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_length-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_length-live.stderr.txt",
+      "owned_root_pid": 19936,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 141.29128659999697,
+      "finished_utc": "2026-09-08T00:40:13Z",
+      "stdout_sha256": "4692f58f01e42bbff4f0a79b0c7719145373ca31cef822396fbfbd7fb591d7b6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "recursor_djinn_native_reject_all-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain"
+      ],
+      "process_timeout_seconds": 180,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T00:40:13Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_reject_all-live.input.txt",
+      "input_sha256": "432feca4b07657ae7e334cbf29f4906e0abb91c128356e100d2b6d640c4a8c4c",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_reject_all-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursor-acceptance\\native-djinn-v2\\recursor_djinn_native_reject_all-live.stderr.txt",
+      "owned_root_pid": 16456,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 110.61763010002323,
+      "finished_utc": "2026-09-08T00:42:04Z",
+      "stdout_sha256": "0935014ed160a03e03b81af762ce4d4f9085f83215696c7d9409069dd242a6a2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
