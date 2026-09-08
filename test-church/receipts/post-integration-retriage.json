@@ -1,0 +1,30 @@
+{
+  "status": "retriage_evidence_snapshot_not_complete_integration_acceptance",
+  "canonical_djex_revision": "63a23f58d2e0f6fd1ffcd0532412f049dd29e834",
+  "native_extended_accepted_dependency": "3529c465ea59378e7d093bf8e9d314bea5a2a24d",
+  "leant_host_revision": "62ada2c05f755f66ac8ea1be34c30fc99f25f4c4",
+  "leant_committed_dependency": "4a4ed0fc23f76d7b82b06496e03adfadbf374f84",
+  "archive": "post-integration-retriage.zip",
+  "archive_sha256": "f1d3dca21933dc941464313c2d730c3008a20d363cf6517530e694cfd6d58a78",
+  "archive_bytes": 9643566,
+  "artifact_count": 7085,
+  "manifest_sha256": "411674f160fbb94d387936be4fb713d9670287ebf97240e87dab0990803e73de",
+  "summary": {
+    "canonical_regression": "2308/2308 in 15 suites; 721.79 suite seconds",
+    "canonical_signatures": "350 per Haskell engine",
+    "canonical_extended_exference": "13/13, 28 oracle controls, actual False control",
+    "native_extended_exference_at_3529": "13/13 with exact full-type kernel replays and actual False control",
+    "native_integration_at_3529": "incomplete; structural provider regression, 700/701 unit tests",
+    "native_integration_at_63a": "stopped after failed gates; 699/701 unit tests, metadata preflight timeout",
+    "focused_unit_retries_at_63a": "both failed aggregate cases passed unchanged in isolation; no aggregate promotion",
+    "kernel_diagnostic": "same metadata source passed with worker pool 1 and default; no causal inference or default change"
+  },
+  "limits": [
+    "Original per-engine search bounds are retained; process deadlines and search budgets are distinct.",
+    "Candidate axiom inventories are separate from observer and proof inventories.",
+    "The cancelled driver results.json retains its historical running status; cancellation.json records termination.",
+    "The first diagnostic script completed both unit probes then failed on a missing receipt key; kernel probes belong to the separate kernel diagnostic.",
+    "Archive omits compiled binaries and object files; raw receipts preserve executable hashes and original local paths.",
+    "No fresh runtime tests were performed solely for this documentation re-triage."
+  ]
+}

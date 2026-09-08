@@ -179,10 +179,10 @@ Companion documents:
   build and 2,306-test regression pass; Leant retains the separately accepted
   `4a4ed0fc` pin above. Implicit-root scoping, ordinary contextual presentation,
   derived method schemes, mixed Lean dictionary inventories and missing Church
-  constructions remain open. The revised order puts Church construction and
-  coverage first, then bounded Haskell frontend usability and supplied tree
-  folds. Broader contextual source/evidence support follows; it is not a
-  prerequisite for the provider-free Church fixtures.
+  constructions remain open. The revised order closes the current native
+  integration gate, then alternates missing Church constructions with bounded
+  Haskell frontend usability and supplied tree folds. Broader contextual
+  source and selected-dictionary evidence follow.
   The canonical [focused introduction change](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-focused-forall-search.md) now synthesizes
   all **13 extended Church operations in one fresh Haskell Exference run**,
   including `maybeEither`, at unchanged search limits. Exact full-signature GHC
@@ -193,8 +193,12 @@ Companion documents:
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
   now includes fresh 13/13 Haskell Exference acceptance and historical
   separate-run 12/13 Haskell Djinn and 2/4 Exference explicit-default acceptance. Lean Exference's
-  selected first six now accept 6/6 as a composite of five historical exact
-  replays and the fresh native-length follow-up. The full 13-operation/19-default coverage
+  extended corpus now passes **13/13 in one native run** at Djex `3529c465`,
+  with exact full-type kernel replay and an actual False control. The
+  [refinement and updated priorities](docs/reports/2026-09-08-post-integration-priorities.md)
+  retain a clean aggregate integration gate for `63a23f58`: its structural
+  regression passes, but two other unit failures only pass in isolated retries.
+  The committed dependency remains `4a4ed0fc`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
 - **Checked conditional providers in canonical Djex.** The

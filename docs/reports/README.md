@@ -273,3 +273,5 @@ a forward-looking proposal rather than a dated record:
 
 - 2026-09-08 — [Expanded Church behavioral coverage and remaining delivery gates](2026-09-07-priority4-behavioral-coverage.md)
 - 2026-09-08 — [Global contextual providers and exact verification traces](2026-09-08-global-contextual-providers.md)
+
+- 2026-09-08 — [Post-integration synthesis priorities](2026-09-08-post-integration-priorities.md) — native Exference 13/13, the refined scheduler integration gate, and the remaining delivery order.

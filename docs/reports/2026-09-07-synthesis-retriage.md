@@ -9,75 +9,22 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-**September 8 re-triage after complete extended Exference acceptance:**
-close the remaining Church matrix and validate the newer engine in Lean;
-then finish bounded frontend usability, tree folds and contextual evidence.
-The [focused introduction report](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-focused-forall-search.md) records a fresh **13/13 extended
-Haskell Exference run**, exact full-signature replay, positive/wrong-reference
-controls and an actual False query at unchanged limits. Strict builds,
-**2,308 regression tests in 15 suites**, and **350 signatures in each Haskell
-engine** pass. This closes Exference's observed `maybeEither` miss.
-It does not establish Djinn parity or native Lean acceptance of the change.
+The [post-integration re-triage](2026-09-08-post-integration-priorities.md)
+supersedes the earlier order and coverage below. Exference now has fresh
+13/13 extended acceptance in both Haskell and Lean at separately recorded
+revisions. The refined scheduler passes the canonical 2,308-test regression;
+clean complete native integration remains a release gate. Two failed native
+unit cases pass unchanged in isolation, which does not promote the aggregate.
 
-The [loaded-provider report](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-loaded-contextual-providers.md)
-records accepted ordinary Haskell source-scheme transport and explicit-`forall`
-behavioral queries in both engines, including independent replay, False
-controls, a strict build and all 2,306 tests in 15 complete suites at Djex
-`85bd472f`. The [global-method integration report](2026-09-08-global-contextual-providers.md) records the completed
-bounded Leant delivery against Djex `4a4ed0fc`: six native ordinary/where method
-cases with full-type kernel replay and 24 observations; nine cache/False
-sessions with 21 independent replay files; a fresh 39/39 local-context matrix;
-a strict build; and the complete 701/701 unit suite. Leant still pins Djex
-`4a4ed0fc`; the newer canonical Haskell acceptance does not establish native
-Lean integration of that revision. These are existing acceptance receipts,
-not new runtime runs performed for this re-triage.
+Finish that integration gate, then alternate missing Church constructions
+with bounded Haskell frontend usability and the prepared tree accumulator.
+Keep all 19 explicit defaults, all five language/engine combinations, broader
+contextual admission and selected dictionary evidence in scope. The linked
+report gives the ordered acceptance gates and re-triages performance, provider
+retrieval, native Lean integration and other architectural ideas.
 
-Ordinary verification now carries exact candidate ownership in optional
-request traces. All cache captures are complete at the explicitly selected
-512-record cap. Cache queries pass at 32 candidates; the original four-slot
-query still misses its required legacy implementation. Neither setting changes
-product defaults. Keep that bounded search miss as a regression target, without
-reopening the now-completed trace/correlation work.
-
-| Order | Delivery | Why now and required acceptance |
-| --- | --- | --- |
-| 1 | Close Church engine parity, explicit defaults and native integration (priority 4) | Preserve fresh Exference 13/13 acceptance; reproduce and repair Djinn `maybeEither`, then Exference `foldl1`/`at` and all remaining default cells. Validate the newer Djex revision in Lean before advancing its pin, with affected context/recursor regressions and all three engine modes. Require original public queries, exact full-signature replay, provider inventories and False controls; reference programs remain outside search. |
-| 2 | Finish bounded Haskell frontend usability (priority 3) | Preserve implicit root binder order and lexical scope, and make ordinary contextual output independently usable. Test explicit and implicit signatures, expression and definition output, and ordinary and named-`where` routes. The worker must check the exact displayed implementation at the original signature. Derived class-method extraction is a separate increment in delivery 4. |
-| 3 | Accept supplied tree folds with accumulators (priority 2) | Execute the prepared polymorphic tree fixture in both Haskell engines and all three Lean modes. Require exact provider inventories, order-sensitive observations, full-type replay, termination checking and False controls. Preparation alone is not acceptance; do not add a new general-recursion mechanism before this fixture identifies a need. |
-| 4 | Extend contextual source coverage (priority 3) | Complete Haskell derived class-method schemes and Lean mixed inventories containing constructors and methods. The existing `ContextProduction.Dictionary.mk` refusal requires source representation/admission, not a larger provider cap. Retain rejected packets and precise unsupported outcomes; integrate a newer Djex pin only with its own native validation. |
-| 5 | Preserve selected dictionaries and derive further evidence (priority 3) | Keep overlap guards until distinct outer/inner dictionaries with equal predicates retain their selected payloads through search and replay. Then extend conditional providers, superclass projections and richer universe metadata through separate fixtures. Existing bounded conditional-provider support does not establish the general case. |
-
-The Church misses are the most direct remaining gap in the requested practical
-coverage. Their current fixtures do not establish a dependency on mixed Lean
-dictionary inventories or broader instance derivation. Loading more providers
-cannot repair a provider-free construction gap. The frontend increment remains
-small because compiling inside a worker does not by itself make displayed code
-usable in a caller's scope. Compiler syntax probes are design evidence only;
-they do not accept implicit-root synthesis or its expression-output contract.
-
-Use one failing public query and its exact candidate/search evidence to drive
-each repair. Instrument only the missing decision, stop speculative tuning
-after an unchanged failure, and preserve existing budgets. A completed delivery
-must add an accepted program or close a demonstrated correctness gap; another
-trace framework or larger evidence archive is not a substitute. Keep runtime
-validation serialized and run affected acceptance cells with each increment.
-
-The full priority-4 obligation remains **all 13 extended operations and all
-19 explicit-default counterparts**, across Haskell Djinn/Exference and Lean
-Djinn/Exference/Both. Exference's 13/13 extended Haskell result is now a fresh
-complete run. Djinn's 12/13 extended Haskell result, the selected 2/4 Exference
-defaults and the selected 6/6 Lean Exference operations remain historical
-unions at their recorded revisions. They do not close the full obligation.
-Run outstanding cells alongside relevant increments, with heavy runtime
-acceptance serialized. A supplied witness or an oracle preflight is not a
-synthesized program.
-
-Delivery 1 is a sequence of publishable increments, not a reason to postpone
-the prepared frontend and tree fixtures indefinitely. After each accepted
-engine repair, update the coverage register and execute the next relevant
-native or prepared fixture. If a cell exposes a distinct missing construction,
-record its exact failure and pursue that bounded repair; do not spend another
-milestone collecting equivalent traces or blindly changing ranking weights.
+The remaining sections preserve historical diagnoses, counts and proposals at
+their recorded revisions. They do not override the current linked decision.
 
 ## What changed in this re-triage
 

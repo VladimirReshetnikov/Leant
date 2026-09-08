@@ -8,14 +8,17 @@ All 2,308 regression tests and 350 signatures per Haskell engine also pass.
 
 Other rows retain their historical receipts and harness pins. This is not a
 fresh complete matrix across languages, engines and the 19 explicit defaults.
-Leant still pins Djex `4a4ed0fc`; the canonical change awaits native acceptance.
+The [native acceptance and refinement follow-up](2026-09-08-post-integration-priorities.md)
+records a fresh 13/13 Lean Exference run at Djex `3529c465`. Complete native
+integration of the refinement at `63a23f58` remains open; Leant still commits
+the accepted `4a4ed0fc` dependency.
 
 | Language and engine | Accepted subset | Remaining within that subset |
 | --- | ---: | --- |
 | Haskell Exference, fresh complete extended run | 13/13 | None within the 13 extended operations |
 | Haskell Djinn, first six, repaired length, and disjoint remaining seven | 12/13 | `maybeEither` |
 | Haskell Exference, selected explicit defaults | 2/4 (`last`, `atKey`) | `foldl1`, `at` |
-| Lean Exference, first six with independent repaired-length follow-up | 6/6 | None; the remaining seven and Djinn/Both are outside this subset |
+| Lean Exference, fresh complete extended run at `3529c465` | 13/13 | None within the 13 extended operations; native Djinn/Both and default coverage remain separate |
 
 Both Haskell engines accept `numeralAdd`, `fromMaybe`, `either`, `maybeToList`,
 `foldl`, `length`, `numeralSuccessor`, `foldr`, `listToMaybe`, `catMaybes`,
