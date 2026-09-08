@@ -9,33 +9,32 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-**September 8 re-triage: integrate the accepted constraint-only engine
-increment, then address the missing Church construction paths.** Canonical
-Djex's [new inference and Haskell rendering milestone](https://github.com/VladimirReshetnikov/Djex/blob/4a4ed0fc23f76d7b82b06496e03adfadbf374f84/docs/reports/2026-09-08-constraint-only-provider-inference.md)
-passes a strict build and all 2,304 tests in 15 complete suites. Four public
-API cases synthesize global/local constrained providers in both engines and
-replay their exact full types with distinct dictionary payloads. Its remaining
-Haskell frontend gates are loaded-provider admission/source-scheme closure and
-implicit-root behavioral scoping. Leant still pins `a44f7057`; this documentation
-update does not change the dependency or accept the working global prototype.
-Two simple search-ranking experiments failed their behavioral gate and were
-restored. The scope of original priorities 1–4 is unchanged.
+**September 8 follow-up: close the working Leant integration, then the
+Haskell frontend gaps and missing Church constructions.** The
+[updated triage and evidence extraction](2026-09-08-integration-retriage.md)
+supersede the earlier method-failure diagnosis. Canonical Djex `4a4ed0fc`
+remains published with its strict build and all 2,304 tests passing. Leant's
+working prototype now uses that dependency and passes all 13 focused tests,
+six real ordinary/where method queries with full-type kernel replay and
+24 observations, and all three actual False controls. The prototype and
+dependency update remain uncommitted pending integration acceptance.
 
-Priority 1's supported-fragment Haskell elaboration remains accepted. The
-published local `Type 0` context route passes its 39-cell matrix; the latest
-published Leant graph integration passes nine native cells and all 686 unit
-tests. These results belong to their recorded revisions. The newer global
-provider prototype's last run, before the new engine increment, built but
-failed all six focused positives, while seven negative controls passed. It
-needs a rebuild against the new dependency and has no full-suite or native
-method acceptance for that increment.
+The complete Leant suite passed 698/699; its obsolete source-text assertion
+was corrected and the focused test passes, but the complete rerun remains due.
+The prior 39-cell local-context matrix also needs a fresh integration run.
+The four-slot cache fixture misses the required legacy candidate; a 32-slot
+diagnostic finds it before and after the contextual visit but fails an
+ordinary-query trace annotation requirement. Inspection confirms the actual
+ordinary verification request exists. This is a trace-contract mismatch,
+not established cache corruption or completed cache acceptance.
 
 | Order | Delivery | Required acceptance |
 | --- | --- | --- |
-| 1 | Integrate the accepted engine inference through complete frontend provider schemes (priority 3) | Keep the forced `Ctx.C.out : {α : Type} → [Ctx.C α] → Nat` fixture and its goal `∀ (α : Type), [Ctx.C α] → Nat`. Infer only fresh provider parameters; preserve exact source schemes, scopes, provider ownership and dictionary evidence. First close the six focused positives, then ordinary/where × Djinn/Exference/Both native replay, payload-sensitive observations, actual False controls, discovery/cache isolation, the existing local-context matrix and the complete unit suite. |
-| 2 | Make missing Church constructions reachable within the existing limits (priority 4) | Diagnose `maybeEither` branch admission and `foldl1`'s flexible-goal construction separately from rendering. Require a generic rule change supported by a concrete failed derivation, followed by the original live queries, exact full-signature replay and unchanged false controls. Keep reference witnesses out of provider inventories. Extend the remaining total/defaulted cells with each accepted change. |
-| 3 | Accept a supplied tree fold with an accumulator (priority 2; independent of steps 1–2) | Use the prepared polymorphic `foldTree`/constructor inventory and order-sensitive observations in both Haskell engines and all three Lean modes. Require full-type behavior, termination-checked replay, actual False controls and the original limits. The fixture is prepared, not executed; reliable native verification is already an accepted foundation. |
-| 4 | Preserve selected dictionary identity, then extend evidence derivation (priority 3) | Keep overlap guards until a forced equal-predicate outer/inner fixture retains the selected introduction and ordered slot, including distinct payload behavior in Haskell and Lean. Follow with conditional providers and superclass projections as separately checked extensions. A unique type substitution does not identify a dictionary occurrence. |
+| 1 | Finish Leant global-method integration (priority 3) | Preserve the successful forced method fixture and exact source/engine/dictionary ownership. Correct ordinary verification correlation, finish all cache/discovery sessions and exact replays, rerun the existing local-context matrix and complete 699-test suite, then publish code and reproducible evidence. |
+| 2 | Close Haskell frontend gaps (priority 3) | Complete loaded constrained-provider admission/source schemes and implicit-root behavioral scoping. Require actual ordinary/where synthesis in both engines at full signatures, distinct dictionary payload behavior and False controls. |
+| 3 | Make missing Church constructions reachable (priority 4) | Trace actual branch admission/substitutions/queue decisions for `maybeEither` and `foldl1`, then validate a generic fix using original live queries and bounds. Keep reference witnesses out of inventories and extend the remaining total/defaulted cells. |
+| 4 | Accept supplied tree folds with accumulators (priority 2; independent bounded delivery) | Execute the prepared polymorphic tree fixture in both Haskell engines and all three Lean modes, with exact provider inventories, order-sensitive observations, full-type behavior, termination checking and False controls. |
+| 5 | Preserve dictionary occurrence, then extend evidence (priority 3) | Keep overlap guards until equal-predicate outer/inner uses retain the selected dictionary and distinguish payloads. Add conditional providers and superclass projections separately. |
 
 The full priority-4 obligation remains **all 13 extended operations and all
 19 explicit-default counterparts**, across Haskell Djinn/Exference and Lean
@@ -47,13 +46,17 @@ easier batch. Heavy runtime acceptance remains serialized.
 
 ## What changed in this re-triage
 
+The [latest integration follow-up](2026-09-08-integration-retriage.md) records the new working-tree
+results and the revised priorities. The diagnosis below describes earlier
+runs; its old six-case failure no longer describes the updated prototype.
+
 The [canonical engine acceptance report](https://github.com/VladimirReshetnikov/Djex/blob/4a4ed0fc23f76d7b82b06496e03adfadbf374f84/docs/reports/2026-09-08-constraint-only-provider-inference.md) supersedes the
 engine failure diagnosis below with unique coherent Given inference, scoped
 Haskell rendering, and complete regression results. It retains ambiguity and
 dictionary-ownership guards. The linked receipt also preserves failed direct
 CLI diagnostics: explicit preflight success is not loaded-provider synthesis
 acceptance. The earlier Leant fixture failures below remain historical results
-against the older dependency, pending a fresh integration run.
+against the older dependency; the follow-up above records the new native passes.
 
 The [diagnostic receipt](https://github.com/VladimirReshetnikov/Djex/blob/12ec0a2002a4e15b48aae1bfbbbd887a1fd431af/test-church/receipts/synthesis-retriage-diagnostics.json) embeds selected process captures, the failed
 method fixture, tested heuristic diffs and source hashes. It is a diagnostic
@@ -208,8 +211,9 @@ error is repairable.
 | Idea | Promotion criterion |
 | --- | --- |
 | Exact accepted-candidate provenance and reproducible replay | Retain the accepted 39-cell/680-test boundaries, non-forcing diagnostics and direct kernel pinning. Retain bounded request capture and its whole-record omission accounting. Keep the accepted empty-environment repair and lifecycle controls as regressions; defer a general tracing framework. |
+| Verification trace and runner consistency | Promote narrowly: ordinary verification lacks the behavioral annotation required by the supplemental runner. Preserve exact candidate ownership while aligning the contract; share exercised UTF-8, runtime-pinning and query-format helpers. |
 | Routing-test maintenance | When touching a routing boundary, replace brittle source-text counts with executable routing or boundary controls where practical. Preserve coverage; this is incremental maintenance, not a separate cleanup milestone. |
-| Constraint-only provider instantiation | Next implementation milestone: close the six forced method positives while retaining the seven negative controls, then native and aggregate acceptance. A unique provider type substitution and a selected dictionary occurrence are separate obligations. |
+| Constraint-only provider instantiation | Six real method cases and three False controls now pass in the working prototype. Finish trace/cache and aggregate regression closure; Haskell frontend admission and implicit-root scoping remain separate tasks. |
 | Tree folds and accumulator programs | Independent next recursion delivery; the polymorphic tree-accumulator fixture is prepared but unexecuted. Require exact supplied-provider inventory, order-sensitive full-signature behavior and termination checking. Native verification repair is already accepted. |
 | Flexible-goal construction and branch diagnostics | Next Church-search investigation: trace actual rule admission, substitutions and queue decisions for a missing derivation. Preserve budgets and distinguish an unavailable construction from an admitted but delayed branch. Public graph histograms alone do not locate the cause. |
 | Further heuristic tuning | Demoted: the two tested Exference changes both leave `maybeEither` at 256 false candidates. Require a measured branch/queue diagnosis and successful original query before adoption. |

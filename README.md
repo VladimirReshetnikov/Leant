@@ -163,17 +163,20 @@ Companion documents:
   from unique coherent lexical class assumptions in both engines. Its strict
   build and all 2,304 tests in 15 complete suites pass; four public Haskell API
   cases retain full signatures and distinguish actual dictionary payloads.
-  This checkout still pins the previously accepted `a44f7057` dependency.
-  The next milestone is integrating the new engine increment with the global
-  method prototype. Its last run, before this increment, failed all six focused
-  positives while seven negative controls passed. Native method replay,
-  discovery/cache isolation, and full regression acceptance remain required.
-  Loaded Haskell provider admission and implicit-root behavioral scoping are
-  separately documented frontend gaps. Then
-  address missing Church construction paths and remaining defaulted cells;
-  supplied tree folds are an independent delivery. Two Exference ranking
-  experiments still yielded 256 false `maybeEither` candidates and were restored.
-  The detailed re-triage records these diagnostics and the next acceptance gates.
+  The [latest integration triage](docs/reports/2026-09-08-integration-retriage.md)
+  records the working global-method prototype against `4a4ed0fc`: all 13 focused
+  tests, six native ordinary/where method cases with full-type replay and
+  24 observations, and three actual False controls pass. The published dependency
+  remains `a44f7057` until this prototype completes its regression gates.
+  The full suite passed 698/699; its corrected source-text test passes in isolation,
+  with a complete rerun still due. Cache/discovery and local-context regression
+  closure come first, followed by Haskell loaded-provider admission and
+  implicit-root behavioral scoping, missing Church constructions, and supplied
+  tree folds as an independent delivery. The cache diagnostic exposed an ordinary
+  verification trace mismatch; it does not establish a cache defect. The detailed
+  triage keeps the original four-slot search miss separate from the 32-slot
+  diagnostic. Two Exference ranking experiments still yielded 256 false
+  `maybeEither` candidates and were restored.
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
   now includes separate-run acceptance of 12/13 extended operations in each
   Haskell engine and 2/4 Exference explicit-default cases. Lean Exference's

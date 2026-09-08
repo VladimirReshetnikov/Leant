@@ -1,0 +1,970 @@
+{
+  "format": "leant-global-method-retriage-v1",
+  "date": "2026-09-08",
+  "scope": "Extraction of existing local integration results plus read-only inspection. No new native or aggregate acceptance run. Prototype and vendor update remain uncommitted.",
+  "published_leant_head": "73372a3c60247350cda878ddebb4b72233ebcf98",
+  "working_djex_head": "4a4ed0fc23f76d7b82b06496e03adfadbf374f84",
+  "runs": [
+    {
+      "artifact": {
+        "path": "C:\\Leant\\dist-newstyle\\global-context-native-v2\\results.json",
+        "sha256": "a3097250a405e0316594aceb007940f3e7167992afeaed6a7c54b140018eb358"
+      },
+      "status": "passed",
+      "source_and_input_hashes_unchanged": true,
+      "exact_replay_sources_unchanged": true,
+      "cases": [
+        {
+          "name": "method_djinn_ordinary",
+          "type": "∀ (α : Type), [Ctx.C α] → Nat",
+          "mode": "ordinary",
+          "status": "candidate",
+          "candidate": "((fun (leantType77 : Type) => (fun [leantGiven2x0 : @_root_.«Ctx».«C» (leantType77)] => @(let leantHead44 : (∀ [@_root_.«Ctx».«C» (leantType77)], @_root_.«Nat») := @(let leantHead27 : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat») := @_root_.«Ctx».«C».«out»; @leantHead27 (leantType77)); @leantHead44 leantGiven2x0))) : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat»))",
+          "provider_inventory": [
+            "Ctx.C.out"
+          ],
+          "kernel_replay": {
+            "path": "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_djinn_ordinary-replay.lean",
+            "sha256": "68235c5d5ed5e85d6cfe61cce2502f50ad1bb965b873bba94d50ae85a698262b",
+            "declarations": [
+              "Ctx.C",
+              "Ctx.C.mk",
+              "Ctx.C.out",
+              "MethodReplay.accepted",
+              "MethodReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "Ctx.C": [],
+              "Ctx.C.mk": [],
+              "Ctx.C.out": [],
+              "MethodReplay.accepted": [],
+              "MethodReplay.passes": []
+            }
+          }
+        },
+        {
+          "name": "method_djinn_where",
+          "type": "∀ (α : Type), [Ctx.C α] → Nat",
+          "mode": "where",
+          "status": "candidate",
+          "candidate": "((fun (leantType77 : Type) => (fun [leantGiven2x0 : @_root_.«Ctx».«C» (leantType77)] => @(let leantHead44 : (∀ [@_root_.«Ctx».«C» (leantType77)], @_root_.«Nat») := @(let leantHead27 : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat») := @_root_.«Ctx».«C».«out»; @leantHead27 (leantType77)); @leantHead44 leantGiven2x0))) : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat»))",
+          "provider_inventory": [
+            "Ctx.C.out"
+          ],
+          "kernel_replay": {
+            "path": "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_djinn_where-replay.lean",
+            "sha256": "68235c5d5ed5e85d6cfe61cce2502f50ad1bb965b873bba94d50ae85a698262b",
+            "declarations": [
+              "Ctx.C",
+              "Ctx.C.mk",
+              "Ctx.C.out",
+              "MethodReplay.accepted",
+              "MethodReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "Ctx.C": [],
+              "Ctx.C.mk": [],
+              "Ctx.C.out": [],
+              "MethodReplay.accepted": [],
+              "MethodReplay.passes": []
+            }
+          }
+        },
+        {
+          "name": "method_exference_ordinary",
+          "type": "∀ (α : Type), [Ctx.C α] → Nat",
+          "mode": "ordinary",
+          "status": "candidate",
+          "candidate": "((fun (leantType6 : Type) => (fun [leantGiven11x0 : @_root_.«Ctx».«C» (leantType6)] => @(let leantHead17 : (∀ [@_root_.«Ctx».«C» (leantType6)], @_root_.«Nat») := @(let leantHead24 : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat») := @_root_.«Ctx».«C».«out»; @leantHead24 (leantType6)); @leantHead17 leantGiven11x0))) : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat»))",
+          "provider_inventory": [
+            "Ctx.C.out"
+          ],
+          "kernel_replay": {
+            "path": "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_exference_ordinary-replay.lean",
+            "sha256": "6921e92c04b690f8c4ef4a3cdba8a31b3b6cafbd19f8ef52610766d286bfd4d9",
+            "declarations": [
+              "Ctx.C",
+              "Ctx.C.mk",
+              "Ctx.C.out",
+              "MethodReplay.accepted",
+              "MethodReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "Ctx.C": [],
+              "Ctx.C.mk": [],
+              "Ctx.C.out": [],
+              "MethodReplay.accepted": [],
+              "MethodReplay.passes": []
+            }
+          }
+        },
+        {
+          "name": "method_exference_where",
+          "type": "∀ (α : Type), [Ctx.C α] → Nat",
+          "mode": "where",
+          "status": "candidate",
+          "candidate": "((fun (leantType6 : Type) => (fun [leantGiven11x0 : @_root_.«Ctx».«C» (leantType6)] => @(let leantHead17 : (∀ [@_root_.«Ctx».«C» (leantType6)], @_root_.«Nat») := @(let leantHead24 : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat») := @_root_.«Ctx».«C».«out»; @leantHead24 (leantType6)); @leantHead17 leantGiven11x0))) : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat»))",
+          "provider_inventory": [
+            "Ctx.C.out"
+          ],
+          "kernel_replay": {
+            "path": "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_exference_where-replay.lean",
+            "sha256": "6921e92c04b690f8c4ef4a3cdba8a31b3b6cafbd19f8ef52610766d286bfd4d9",
+            "declarations": [
+              "Ctx.C",
+              "Ctx.C.mk",
+              "Ctx.C.out",
+              "MethodReplay.accepted",
+              "MethodReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "Ctx.C": [],
+              "Ctx.C.mk": [],
+              "Ctx.C.out": [],
+              "MethodReplay.accepted": [],
+              "MethodReplay.passes": []
+            }
+          }
+        },
+        {
+          "name": "method_both_ordinary",
+          "type": "∀ (α : Type), [Ctx.C α] → Nat",
+          "mode": "ordinary",
+          "status": "candidate",
+          "candidate": "((fun (leantType77 : Type) => (fun [leantGiven2x0 : @_root_.«Ctx».«C» (leantType77)] => @(let leantHead44 : (∀ [@_root_.«Ctx».«C» (leantType77)], @_root_.«Nat») := @(let leantHead27 : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat») := @_root_.«Ctx».«C».«out»; @leantHead27 (leantType77)); @leantHead44 leantGiven2x0))) : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat»))",
+          "provider_inventory": [
+            "Ctx.C.out"
+          ],
+          "kernel_replay": {
+            "path": "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_both_ordinary-replay.lean",
+            "sha256": "68235c5d5ed5e85d6cfe61cce2502f50ad1bb965b873bba94d50ae85a698262b",
+            "declarations": [
+              "Ctx.C",
+              "Ctx.C.mk",
+              "Ctx.C.out",
+              "MethodReplay.accepted",
+              "MethodReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "Ctx.C": [],
+              "Ctx.C.mk": [],
+              "Ctx.C.out": [],
+              "MethodReplay.accepted": [],
+              "MethodReplay.passes": []
+            }
+          }
+        },
+        {
+          "name": "method_both_where",
+          "type": "∀ (α : Type), [Ctx.C α] → Nat",
+          "mode": "where",
+          "status": "candidate",
+          "candidate": "((fun (leantType77 : Type) => (fun [leantGiven2x0 : @_root_.«Ctx».«C» (leantType77)] => @(let leantHead44 : (∀ [@_root_.«Ctx».«C» (leantType77)], @_root_.«Nat») := @(let leantHead27 : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat») := @_root_.«Ctx».«C».«out»; @leantHead27 (leantType77)); @leantHead44 leantGiven2x0))) : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat»))",
+          "provider_inventory": [
+            "Ctx.C.out"
+          ],
+          "kernel_replay": {
+            "path": "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_both_where-replay.lean",
+            "sha256": "68235c5d5ed5e85d6cfe61cce2502f50ad1bb965b873bba94d50ae85a698262b",
+            "declarations": [
+              "Ctx.C",
+              "Ctx.C.mk",
+              "Ctx.C.out",
+              "MethodReplay.accepted",
+              "MethodReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "Ctx.C": [],
+              "Ctx.C.mk": [],
+              "Ctx.C.out": [],
+              "MethodReplay.accepted": [],
+              "MethodReplay.passes": []
+            }
+          }
+        }
+      ],
+      "processes": [
+        {
+          "label": "emit-production-prelude",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+            "--emit-synthesis-prelude"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.0664354000473395,
+          "stdout_sha256": "10956e88901d97a702558f8da4fc93a2b754a061edbd1cdfad1d9017cbfbf2ee",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "projection-metadata-controls",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-native-v2\\ProjectionMetadata.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 120.94344130001264,
+          "stdout_sha256": "ada8245a5bef583d49e345d3dbe185cdd4720b87e52b1e7b3ac396ae8a8b9024",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method-oracle",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-integration-fixtures-v1\\MethodOracle.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 1.0292806000215933,
+          "stdout_sha256": "818ae854d27913a0571367a7ba83f75ec8184f87dddf1fe541e3a1e1f0413845",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_djinn_ordinary-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 31.698433999961708,
+          "stdout_sha256": "c5dc10c5cab854cd02d60da7b8a43f61af35efd3796c9b7373da840c05697502",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_djinn_ordinary-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_djinn_ordinary-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 2.6768311000196263,
+          "stdout_sha256": "1d3043796fa0c13e51907b38b8f9b5a8c8f79329033edc8ee03108959f442644",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_djinn_where-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 9.548795900016557,
+          "stdout_sha256": "b10d75db5db8d5dc93be92cd2d116d08e4896d6b10727f59bddf74394de2667f",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_djinn_where-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_djinn_where-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.7643188999500126,
+          "stdout_sha256": "1d3043796fa0c13e51907b38b8f9b5a8c8f79329033edc8ee03108959f442644",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_exference_ordinary-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 8.624731399992015,
+          "stdout_sha256": "17d3ba55c2997bf0bf35c778842e4376d841b0136fad28d4e7ec05fffbbb4f58",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_exference_ordinary-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_exference_ordinary-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.6467819000245072,
+          "stdout_sha256": "1d3043796fa0c13e51907b38b8f9b5a8c8f79329033edc8ee03108959f442644",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_exference_where-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 11.050621400005184,
+          "stdout_sha256": "64583e19a4d8ef5ef7d1e52808246b8b684fb86bae27a5e0e236ae009483bdcb",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_exference_where-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_exference_where-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.8510778999770992,
+          "stdout_sha256": "1d3043796fa0c13e51907b38b8f9b5a8c8f79329033edc8ee03108959f442644",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_both_ordinary-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 8.169389499991667,
+          "stdout_sha256": "0525fb69f85c16d00891b95a6065c844a56bb67f7d4fe7d53ef8f9d7af8be13f",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_both_ordinary-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_both_ordinary-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.6756949999835342,
+          "stdout_sha256": "1d3043796fa0c13e51907b38b8f9b5a8c8f79329033edc8ee03108959f442644",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_both_where-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 9.273712299996987,
+          "stdout_sha256": "b2eecfb00eec7fc466856710f7a000d99fb6ee2d4f6272196690c373648b499b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "method_both_where-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-native-v2\\method_both_where-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.6869274000055157,
+          "stdout_sha256": "1d3043796fa0c13e51907b38b8f9b5a8c8f79329033edc8ee03108959f442644",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "artifact": {
+        "path": "C:\\Leant\\dist-newstyle\\global-context-false-v1\\results.json",
+        "sha256": "a671f6c8d4d63e6c5ec0646ebf478bc98b5c8a8159ede78dd36dbd98a93431f3"
+      },
+      "status": "passed",
+      "hashes_unchanged": true,
+      "exact_replay_and_export_bytes_unchanged": true,
+      "sessions": [
+        {
+          "name": "global_djinn_literal_false",
+          "status": "passed",
+          "replays": [
+            {
+              "path": "C:\\Leant\\dist-newstyle\\global-context-false-v1\\global_djinn_literal_false-replay.lean",
+              "sha256": "7f3af81141fb8c2241f86d69afe529b479b680697ecdda0fe98a5ebe0b1229ba",
+              "declarations": [
+                "Ctx.C",
+                "Ctx.C.mk",
+                "Ctx.C.out",
+                "RejectedReplay.candidate0",
+                "RejectedReplay.literalFalse"
+              ],
+              "status": "passed",
+              "source_unchanged": true,
+              "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+              "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+              "kernel_unchanged": true,
+              "axiom_inventories": {
+                "Ctx.C": [],
+                "Ctx.C.mk": [],
+                "Ctx.C.out": [],
+                "RejectedReplay.candidate0": [],
+                "RejectedReplay.literalFalse": []
+              }
+            }
+          ],
+          "capture_valid": true,
+          "omitted_records": 0,
+          "dropped_events": 0,
+          "trace_sha256": "2697de74fc669e815c265c0422539570ffbd85bf5c73bf7e2bf863dc8fe07822"
+        },
+        {
+          "name": "global_exference_literal_false",
+          "status": "passed",
+          "replays": [
+            {
+              "path": "C:\\Leant\\dist-newstyle\\global-context-false-v1\\global_exference_literal_false-replay.lean",
+              "sha256": "037f465f4b785dd06f1bf52141dbd931bead11e399dce55af45560b6d33bc2c9",
+              "declarations": [
+                "Ctx.C",
+                "Ctx.C.mk",
+                "Ctx.C.out",
+                "RejectedReplay.candidate0",
+                "RejectedReplay.literalFalse"
+              ],
+              "status": "passed",
+              "source_unchanged": true,
+              "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+              "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+              "kernel_unchanged": true,
+              "axiom_inventories": {
+                "Ctx.C": [],
+                "Ctx.C.mk": [],
+                "Ctx.C.out": [],
+                "RejectedReplay.candidate0": [],
+                "RejectedReplay.literalFalse": []
+              }
+            }
+          ],
+          "capture_valid": true,
+          "omitted_records": 0,
+          "dropped_events": 0,
+          "trace_sha256": "fce9067953cb04e97c5faebe9af862d942e9dfbe2b7d542d4da5806774d3c093"
+        },
+        {
+          "name": "global_both_literal_false",
+          "status": "passed",
+          "replays": [
+            {
+              "path": "C:\\Leant\\dist-newstyle\\global-context-false-v1\\global_both_literal_false-replay.lean",
+              "sha256": "f3cba5b85ab880ff743b37bbc6288cc7c1c369624b2cdd9c173b8e3784a5027c",
+              "declarations": [
+                "Ctx.C",
+                "Ctx.C.mk",
+                "Ctx.C.out",
+                "RejectedReplay.candidate0",
+                "RejectedReplay.candidate1",
+                "RejectedReplay.literalFalse"
+              ],
+              "status": "passed",
+              "source_unchanged": true,
+              "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+              "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+              "kernel_unchanged": true,
+              "axiom_inventories": {
+                "Ctx.C": [],
+                "Ctx.C.mk": [],
+                "Ctx.C.out": [],
+                "RejectedReplay.candidate0": [],
+                "RejectedReplay.candidate1": [],
+                "RejectedReplay.literalFalse": []
+              }
+            }
+          ],
+          "capture_valid": true,
+          "omitted_records": 0,
+          "dropped_events": 0,
+          "trace_sha256": "2be1e9adeba1f17fa1174b37f44d28e0c0c2666d65800863c541f3a43e254de1"
+        }
+      ],
+      "processes": [
+        {
+          "label": "global_djinn_literal_false-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 22.437148500001058,
+          "stdout_sha256": "74e5ede4c09d5fe2445cffeb4aa8cc651189cb5b875d54784e023f2f4eae1aa7",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "global_djinn_literal_false-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-false-v1\\global_djinn_literal_false-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 1.1709020000416785,
+          "stdout_sha256": "46ac22f075479918d92963c7402519b84e84dc345aa18ab127ceb1e722e01bc9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "global_exference_literal_false-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 10.01637500000652,
+          "stdout_sha256": "604e51c9e6bdd6730315b079dc3c9086a5a164645b4e729689214447838e9fc4",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "global_exference_literal_false-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-false-v1\\global_exference_literal_false-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.8254519000183791,
+          "stdout_sha256": "46ac22f075479918d92963c7402519b84e84dc345aa18ab127ceb1e722e01bc9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "global_both_literal_false-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 9.426847400027327,
+          "stdout_sha256": "9d4bbe40038a687691a886a468ca6008d368b54ecfcb009d71282fd33f12d1cf",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "global_both_literal_false-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-false-v1\\global_both_literal_false-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.7689030999899842,
+          "stdout_sha256": "be0a55b69aa647696bcf344c44cb37281e28be1cdd1a2185912151b230cc9c0c",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "artifact": {
+        "path": "C:\\Leant\\dist-newstyle\\global-context-controls-v2\\results.json",
+        "sha256": "3947bcdba5ee814e5140a072f7fd2c2964efdaf1807e4f238491fc61d783c6ba"
+      },
+      "status": "failed",
+      "failure": "ValueError('expected exactly one verified displayed output')",
+      "hashes_unchanged": true,
+      "exact_replay_and_export_bytes_unchanged": true,
+      "sessions": [
+        {
+          "name": "global_djinn_literal_false",
+          "status": "passed",
+          "replays": [
+            {
+              "path": "C:\\Leant\\dist-newstyle\\global-context-controls-v2\\global_djinn_literal_false-replay.lean",
+              "sha256": "7f3af81141fb8c2241f86d69afe529b479b680697ecdda0fe98a5ebe0b1229ba",
+              "declarations": [
+                "Ctx.C",
+                "Ctx.C.mk",
+                "Ctx.C.out",
+                "RejectedReplay.candidate0",
+                "RejectedReplay.literalFalse"
+              ],
+              "status": "passed",
+              "source_unchanged": true,
+              "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+              "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+              "kernel_unchanged": true,
+              "axiom_inventories": {
+                "Ctx.C": [],
+                "Ctx.C.mk": [],
+                "Ctx.C.out": [],
+                "RejectedReplay.candidate0": [],
+                "RejectedReplay.literalFalse": []
+              }
+            }
+          ],
+          "capture_valid": true,
+          "omitted_records": 0,
+          "dropped_events": 0,
+          "trace_sha256": "aa0e47ab28365764fb892558c8c0292052c82115a98c03a8a3240e983d1c5765"
+        },
+        {
+          "name": "global_djinn_ordinary_cache",
+          "status": "failed",
+          "failure": "ValueError('expected exactly one verified displayed output')",
+          "replays": [],
+          "capture_valid": true,
+          "omitted_records": 0,
+          "dropped_events": 0,
+          "trace_sha256": "54f06cf830818c739606c17225525b0df5b37c5f0b573a62e2d387f3f36502a4"
+        }
+      ],
+      "processes": [
+        {
+          "label": "native-cache-oracle",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-integration-fixtures-v1\\supplemental-v2\\NativeCacheOracle.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 3.3244168999954127,
+          "stdout_sha256": "2a72e9ced11eef564082bd6e69991277ce1c948f8fa8f789af5b1c40976a663b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "global_djinn_literal_false-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 17.766335699998308,
+          "stdout_sha256": "87a45a1dda4adf910efa3da523258c1f4e461ec91c26ab9080d09b68fe906485",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "global_djinn_literal_false-replay",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-controls-v2\\global_djinn_literal_false-replay.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.7276670999708585,
+          "stdout_sha256": "46ac22f075479918d92963c7402519b84e84dc345aa18ab127ceb1e722e01bc9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "global_djinn_ordinary_cache-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 10.28928349999478,
+          "stdout_sha256": "b0761a965ad79a4d64a07b343595c11df1e1650b0ddab514eb91702f9baa76c8",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "artifact": {
+        "path": "C:\\Leant\\dist-newstyle\\global-context-cache-window32-v1\\results.json",
+        "sha256": "c2bb7a5c2dbca3b9d3988a2c2096036816881afd93861419e3d361eccd5baca9"
+      },
+      "status": "failed",
+      "failure": "ValueError('query did not reach actual candidate verification')",
+      "hashes_unchanged": true,
+      "exact_replay_and_export_bytes_unchanged": true,
+      "sessions": [
+        {
+          "name": "global_djinn_ordinary_cache",
+          "status": "failed",
+          "failure": "ValueError('query did not reach actual candidate verification')",
+          "replays": [],
+          "capture_valid": true,
+          "omitted_records": 0,
+          "dropped_events": 0,
+          "trace_sha256": "a2aa3384dda195265ac06a3000295c1367f656396a1315e5200fdfc18b4180df"
+        }
+      ],
+      "processes": [
+        {
+          "label": "native-cache-oracle",
+          "command": [
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "C:\\Leant\\dist-newstyle\\global-context-integration-fixtures-v1\\supplemental-window32-diagnostic\\NativeCacheOracle.lean"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.7795779999578372,
+          "stdout_sha256": "2a72e9ced11eef564082bd6e69991277ce1c948f8fa8f789af5b1c40976a663b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "global_djinn_ordinary_cache-live",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+            "--plain",
+            "--lake",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 11.43689589999849,
+          "stdout_sha256": "10cc84c7ac3735008447756052b5034454dcc0be140516549569d760f4e165c9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "artifact": {
+        "path": "C:\\Leant\\dist-newstyle\\global-context-full-unit-v1\\results.json",
+        "sha256": "08f16b4d87e9ee897207db420fb2d624ec45efc59bed80d2966749268cc3e9fc"
+      },
+      "status": "failed",
+      "failure": "RuntimeError: the unfiltered suite did not report exactly one successful complete summary",
+      "expected_count": 699,
+      "inventory_count": 699,
+      "suite_exit_code": 1,
+      "sources_unchanged": true,
+      "executables_unchanged": true,
+      "processes": [
+        {
+          "label": "list-tests",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+            "--list-tests"
+          ],
+          "status": "completed",
+          "exit_code": 0,
+          "timed_out": false,
+          "wall_seconds": 0.10931169998366386,
+          "stdout_sha256": "3bb7bc3c9d4ad6b18b0762a24b2beb4ca5e201a3fe2ee205a755a783600d1887",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "label": "unit",
+          "command": [
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe",
+            "-j1"
+          ],
+          "status": "completed",
+          "exit_code": 1,
+          "timed_out": false,
+          "wall_seconds": 268.4539216000121,
+          "stdout_sha256": "8f68cd5b950f376334d7aa46b379c0aa4eca28e7381abddbd294cab02e926918",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ],
+  "log_extracts": [
+    {
+      "path": "C:\\Leant\\dist-newstyle\\global-context-focused-v2.log",
+      "sha256": "0f00c36500490dc9117eaee17bb5095a0f83a6e7477653e4f3968e17144ba8e9",
+      "tail": "Leant synthesis boundary\n  Complete global contextual provider source\n    forced method EngineDjinn behavioral=False:                              OK\n    forced method EngineDjinn behavioral=True:                               OK\n    forced method EngineExference behavioral=False:                          OK\n    forced method EngineExference behavioral=True:                           OK\n    forced method EngineBoth behavioral=False:                               OK\n    forced method EngineBoth behavioral=True:                                OK\n    a legacy provider cannot acquire complete source authority:              OK\n    an unsupported universe packet is not silently dropped for identity:     OK\n    structured provider owner cannot be changed independently:               OK\n    a repeated foreign provider owner is rejected during actual preparation: OK\n    a provider packet cannot substitute a namespace sibling owner:           OK\n    the packet preserves independent explicit and implicit source binders:   OK\n    a provider source cannot authorize a changed private scheme:             OK\n\nAll 13 tests passed (0.01s)\n"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\global-context-routing-maintenance-v1.log",
+      "sha256": "2b9fa2b9bcb68a30fa7af9e1a7ff1b09028e688c61e310990cb856b6cd4162b8",
+      "tail": "Leant synthesis boundary\n  checked Length behavioral ranking\n    explicit ranking policy\n      current bounded ranking configuration file\n        explicit Length assessment integration\n          scope parallel work to default structural engine or library pairs: OK (0.08s)\n\nAll 1 tests passed (0.08s)\n"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\global-context-inference-build-v1.log",
+      "sha256": "00dd344e97c45add83c781d319f4f61e302617a6383333416b195873116efae6",
+      "tail": "\\Synth\\Observability.hs, dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests-tmp\\Leant\\Synth\\Observability.o ) [Language.Haskell.Exference.Core.Internal.ExpressionCheck changed]\n[17 of 56] Compiling Leant.Synth.Fragment ( src\\Leant\\Synth\\Fragment.hs, dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests-tmp\\Leant\\Synth\\Fragment.o ) [Source file changed]\n[21 of 56] Compiling Leant.Synth.Engine ( src\\Leant\\Synth\\Engine.hs, dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests-tmp\\Leant\\Synth\\Engine.o ) [Language.Haskell.Exference.Core.Internal.ExpressionCheck changed]\n[27 of 56] Compiling Leant.Synth.Length.Handoff ( src\\Leant\\Synth\\Length\\Handoff.hs, dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests-tmp\\Leant\\Synth\\Length\\Handoff.o ) [Language.Haskell.Exference.Core.Internal.ExpressionCheck changed]\n[56 of 56] Compiling Main             ( test-unit\\Spec.hs, dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests-tmp\\Main.o ) [Language.Haskell.Exference.Core.Internal.ExpressionCheck changed]\n[57 of 57] Linking dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe [Objects changed]\n"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\global-context-test-maintenance-build-v1.log",
+      "sha256": "d64b8e8ce91fde027644f0f710b3a90721a45aeee470324fbcb5b24069713f92",
+      "tail": "Build profile: -w ghc-9.12.4 -O1\nIn order, the following will be built (use -v for more details):\n - leant-0.1.0 (test:leant-synth-tests) (file test-unit\\Spec.hs changed)\nPreprocessing test suite 'leant-synth-tests' for leant-0.1.0...\nBuilding test suite 'leant-synth-tests' for leant-0.1.0...\n[56 of 56] Compiling Main             ( test-unit\\Spec.hs, dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests-tmp\\Main.o ) [Source file changed]\n[57 of 57] Linking dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\t\\leant-synth-tests\\build\\leant-synth-tests\\leant-synth-tests.exe [Objects changed]\n"
+    },
+    {
+      "path": "C:\\Leant\\dist-newstyle\\global-context-full-unit-v1\\unit.stdout.txt",
+      "sha256": "8f68cd5b950f376334d7aa46b379c0aa4eca28e7381abddbd294cab02e926918",
+      "tail": "s:                           OK\n    a source class identity cannot also become a nominal type:                                  OK\n  Complete global contextual provider source\n    forced method EngineDjinn behavioral=False:                                                 OK\n    forced method EngineDjinn behavioral=True:                                                  OK\n    forced method EngineExference behavioral=False:                                             OK\n    forced method EngineExference behavioral=True:                                              OK\n    forced method EngineBoth behavioral=False:                                                  OK\n    forced method EngineBoth behavioral=True:                                                   OK\n    a legacy provider cannot acquire complete source authority:                                 OK\n    an unsupported universe packet is not silently dropped for identity:                        OK\n    structured provider owner cannot be changed independently:                                  OK\n    a repeated foreign provider owner is rejected during actual preparation:                    OK\n    a provider packet cannot substitute a namespace sibling owner:                              OK\n    the packet preserves independent explicit and implicit source binders:                      OK\n    a provider source cannot authorize a changed private scheme:                                OK\n\n1 out of 699 tests failed (268.33s)\n"
+    }
+  ],
+  "trace_diagnosis": {
+    "artifact": {
+      "path": "C:\\Leant\\dist-newstyle\\global-context-cache-window32-v1\\global_djinn_ordinary_cache.backend-trace.json",
+      "sha256": "a2aa3384dda195265ac06a3000295c1367f656396a1315e5200fdfc18b4180df"
+    },
+    "request": {
+      "backend_id": 1,
+      "request_id": 53,
+      "capture_started_ns": 317797797309200,
+      "capture_completed_ns": 317797797361600,
+      "payload_utf8_bytes": 581,
+      "annotation_utf8_bytes": 0,
+      "payload_json": "{\"cmd\":\"set_option autoImplicit true in noncomputable example : (∀ (α : Type), [Ctx.C α] → Nat) := (((fun (leantType77 : Type) => (fun [leantGiven2x0 : @_root_.«Ctx».«C» (leantType77)] => @(let leantHead44 : (∀ [@_root_.«Ctx».«C» (leantType77)], @_root_.«Nat») := @(let leantHead27 : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat») := @_root_.«Ctx».«C».«out»; @leantHead27 (leantType77)); @leantHead44 leantGiven2x0))) : (∀ (leantBound0x0 : Type) [@_root_.«Ctx».«C» (leantBound0x0)], @_root_.«Nat»)))\",\"env\":48}",
+      "annotation_json": null
+    },
+    "terminal_events": [
+      {
+        "monotonic_ns": 317797797308100,
+        "backend_id": 1,
+        "request_id": 53,
+        "stage": "TraceRequestStarted (Just 300)"
+      },
+      {
+        "monotonic_ns": 317797797362200,
+        "backend_id": 1,
+        "request_id": 53,
+        "stage": "TraceWriteStarted"
+      },
+      {
+        "monotonic_ns": 317797797396000,
+        "backend_id": 1,
+        "request_id": 53,
+        "stage": "TraceWriteCompleted"
+      },
+      {
+        "monotonic_ns": 317797797396600,
+        "backend_id": 1,
+        "request_id": 53,
+        "stage": "TraceFlushCompleted"
+      },
+      {
+        "monotonic_ns": 317797797396800,
+        "backend_id": 1,
+        "request_id": 53,
+        "stage": "TraceResponseReadStarted"
+      },
+      {
+        "monotonic_ns": 317797804061300,
+        "backend_id": 1,
+        "request_id": 53,
+        "stage": "TraceResponseFirstLine"
+      },
+      {
+        "monotonic_ns": 317797804083800,
+        "backend_id": 1,
+        "request_id": 53,
+        "stage": "TraceResponseDelimiter"
+      },
+      {
+        "monotonic_ns": 317797804090600,
+        "backend_id": 1,
+        "request_id": 53,
+        "stage": "TraceResponseReadCompleted"
+      },
+      {
+        "monotonic_ns": 317797804109400,
+        "backend_id": 1,
+        "request_id": 53,
+        "stage": "TraceResponseParsed"
+      }
+    ],
+    "source": {
+      "path": "C:\\Leant\\src\\Main.hs",
+      "sha256": "5a384ac092a038e596522a29066d1a9f1bc5a4e3e90c1593d9902aa3bce4b6d6"
+    },
+    "source_excerpt": "  attempts <- reverse <$> readIORef reverseAttempts\n  pure (verification, attempts)\n where\n  verifyVariant reverseAttempts variant = do\n    -- Trace at the exact callback boundary: failed variants before an\n    -- acceptance are present, while the accepted group's remaining variants\n    -- and every group beyond the success quota are absent.\n    modifyIORef' reverseAttempts (variant :)\n    let term = detailedVerificationVariantText variant\n    result <- runCurrentCmd st (candidateVerificationProgram goal term)\n    pure $ case result of\n      Left _ -> VariantRejected BackendRequestFailure\n      Right response\n        | isJust (respFatal response) ->\n            VariantRejected BackendFatalResponse\n        | hasErrors response -> VariantRejected LeanErrorDiagnostic\n        | not (null (respSorries response)) ->\n            VariantRejected LeanContainsSorry\n        | otherwise -> VariantAccepted\n",
+    "finding": "Ordinary synthVerify calls runCurrentCmd without a behavioral annotation. Request 53 contains the ordinary candidate type check and reaches TraceResponseParsed. The supplemental validator rejects the phase because it requires an annotated candidate role. This does not establish a cache defect or complete cache acceptance."
+  },
+  "production_source_comparison": {
+    "leant.cabal": {
+      "current_sha256": "222530bd1fb4fe81051be6aff72d1a0757879df34a815bfc197d11d3412277a3",
+      "native_run_sha256": "222530bd1fb4fe81051be6aff72d1a0757879df34a815bfc197d11d3412277a3",
+      "unchanged": true
+    },
+    "src/Main.hs": {
+      "current_sha256": "5a384ac092a038e596522a29066d1a9f1bc5a4e3e90c1593d9902aa3bce4b6d6",
+      "native_run_sha256": "5a384ac092a038e596522a29066d1a9f1bc5a4e3e90c1593d9902aa3bce4b6d6",
+      "unchanged": true
+    },
+    "src/Leant/Synth/ContextSource.hs": {
+      "current_sha256": "ace5febe3d37f0fad9e85b35dd51ac7bc4256de0b16efa1b2658015ceae11d7a",
+      "native_run_sha256": "ace5febe3d37f0fad9e85b35dd51ac7bc4256de0b16efa1b2658015ceae11d7a",
+      "unchanged": true
+    },
+    "src/Leant/Synth/Engine.hs": {
+      "current_sha256": "aa772cd052de8f43767f308b0cf07caae5ad8260a3f4356cf5fe778a42e1fc3e",
+      "native_run_sha256": "aa772cd052de8f43767f308b0cf07caae5ad8260a3f4356cf5fe778a42e1fc3e",
+      "unchanged": true
+    },
+    "src/Leant/Synth/Fragment.hs": {
+      "current_sha256": "8d958b76f1ae9860accca9a9146d5e65695578d89fd32a026eb975f5fcf61609",
+      "native_run_sha256": "8d958b76f1ae9860accca9a9146d5e65695578d89fd32a026eb975f5fcf61609",
+      "unchanged": true
+    }
+  },
+  "boundaries": [
+    "Original four-slot cache test failed to find the required legacy candidate.",
+    "The 32-slot run is a diagnostic with changed search/verification windows; it is not acceptance at four slots.",
+    "No fresh full 699-test rerun after the source-text test maintenance fix.",
+    "The prior 39-cell local-context matrix has not been rerun for this working implementation.",
+    "No additional Church or tree-accumulator acceptance is claimed."
+  ]
+}
