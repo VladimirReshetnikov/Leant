@@ -1,0 +1,1667 @@
+{
+  "schema_version": 1,
+  "status": "incomplete_public_acceptance_35_of_39",
+  "scope": "Initial complete public ordinary/where contextual run plus exactly six corrected universe-fixture cells. Exact displayed terms, source types, owner observations and finite dictionary-payload behavior were independently checked; no complete public or global/universe-support claim.",
+  "composite": {
+    "inventory_cells": 39,
+    "accepted_cells": 35,
+    "exact_candidate_outputs": 14,
+    "genuine_false_controls": 3,
+    "explicit_metadata_refusals": 18,
+    "remaining_command_timeouts": 4,
+    "all_nine_where_positive_cells_pass": true,
+    "interpretation": "Offline combination of two disjoint selected outcomes. This is not a fresh 39-cell rerun; the original six fixture failures and four production timeouts remain recorded below."
+  },
+  "review": {
+    "mode": "Read/hash-only receipt and capture verification; no synthesis, compiler, kernel or tests rerun.",
+    "raw_capture_hashes_checked": 138,
+    "live_input_hashes_checked": 39,
+    "prepared_command_hashes_checked": 45,
+    "kernel_source_hashes_checked": 30,
+    "exact_candidate_observation_hashes_checked": 14,
+    "separate_process_manifests_matched": true,
+    "executable_and_kernel_rehashed": true,
+    "command_input_relation": "Prepared commands use LF; the existing Windows process helper captures stdin using CRLF. Both raw hashes are preserved and the decoded texts match after only CRLF-to-LF normalization.",
+    "scope": "Source manifests verified against their preserved before/after boundaries; runtime bytes rehashed. The runner fixture was corrected between runs, not relabeled as identical source."
+  },
+  "original_source_types": {
+    "identity": "∀ (α : Type), [ContextProduction.Dictionary α] → α → α",
+    "forwarding": "(∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token) → (∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token)",
+    "local_given": "∀ (α : Type), [ContextProduction.Dictionary α] → (∀ (β : Type), [ContextProduction.Dictionary β] → β → ContextProduction.Token) → α → ContextProduction.Token",
+    "higher_universe": "∀ (α : Type), [ContextProduction.Dictionary α] → (∀ (β : Type 1), β → β)",
+    "constant_universe": "∀ (α : Type), [ContextProduction.UniverseDictionary.{1} α] → α → α",
+    "global_metadata": "∀ (α : Type), [ContextProduction.Dictionary α] → ContextProduction.Token",
+    "reject_all": "∀ (α : Type), [ContextProduction.Dictionary α] → α → α"
+  },
+  "unchanged_production_pins": {
+    "leant.cabal": "bd4fe90af79b85e61ead01436e3ec2c61775e084a68542e8eea05838c630f496",
+    "lib/Djex/djex.cabal": "f1f889cd12e02b05784f485d37d251e1f115ed47b64b09116f6dcb22c52c73c4",
+    "src/Main.hs": "1774f806f7e469ae38e11e092e29d5e54500cf14b863f98bc9d362d1c4b07775",
+    "src/Leant/Backend.hs": "4ec498162774012a74764b00abf6aa1c8954d53fd93188253a348901aa026d96",
+    "src/Leant/Synth/ContextSource.hs": "582509b2a98c764cfc5452b85b8f5be44befe0327e711242870ce9359ff3a2ff",
+    "src/Leant/Synth/ContextRender.hs": "90552057926790c8873e77558f0ad35420af79f41a80210416f9aa2f860cd4c5",
+    "src/Leant/Synth/CandidateObservation.hs": "eafc5b4dbb2ac055e8a35927986a6bb402b1a20be22d234073bda2c784914c75",
+    "src/Leant/Synth/Engine.hs": "938ed002991edede9790e56a723c688dcaefa2c38668efeb01f3fd3ce3164667",
+    "src/Leant/Synth/Length/Presentation.hs": "87b7b2106eb40f0a33d2011ca63e05bf5128806bb6f460b01c77a006269df8de",
+    "src/Leant/Synth/Verification.hs": "4045c4cb2560704694d87bc7f20f378f0503ebda77daa492b068bd46e596bc88",
+    "lib/Djex/djinn/src-core/Djinn/Core.hs": "c554426dba6cd00e7fe6b2d3e7c5e5075d43444ae825d761069d908651f03414",
+    "lib/Djex/djinn/src-internal/Djinn/Internal/SourceEvidence.hs": "d4e88a63c7413a98d6373f44aa806e90f9e7cdb672190af1692f70f630005afc",
+    "lib/Djex/synthesis/src/Language/Haskell/Synthesis/TypedGenerated.hs": "41efe446381d2091fc56d6e14fb1e9ec33d8883d5b570b4de5116f9265353465"
+  },
+  "preserved_failures": [
+    "Four ordinary forwarding/local_given cases in Exference/Both report the original 45-second command timeout with no displayed output. Their live processes completed, not process-guard timeouts.",
+    "Six initial constant_universe cases never ran live because their shared syntax preflight incorrectly expected Type from a Prop-valued class. Its oracle preflight passed.",
+    "The follow-up adds only an explicit Type result sort to that fixture class. It passes syntax/oracle checks and all six explicit metadata-refusal cells; no runtime production source or setting changed."
+  ],
+  "initial_run": {
+    "original_result": {
+      "path": "dist-newstyle/context-production-owned-all-v1/results.json",
+      "sha256": "5ae452ac444c86767600437e7b61537cf73308224fb788c6fb41d72b91db994d",
+      "status": "failed",
+      "runner_exit_code": 1,
+      "exit_code_provenance": "Coordinator observed terminal exit; original receipt status independently checked."
+    },
+    "raw_artifact_directory": "dist-newstyle/context-production-owned-all-v1",
+    "artifact_naming": "Process labels name .stdout.txt/.stderr.txt and optional .input.txt captures; cell names name .commands.txt; kernel process labels name .lean sources.",
+    "process_manifest": {
+      "path": "dist-newstyle/context-production-owned-all-v1/processes.json",
+      "sha256": "e06a247c10206306394dce204c4fba5b7339c785d1eb1cd8bea7d687d6a91a06",
+      "process_count": 61,
+      "all_completed": true,
+      "process_guard_timeouts": 0
+    },
+    "summary": {
+      "fixture": 6,
+      "payload_observations": 56,
+      "live": 33,
+      "false": 3,
+      "accepted": 14,
+      "timeout": 4,
+      "replay_axioms": 112,
+      "refusal": 12
+    },
+    "settings": {
+      "window": 32,
+      "verify": 32,
+      "steps": 20000,
+      "budget": 20000,
+      "timeout": 45,
+      "process_timeout": 120,
+      "provider_cap": 80,
+      "strategy": "interleave",
+      "shown": 1,
+      "ranking": "balanced",
+      "debug": true,
+      "library": false,
+      "classical": false,
+      "providers": "off except explicit global_metadata refusal control"
+    },
+    "selected": {
+      "engines": [
+        "djinn",
+        "exference",
+        "both"
+      ],
+      "modes": [
+        "ordinary",
+        "where"
+      ],
+      "operations": [
+        "identity",
+        "forwarding",
+        "local_given",
+        "reject_all",
+        "higher_universe",
+        "constant_universe",
+        "global_metadata"
+      ]
+    },
+    "observed_process_time": {
+      "first_started_utc": "2026-09-08T04:23:09Z",
+      "last_finished_utc": "2026-09-08T04:32:10Z",
+      "summed_child_wall_seconds": 537.7489699998987,
+      "boundary": "Per-process wall times are actual measurements. UTC endpoints are retained at their original one-second resolution, not claimed as an outer runner duration."
+    },
+    "executable": {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+      "sha256": "49d1dca002474e9a16ed35007110d40d8b3ecd2e46bb14e40ceb6a0a769aa26e",
+      "live_command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain"
+      ]
+    },
+    "kernel": {
+      "path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+      "sha256_before": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+      "invocation": "direct absolute kernel executable; no PATH lookup or elan proxy",
+      "sha256_after": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810"
+    },
+    "integrity": {
+      "sources_unchanged": true,
+      "executable_unchanged": true,
+      "kernel_executable_unchanged": true,
+      "commands_unchanged": true,
+      "kernel_sources_unchanged": true
+    },
+    "source_manifest": {
+      "entries": 234,
+      "sha256": "d2fc3451c04edc45d4700b9aa0b517e78f5c91f0275c4dd426dd6f8c5fa02034",
+      "before_equals_after": true,
+      "digest_format": "UTF-8 without BOM; each original SHA256, two spaces, repo-relative path normalized to forward slashes, LF; complete lines sorted ordinal, final LF included."
+    },
+    "preflights": [
+      {
+        "label": "identity-syntax",
+        "status": "passed",
+        "source_sha256": "a1fa95d1aaa630373a4452f04b1183a0cb0689b3fff7c6990b7558ba7aa3abbb",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "identity-syntax",
+          "exit_code": 0,
+          "wall_seconds": 19.123227100004442,
+          "started_utc": "2026-09-08T04:23:09Z",
+          "finished_utc": "2026-09-08T04:23:28Z",
+          "stdout_sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "identity-oracle",
+        "status": "passed",
+        "source_sha256": "61e092680b3f450e477c5497e53879bbe7cf37e3f4909f2937ba70122ca6757e",
+        "declared_inventory_count": 9,
+        "process": {
+          "label": "identity-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.863099499954842,
+          "started_utc": "2026-09-08T04:23:28Z",
+          "finished_utc": "2026-09-08T04:23:29Z",
+          "stdout_sha256": "3508c26a24cb668bb826d1602b7912d24fc72f2a832dbfb3d069f6b6bde0ee8b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "forwarding-syntax",
+        "status": "passed",
+        "source_sha256": "3817d6c3cf835b0820f3b2048b6784ef376c7ea7f2ebfc2f058b40767e186bd9",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "forwarding-syntax",
+          "exit_code": 0,
+          "wall_seconds": 1.0894961999729276,
+          "started_utc": "2026-09-08T04:23:29Z",
+          "finished_utc": "2026-09-08T04:23:30Z",
+          "stdout_sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "forwarding-oracle",
+        "status": "passed",
+        "source_sha256": "88604bb6bb1ce302788608e826c954609129cd74b4b001aae0b7ff40b6e8a4b0",
+        "declared_inventory_count": 10,
+        "process": {
+          "label": "forwarding-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.9880499000428244,
+          "started_utc": "2026-09-08T04:23:30Z",
+          "finished_utc": "2026-09-08T04:23:31Z",
+          "stdout_sha256": "ebda9437b44f56d48e2dbd339ee5b5cf3c2635ce56a3fa126e13c63b0bb1e5ff",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "local_given-syntax",
+        "status": "passed",
+        "source_sha256": "93cba25cdd3f885dfc33094cc91fa7279fb1df69b1928733589e8d2c94007f6e",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "local_given-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.7206438999855891,
+          "started_utc": "2026-09-08T04:23:31Z",
+          "finished_utc": "2026-09-08T04:23:32Z",
+          "stdout_sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "local_given-oracle",
+        "status": "passed",
+        "source_sha256": "bec9b95dad2cf7ffa764cad41ba8ced73ca86a0637206c406fefc11ae1253fdd",
+        "declared_inventory_count": 10,
+        "process": {
+          "label": "local_given-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.9047735999920405,
+          "started_utc": "2026-09-08T04:23:32Z",
+          "finished_utc": "2026-09-08T04:23:33Z",
+          "stdout_sha256": "235dfdbcc65d9b2faed1697dc836c16b9e70d0b7927d9c74be61fe1cf7e55b37",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "higher_universe-syntax",
+        "status": "passed",
+        "source_sha256": "41bcb86884267e3cafe5af1d54f52892ed2df3b1b7484e7101863080af0b07d3",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "higher_universe-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.6830282000009902,
+          "started_utc": "2026-09-08T04:23:33Z",
+          "finished_utc": "2026-09-08T04:23:34Z",
+          "stdout_sha256": "1801cf432ff0d359143c0a1f181f54c1b71d3633ddf6936e5492673a96a74fd3",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "higher_universe-oracle",
+        "status": "passed",
+        "source_sha256": "3cb34b44162cce50c837ff398f7293e0b745abc850d3fa3d8de2d34bb534b399",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "higher_universe-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.6525917999679223,
+          "started_utc": "2026-09-08T04:23:34Z",
+          "finished_utc": "2026-09-08T04:23:34Z",
+          "stdout_sha256": "69584a072d987c63613cafabe4992094a2b6f39bdc81afaf0d29dae234dd3d23",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "constant_universe-syntax",
+        "status": "failed",
+        "source_sha256": "e74210c233d9ac7160d051a26c60d26e0dbe6723f8e227216a80b870faa94dfd",
+        "declared_inventory_count": 12,
+        "process": {
+          "label": "constant_universe-syntax",
+          "exit_code": 1,
+          "wall_seconds": 0.7080934999976307,
+          "started_utc": "2026-09-08T04:23:34Z",
+          "finished_utc": "2026-09-08T04:23:35Z",
+          "stdout_sha256": "bc7031c577e6b7aec1b175a1dfd283fa0e15205ed8510253396d20a2755ed8ba",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "constant_universe-oracle",
+        "status": "passed",
+        "source_sha256": "773c8774c1e9e1d0187eb54e14a7e840a013d1de9654f75fc670b421ea79b203",
+        "declared_inventory_count": 11,
+        "process": {
+          "label": "constant_universe-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.8324507999932393,
+          "started_utc": "2026-09-08T04:23:35Z",
+          "finished_utc": "2026-09-08T04:23:36Z",
+          "stdout_sha256": "ee36c51292811250c07ed87928f8da83d137cda131f61f68674aa053d377ae7a",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "global_metadata-syntax",
+        "status": "passed",
+        "source_sha256": "48e326235f7f3995687eea19c8e96e6d2d2131362518d91f5fd81b856aba6d18",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "global_metadata-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.7905521999928169,
+          "started_utc": "2026-09-08T04:23:36Z",
+          "finished_utc": "2026-09-08T04:23:37Z",
+          "stdout_sha256": "172bd627bbf6776de43bd3b94bf4a9b20e5cf9d0f37535ec2c87994021c44546",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "global_metadata-oracle",
+        "status": "passed",
+        "source_sha256": "0e587f1e7e8a385445fd1202f1f38be8d9f2b97ae2325bd2980cf9d93275c018",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "global_metadata-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.6540491000050679,
+          "started_utc": "2026-09-08T04:23:37Z",
+          "finished_utc": "2026-09-08T04:23:37Z",
+          "stdout_sha256": "85f42182bfee883c133a9304658d8b7de8889f869ae0b129abe31fc86f621351",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "reject_all-syntax",
+        "status": "passed",
+        "source_sha256": "e035bbe85b70ac54815cd28945643aa3791df151bc942c244c9bc7f9e281a559",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "reject_all-syntax",
+          "exit_code": 0,
+          "wall_seconds": 0.6617985999910161,
+          "started_utc": "2026-09-08T04:23:37Z",
+          "finished_utc": "2026-09-08T04:23:38Z",
+          "stdout_sha256": "90cbacca56ce526fa8da2e10a1fc953167579285364e78436f32a04cee0049aa",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "reject_all-oracle",
+        "status": "passed",
+        "source_sha256": "b81ea1974ce483eb999861b460902208a632c3ec70a076c672b01241cae0388a",
+        "declared_inventory_count": 8,
+        "process": {
+          "label": "reject_all-oracle",
+          "exit_code": 0,
+          "wall_seconds": 0.656206400017254,
+          "started_utc": "2026-09-08T04:23:38Z",
+          "finished_utc": "2026-09-08T04:23:39Z",
+          "stdout_sha256": "625d5580a5dca2ec93e40e69d5495030286ef6fb8fb425f45ea7bf742534beb3",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "cells": [
+      {
+        "name": "context_djinn_ordinary_identity",
+        "status": "passed",
+        "commands_sha256": "340f63511c57c77b3d51139d9aa5610dcc610c89d168d668d57a5a0dbc2aafdc",
+        "live": {
+          "label": "context_djinn_ordinary_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 43.17494410002837,
+          "started_utc": "2026-09-08T04:23:39Z",
+          "finished_utc": "2026-09-08T04:24:22Z",
+          "stdout_sha256": "6ed6dde2134de6b78c04bd469cbd7ee448af71d676adae7457be5db217e6a5b3",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "33c5a0273bf3308cbedc118ae7004ea0ac4f5e6d0967328664e0c17c04d0c1ba",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType44 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType44)] => (fun (leantLocal5 : leantType44) => @leantLocal5))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "5fc51a8bd8e556a8fcbf42bffaa7bf34582d083c6e5073b54e88691af9c3e51f",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f8ffe38e5081380301d44f29314a1ded48f1d45326f60f067548b2986ca30e3e",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_ordinary_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.9368150999653153,
+            "started_utc": "2026-09-08T04:24:22Z",
+            "finished_utc": "2026-09-08T04:24:23Z",
+            "stdout_sha256": "1044ab89dc28e4b277cf87b9ab7ceca2feaf303419cd50de2e830dde05c3370b",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "name": "context_djinn_ordinary_forwarding",
+        "status": "passed",
+        "commands_sha256": "d590b497c5fefbea1b808ef488f4e143a247cce77ba00adf64290c89abaa1cbd",
+        "live": {
+          "label": "context_djinn_ordinary_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 11.946649999998044,
+          "started_utc": "2026-09-08T04:24:23Z",
+          "finished_utc": "2026-09-08T04:24:35Z",
+          "stdout_sha256": "30c9fc329a3c16dd52a07b512f6767052631db917da510d321bf60f9c6bd4e6e",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "26b9b65b8d42f8443dfb65b3b96e99a081fd4ebe00ff4063062e453cd5a07e49",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal0 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal0) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "2f1f1769e5f69cce907b88ce02d29703163ff1c3fc2deb49aee7ab1a78a5abc0",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "c17665573b524a4c7f6ed6b78db52357aa0f52a4f357621643e7de4f203eb0c4",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_ordinary_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.746468500001356,
+            "started_utc": "2026-09-08T04:24:35Z",
+            "finished_utc": "2026-09-08T04:24:36Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "name": "context_djinn_ordinary_local_given",
+        "status": "passed",
+        "commands_sha256": "68b0640cdd85ba600f34501da2cc20fab4cbb617e085ea670afeeed72449a3f7",
+        "live": {
+          "label": "context_djinn_ordinary_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 9.169401000021026,
+          "started_utc": "2026-09-08T04:24:36Z",
+          "finished_utc": "2026-09-08T04:24:45Z",
+          "stdout_sha256": "a9b21d72242ab8c8a0dc218212e7254818bd236421829e704769c440b56d192b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "17ba15ca79a74940ca970caf1d76cfe8ddf6f7a31b762ff83d60a37066672a47",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType170 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType170)] => (fun (leantLocal5 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) (leantLocal9 : leantType170) => @(let leantHead104 : (leantType170 → @_root_.«ContextProduction».«Token») := @(let leantHead90 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType170)], (leantType170 → @_root_.«ContextProduction».«Token»)) := @(let leantHead65 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal5; @leantHead65 (leantType170)); @leantHead90 leantGiven2x0); @leantHead104 (@leantLocal9 : leantType170))))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "fc7b1a406846602281829937e9e3fdf3104667634c4cf6145339a52cc7e16538",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 8,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f5c859bb4a923c7beb65ea05d1da558153153c6bf25e80198ad10b4fa9de4748",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_ordinary_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.8380182000109926,
+            "started_utc": "2026-09-08T04:24:45Z",
+            "finished_utc": "2026-09-08T04:24:46Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "name": "context_djinn_ordinary_higher_universe",
+        "status": "passed",
+        "commands_sha256": "f5652931163d2705cbeae62fc2e9f136952d855b90e80acc2b932cc4043da966",
+        "live": {
+          "label": "context_djinn_ordinary_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 7.014494200004265,
+          "started_utc": "2026-09-08T04:24:46Z",
+          "finished_utc": "2026-09-08T04:24:53Z",
+          "stdout_sha256": "1467a43918e2800dead67826950b0d0731f9c179a831a390e47c01495bf946d9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "2022a6044353a86f8e13f184b94f957f702c1d994cba756d9b95996c4bab99b1",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+      },
+      {
+        "name": "context_djinn_ordinary_constant_universe",
+        "status": "preflight_failed",
+        "commands_sha256": "7b62d09fb0c4d7d8d1ed4efad342fe26da5af217c7139f8edb2d1c14b5886f98",
+        "outcome": "fixture_syntax_preflight_failed_no_live_run",
+        "failure": "syntax or oracle preflight failed; live search was not run"
+      },
+      {
+        "name": "context_djinn_ordinary_global_metadata",
+        "status": "passed",
+        "commands_sha256": "8319d27afd7f4333e5d90e128edf741c6677e0ceb8c874cd8055fde89596bb31",
+        "live": {
+          "label": "context_djinn_ordinary_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 7.684194800036494,
+          "started_utc": "2026-09-08T04:24:53Z",
+          "finished_utc": "2026-09-08T04:25:01Z",
+          "stdout_sha256": "4df87a9e3371dd3488a763e1c39fa2db0e3a99ed89441ecf60479a5b4d3e3fa7",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "f73e19f7565e474f5c4b1e62317498163ed1730d75aa916418ce71dbf3714bf0",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata"
+      },
+      {
+        "name": "context_djinn_where_identity",
+        "status": "passed",
+        "commands_sha256": "5fb581e97b35c165261a000c553aea02c22820c4a9c382645ab9ed7e50d55d59",
+        "live": {
+          "label": "context_djinn_where_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 7.077121099981014,
+          "started_utc": "2026-09-08T04:25:01Z",
+          "finished_utc": "2026-09-08T04:25:08Z",
+          "stdout_sha256": "9d520ff652bf25f5db8d09d18c5e33e4b4055647d84dd3af3918a4eb470c586a",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "d74caad663633de072165234f1da104b6fe33a930f75403b326646722cae5097",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType44 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType44)] => (fun (leantLocal5 : leantType44) => @leantLocal5))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "5fc51a8bd8e556a8fcbf42bffaa7bf34582d083c6e5073b54e88691af9c3e51f",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f8ffe38e5081380301d44f29314a1ded48f1d45326f60f067548b2986ca30e3e",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_where_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.8231305999797769,
+            "started_utc": "2026-09-08T04:25:08Z",
+            "finished_utc": "2026-09-08T04:25:09Z",
+            "stdout_sha256": "49ced71e0c39141b8e9cdfbf5f56b0978a2343cc519338b732d75255ea734fd2",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_djinn_where_forwarding",
+        "status": "passed",
+        "commands_sha256": "f4d78777441945e8418e421e74682c078069dfb525f7c7a15b9eed732a88b2a5",
+        "live": {
+          "label": "context_djinn_where_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 10.531553799984977,
+          "started_utc": "2026-09-08T04:25:09Z",
+          "finished_utc": "2026-09-08T04:25:20Z",
+          "stdout_sha256": "affd59c0d7ebc8a0346bdf7dc557685fef56c4cb7e9d9de3ca27c7e4a2c44dbd",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "33f9bf4a58a7638c3fdb717481dc892aac8d088cb0be4842ed5a110649c8e4c9",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal0 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal0) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "2f1f1769e5f69cce907b88ce02d29703163ff1c3fc2deb49aee7ab1a78a5abc0",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "c17665573b524a4c7f6ed6b78db52357aa0f52a4f357621643e7de4f203eb0c4",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_where_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 1.0882714000181295,
+            "started_utc": "2026-09-08T04:25:20Z",
+            "finished_utc": "2026-09-08T04:25:21Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_djinn_where_local_given",
+        "status": "passed",
+        "commands_sha256": "44d0ab99babaac0c5751bc8018fff6056afd71e5e43cf8f881df86a65ee379e3",
+        "live": {
+          "label": "context_djinn_where_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 11.626653100014664,
+          "started_utc": "2026-09-08T04:25:21Z",
+          "finished_utc": "2026-09-08T04:25:32Z",
+          "stdout_sha256": "cd5d93c0114c607c50e86a330ee8d2cf97de7739f3762791486ff4100a5e9c5e",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "605bf9383eb93199816f2b564773ea620c18edc5f8746c437a95a80a70a960b7",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType170 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType170)] => (fun (leantLocal5 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) (leantLocal9 : leantType170) => @(let leantHead104 : (leantType170 → @_root_.«ContextProduction».«Token») := @(let leantHead90 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType170)], (leantType170 → @_root_.«ContextProduction».«Token»)) := @(let leantHead65 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal5; @leantHead65 (leantType170)); @leantHead90 leantGiven2x0); @leantHead104 (@leantLocal9 : leantType170))))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "fc7b1a406846602281829937e9e3fdf3104667634c4cf6145339a52cc7e16538",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 8,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f5c859bb4a923c7beb65ea05d1da558153153c6bf25e80198ad10b4fa9de4748",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_djinn_where_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.9478590000071563,
+            "started_utc": "2026-09-08T04:25:32Z",
+            "finished_utc": "2026-09-08T04:25:33Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_djinn_where_reject_all",
+        "status": "passed",
+        "commands_sha256": "1fa63373e8a4c771fc420c845ec1b2968c72cb7cf10543242527406ff669be1c",
+        "live": {
+          "label": "context_djinn_where_reject_all-live",
+          "exit_code": 0,
+          "wall_seconds": 10.317480800033081,
+          "started_utc": "2026-09-08T04:25:33Z",
+          "finished_utc": "2026-09-08T04:25:44Z",
+          "stdout_sha256": "522d8ebcac4393ee36179544a3dafeb10dd936a7719258338d2825aea491b1af",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "d607a4189ffde8937b453aefe4092585aabef9b46c602639d71e0f2d5294f820",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "false_rejected",
+        "behavioral_observations": {
+          "passed": 0,
+          "falsified": 1,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_djinn_where_higher_universe",
+        "status": "passed",
+        "commands_sha256": "76bf9d8c1135b9a6af685a1296d64bcd23a46f602685aa196657e3d2b87d24dd",
+        "live": {
+          "label": "context_djinn_where_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 8.326516999979503,
+          "started_utc": "2026-09-08T04:25:44Z",
+          "finished_utc": "2026-09-08T04:25:52Z",
+          "stdout_sha256": "76b2e168a1a7570bc1f673f44e75f619090e5ef4d5b79b659e1fb7e6b4024502",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "c6b9e3f7659bbbc4fa9f21e00cbda1b5ef7ea569f5c5380275598d127cf244ae",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+      },
+      {
+        "name": "context_djinn_where_constant_universe",
+        "status": "preflight_failed",
+        "commands_sha256": "39485b19b6e376469493fe2a49623fcfbf12de5e5d7d9e5c2faf47df09bc295e",
+        "outcome": "fixture_syntax_preflight_failed_no_live_run",
+        "failure": "syntax or oracle preflight failed; live search was not run"
+      },
+      {
+        "name": "context_djinn_where_global_metadata",
+        "status": "passed",
+        "commands_sha256": "ad66cf5815b6a2e24306308bc08fbeeb023c0ab641b28cefdb9e24cc957865aa",
+        "live": {
+          "label": "context_djinn_where_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 9.231961100012995,
+          "started_utc": "2026-09-08T04:25:52Z",
+          "finished_utc": "2026-09-08T04:26:01Z",
+          "stdout_sha256": "f604c8e0aec7e9aefa00bb43db2fbf057095d4c83018a58a376e708e41e70a62",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "0e96f7492f4893cb6f8bc97e62f4e2801750613cda31adf91228640b483cff3e",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata"
+      },
+      {
+        "name": "context_exference_ordinary_identity",
+        "status": "passed",
+        "commands_sha256": "e9690c0c2bc85bb240f1c3094ee0e917e08a66a1942cdb3321eebb83692ac950",
+        "live": {
+          "label": "context_exference_ordinary_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 7.249919800029602,
+          "started_utc": "2026-09-08T04:26:01Z",
+          "finished_utc": "2026-09-08T04:26:09Z",
+          "stdout_sha256": "e7b3bead00523581a8d4ec575e7d0f12afe3043f8e69be22b7b9e470b0ece603",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "da3db32d11478ceef02832c1ee226b6b890678c1e11fed433cfa46e3f21d3a1a",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType21 : Type) => (fun [leantGiven29x0 : @_root_.«ContextProduction».«Dictionary» (leantType21)] => (fun (leantLocal38 : leantType21) => @leantLocal38))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "4fa721dd2800f5944041013accf0cc693d63c2981ca5e9696f510b07568a2055",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "2c7e58e86714f923e4da26fae5033f1082b4de31ec51c04e9fe8d4114fbbb153",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_ordinary_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.731807200005278,
+            "started_utc": "2026-09-08T04:26:09Z",
+            "finished_utc": "2026-09-08T04:26:09Z",
+            "stdout_sha256": "4a6932579da3e7e911d12b2043fefb06d6e92d0f0d12325732eb26f87df7e7d7",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "name": "context_exference_ordinary_forwarding",
+        "status": "failed",
+        "commands_sha256": "b45b00e68165ebd597a06d9030c50368d560c61b368e1ed3521770b0140921f1",
+        "live": {
+          "label": "context_exference_ordinary_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 52.09549400000833,
+          "started_utc": "2026-09-08T04:26:10Z",
+          "finished_utc": "2026-09-08T04:27:02Z",
+          "stdout_sha256": "6d37feb4231747c1120cab558e2a7c4d05318fe79357650cb74852173bf81a3d",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "c3153784b3edd2dffc21a42cb5930c7f4504a462b51c3361c08d2f724e5eb39d",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "command_timeout_45s_no_output",
+        "failure": "ValueError: expected exactly one verified displayed output"
+      },
+      {
+        "name": "context_exference_ordinary_local_given",
+        "status": "failed",
+        "commands_sha256": "a54e8cf0e776655d170d7e6183eb39b9d451c63561d49f8cfdfe39cf146d36ea",
+        "live": {
+          "label": "context_exference_ordinary_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 53.883004800009076,
+          "started_utc": "2026-09-08T04:27:02Z",
+          "finished_utc": "2026-09-08T04:27:56Z",
+          "stdout_sha256": "cce8233a9278b69dd1868e89ba0187e13c9ffc576a724c927d7a259de01af5c0",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "539d9cf783407a6c5f051df5fc3053f1b37914eb0b117cbdce90f08fef21b2f5",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "command_timeout_45s_no_output",
+        "failure": "ValueError: expected exactly one verified displayed output"
+      },
+      {
+        "name": "context_exference_ordinary_higher_universe",
+        "status": "passed",
+        "commands_sha256": "59979303150b0d41be20cf44325e2be33b3775a6f9852cd108b29860de422bda",
+        "live": {
+          "label": "context_exference_ordinary_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 7.604407499951776,
+          "started_utc": "2026-09-08T04:27:56Z",
+          "finished_utc": "2026-09-08T04:28:03Z",
+          "stdout_sha256": "5bd5cd2b903dd6a06f298f6fd84e99245f9270ade55396aa4d471a5b65c648a0",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "e1a47c6c6c2764a1f51f84f246d5e007a7658d0bcdedbc482d50e9cf242022c8",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+      },
+      {
+        "name": "context_exference_ordinary_constant_universe",
+        "status": "preflight_failed",
+        "commands_sha256": "55b5688e36229154e8325044d0b026394e3dbf4b3315ecbac8772e89e571be0f",
+        "outcome": "fixture_syntax_preflight_failed_no_live_run",
+        "failure": "syntax or oracle preflight failed; live search was not run"
+      },
+      {
+        "name": "context_exference_ordinary_global_metadata",
+        "status": "passed",
+        "commands_sha256": "61410d2dcdb623a6c07e37c21d97c451b64b3ad1df0a5bfdcb67e7874da94049",
+        "live": {
+          "label": "context_exference_ordinary_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 7.491003900009673,
+          "started_utc": "2026-09-08T04:28:03Z",
+          "finished_utc": "2026-09-08T04:28:11Z",
+          "stdout_sha256": "b84d6137c22a8f756e8b79a3ca69fc72ee0779ade9676f12a173c9addf1c3b48",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "77b9815ce231b549269f28e9e369fc3f2a2c453a52c4b5421db58bbc9c550994",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata"
+      },
+      {
+        "name": "context_exference_where_identity",
+        "status": "passed",
+        "commands_sha256": "0e20dac432f11e44de2ad6f810c36b5e3d6eae2da77f0f2a527abbdcea1711e9",
+        "live": {
+          "label": "context_exference_where_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 8.705088099988643,
+          "started_utc": "2026-09-08T04:28:11Z",
+          "finished_utc": "2026-09-08T04:28:20Z",
+          "stdout_sha256": "78996b79f1914f56a30f2ce6be396a1aef63c1cd13b218d1d6360520f4db1c7e",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "9f8db1cfab5531488b3bf50ef9f447e118d0798652fb3b6cec9d83acc9483c68",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType21 : Type) => (fun [leantGiven29x0 : @_root_.«ContextProduction».«Dictionary» (leantType21)] => (fun (leantLocal38 : leantType21) => @leantLocal38))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "4fa721dd2800f5944041013accf0cc693d63c2981ca5e9696f510b07568a2055",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "2c7e58e86714f923e4da26fae5033f1082b4de31ec51c04e9fe8d4114fbbb153",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_where_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.7525172999594361,
+            "started_utc": "2026-09-08T04:28:20Z",
+            "finished_utc": "2026-09-08T04:28:20Z",
+            "stdout_sha256": "ceaacfa06f20abe815d0304328152c4ec34025395d9470640cfab2db51ae9477",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_exference_where_forwarding",
+        "status": "passed",
+        "commands_sha256": "e9d6b37f295e176acbbf4e9ab307c1d0be1b1ef0c9cf2a5122f3653bcaa61ced",
+        "live": {
+          "label": "context_exference_where_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 7.535799600009341,
+          "started_utc": "2026-09-08T04:28:20Z",
+          "finished_utc": "2026-09-08T04:28:28Z",
+          "stdout_sha256": "83bf5443d358a7671aa48468aeb854830e9993b87d6afb7ac97621f0ca203fd5",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "9af8af1523eea402cf131a9d4e5912b150187ba059f5243ea5b0a4a2775377fe",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal21 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal21) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "e51a8dc2d96f3b250e9916f98f5589b6641fc2910dd5e5a9c581300af8ca2e97",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "6ad26fe0c707273476667e9c17b9acd89478a6887d2e239e07e6837d6250ac09",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_where_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.9428185000433587,
+            "started_utc": "2026-09-08T04:28:28Z",
+            "finished_utc": "2026-09-08T04:28:29Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_exference_where_local_given",
+        "status": "passed",
+        "commands_sha256": "23e82e5ddacaa52d16f4f3455c63ca2f843b2d12fdb1e71a9483d397815d56e7",
+        "live": {
+          "label": "context_exference_where_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 8.221986100019421,
+          "started_utc": "2026-09-08T04:28:29Z",
+          "finished_utc": "2026-09-08T04:28:37Z",
+          "stdout_sha256": "8cec457c6032af464cc7cc11cf8639052afc4790617eee267e81c74021af37cb",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "9acd93c31f5c689de97f83d8a97bda02bbf43c5bb3efd295c55c7d32fbc5e2d5",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType55 : Type) => (fun [leantGiven67x0 : @_root_.«ContextProduction».«Dictionary» (leantType55)] => (fun (leantLocal80 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @(let leantHead94 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType55)], (leantType55 → @_root_.«ContextProduction».«Token»)) := @(let leantHead109 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal80; @leantHead109 (leantType55)); @leantHead94 leantGiven67x0)))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "982672f22e9cd2f04fc7ebe9c94cc4d42cd9a015bfbc504e5997f95e26869478",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 6,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "2155640d6b12c547b4a2c3a455229fc1239a2f8672c9f976c6a701893e401d19",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_exference_where_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 1.022508599970024,
+            "started_utc": "2026-09-08T04:28:37Z",
+            "finished_utc": "2026-09-08T04:28:39Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_exference_where_reject_all",
+        "status": "passed",
+        "commands_sha256": "017c1b0df56fafcc8035dbc7ddfd43e2ffeb33a3d6ad9fa389e77e78f5b175f0",
+        "live": {
+          "label": "context_exference_where_reject_all-live",
+          "exit_code": 0,
+          "wall_seconds": 8.01661079999758,
+          "started_utc": "2026-09-08T04:28:39Z",
+          "finished_utc": "2026-09-08T04:28:47Z",
+          "stdout_sha256": "21ba48f42a99e82a5c6d34b12a46470c4e3815002bc722a90efd93ed2cd01daa",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "3e333ce441938bdb85c9e82815f65db145dd5d0126a8d9ca3b7d97aad96fca90",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "false_rejected",
+        "behavioral_observations": {
+          "passed": 0,
+          "falsified": 1,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_exference_where_higher_universe",
+        "status": "passed",
+        "commands_sha256": "fdedeb808174c40a7ca418e0b575f065a66d30c391160f6a5acf3dde824d5af0",
+        "live": {
+          "label": "context_exference_where_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 7.173468799970578,
+          "started_utc": "2026-09-08T04:28:47Z",
+          "finished_utc": "2026-09-08T04:28:54Z",
+          "stdout_sha256": "0a8c645c39581176ad0a80221a83377d8c3966d46f499e2f05e820d6e104aef6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "795ad48abc28162892a96a7c2cbd651771d78a01addb5269d5e84b8d86098baa",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+      },
+      {
+        "name": "context_exference_where_constant_universe",
+        "status": "preflight_failed",
+        "commands_sha256": "cb2e19279baaaa51760d3bbcbc079cd986086cc8954d20ddedc83a8066bdc937",
+        "outcome": "fixture_syntax_preflight_failed_no_live_run",
+        "failure": "syntax or oracle preflight failed; live search was not run"
+      },
+      {
+        "name": "context_exference_where_global_metadata",
+        "status": "passed",
+        "commands_sha256": "a44a98a166a2c0e8241703072645ddd46710615fcc655fdbfd3bafd395b6cb3e",
+        "live": {
+          "label": "context_exference_where_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 7.612127700005658,
+          "started_utc": "2026-09-08T04:28:54Z",
+          "finished_utc": "2026-09-08T04:29:01Z",
+          "stdout_sha256": "c72c97d6c2f7fc670a0e2f14b69f4dae824d88818933d48d49eff6224748e2e6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "1152ba365415501f8b31213ad7f85ac4cafdcd38235a1bebc8766be48b82e6c6",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata"
+      },
+      {
+        "name": "context_both_ordinary_identity",
+        "status": "passed",
+        "commands_sha256": "d62b84b18d777f27df3aa7667ce836d790b2ae7965c1dfdd3910e02cb4529afa",
+        "live": {
+          "label": "context_both_ordinary_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 7.959130999981426,
+          "started_utc": "2026-09-08T04:29:02Z",
+          "finished_utc": "2026-09-08T04:29:10Z",
+          "stdout_sha256": "ab238af05d0a39584c8cfbe628b0f7e1563e11663a45e680a60a173dae3d5a50",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "c2bc8c2b333a60e984b10a9193eab672ee9acef78de7ef83c76bb278565e733f",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType21 : Type) => (fun [leantGiven29x0 : @_root_.«ContextProduction».«Dictionary» (leantType21)] => (fun (leantLocal38 : leantType21) => @leantLocal38))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "4fa721dd2800f5944041013accf0cc693d63c2981ca5e9696f510b07568a2055",
+        "owner": {
+          "engine": "exference",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "2c7e58e86714f923e4da26fae5033f1082b4de31ec51c04e9fe8d4114fbbb153",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_ordinary_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.7004652000032365,
+            "started_utc": "2026-09-08T04:29:10Z",
+            "finished_utc": "2026-09-08T04:29:10Z",
+            "stdout_sha256": "d868e5c602a54b51e44026adb6be9034776fdee059a1189b8e8fefe1f137af46",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      },
+      {
+        "name": "context_both_ordinary_forwarding",
+        "status": "failed",
+        "commands_sha256": "3656ddcf6b728d8129c02d55d6058f4261372fbc9cd2049d4555c495614981d2",
+        "live": {
+          "label": "context_both_ordinary_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 54.13833829999203,
+          "started_utc": "2026-09-08T04:29:10Z",
+          "finished_utc": "2026-09-08T04:30:04Z",
+          "stdout_sha256": "3bea0f83e11926950dc6c8d072c29d4c90cefc150b399e19ad5f7e4c452495c0",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "0b3b69516a545a78984ad33b79dc24a7b1bbafa5e01145c4aa1d35721c121045",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "command_timeout_45s_no_output",
+        "failure": "ValueError: expected exactly one verified displayed output"
+      },
+      {
+        "name": "context_both_ordinary_local_given",
+        "status": "failed",
+        "commands_sha256": "92f4a8cd12229ddc97d72b320caf0e6ba77cac04fe51d898b55aea41db8c94b9",
+        "live": {
+          "label": "context_both_ordinary_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 54.06290409999201,
+          "started_utc": "2026-09-08T04:30:05Z",
+          "finished_utc": "2026-09-08T04:30:59Z",
+          "stdout_sha256": "7af4ce85fddeee31051de975b5a7bf5baad6b7e25dec599f351565219f129558",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "63b3c373f36e954a64b474dfa61e6e09991c9d37a42812283493a4847ca0c2f8",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "command_timeout_45s_no_output",
+        "failure": "ValueError: expected exactly one verified displayed output"
+      },
+      {
+        "name": "context_both_ordinary_higher_universe",
+        "status": "passed",
+        "commands_sha256": "34799d25cb79745918dd5f4ca1993573da0d68bf7a2a7b646cf1990e8e70a199",
+        "live": {
+          "label": "context_both_ordinary_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 6.498276999976952,
+          "started_utc": "2026-09-08T04:30:59Z",
+          "finished_utc": "2026-09-08T04:31:05Z",
+          "stdout_sha256": "263f95a41f7e08c395af3d3f9f53da6f6da26f4a1a84689f5e107855c0dbe5c9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "9a7f5b16851f63e5b8c52f48829246750ef5e134b9a5ac6f1e91f8bd6e0e02dc",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+      },
+      {
+        "name": "context_both_ordinary_constant_universe",
+        "status": "preflight_failed",
+        "commands_sha256": "1f33c332a83b4a0e14e7900d9fc1b499ee2eeb4c13d3cf5470a3a7031559615f",
+        "outcome": "fixture_syntax_preflight_failed_no_live_run",
+        "failure": "syntax or oracle preflight failed; live search was not run"
+      },
+      {
+        "name": "context_both_ordinary_global_metadata",
+        "status": "passed",
+        "commands_sha256": "cf0c8bbf484eb312bd435dcb56d57ad8766bcc57655467d454a28e93576b57b8",
+        "live": {
+          "label": "context_both_ordinary_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 8.952571799978614,
+          "started_utc": "2026-09-08T04:31:05Z",
+          "finished_utc": "2026-09-08T04:31:14Z",
+          "stdout_sha256": "549f229e3c0a4b47572874dfd12a7f80cadefab219faa32620756798de2d36f8",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "a40845954fb2a45266688356edc5eab7c09072d0915374da1692b98826c22daa",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata"
+      },
+      {
+        "name": "context_both_where_identity",
+        "status": "passed",
+        "commands_sha256": "14cfd3343ee29ff051ac87112834c08850da4da3d5d8f91c2053143a7db9d3a6",
+        "live": {
+          "label": "context_both_where_identity-live",
+          "exit_code": 0,
+          "wall_seconds": 8.045844800013583,
+          "started_utc": "2026-09-08T04:31:14Z",
+          "finished_utc": "2026-09-08T04:31:22Z",
+          "stdout_sha256": "e8cfe78a452d50a14d3eb7c80626e0dcfd43cef4c5e2114741772036e2c52ac3",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "8f872396bb9f4533eb519eca069a38eee8f91857c9692e0157b3b4b3366d9532",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType44 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType44)] => (fun (leantLocal5 : leantType44) => @leantLocal5))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → leantBound0x0)))",
+        "observation_sha256": "5fc51a8bd8e556a8fcbf42bffaa7bf34582d083c6e5073b54e88691af9c3e51f",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 4,
+          "context_introductions": 1,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f8ffe38e5081380301d44f29314a1ded48f1d45326f60f067548b2986ca30e3e",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_where_identity-replay",
+            "exit_code": 0,
+            "wall_seconds": 1.0024615000002086,
+            "started_utc": "2026-09-08T04:31:22Z",
+            "finished_utc": "2026-09-08T04:31:23Z",
+            "stdout_sha256": "e66d2b747ad91619126f59015442d8da77dcd5dd1a5889930804796a5dd519b4",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_both_where_forwarding",
+        "status": "passed",
+        "commands_sha256": "7c2a5f9f105ac2ac80baa2e27626c9ee41705819645e08562812a1a5d022845b",
+        "live": {
+          "label": "context_both_where_forwarding-live",
+          "exit_code": 0,
+          "wall_seconds": 10.99874519999139,
+          "started_utc": "2026-09-08T04:31:23Z",
+          "finished_utc": "2026-09-08T04:31:34Z",
+          "stdout_sha256": "45e3589983b8dc06ad555a138e6e6af7bd933fc7b3ae0004d4382b5659817ff6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "cc43c2892a85db4b725fdc9b407e5bba6ec5e5bef5bb95f59454067f69ef2256",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantLocal0 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) => @leantLocal0) : ((∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) → (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "2f1f1769e5f69cce907b88ce02d29703163ff1c3fc2deb49aee7ab1a78a5abc0",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 2,
+          "context_introductions": 0,
+          "context_applications": 0,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "c17665573b524a4c7f6ed6b78db52357aa0f52a4f357621643e7de4f203eb0c4",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_where_forwarding-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.991690099996049,
+            "started_utc": "2026-09-08T04:31:34Z",
+            "finished_utc": "2026-09-08T04:31:35Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_both_where_local_given",
+        "status": "passed",
+        "commands_sha256": "ff8a3a46a8a2bb252a977489f40ebe10c163bcb955dd77e41b50d92003049f07",
+        "live": {
+          "label": "context_both_where_local_given-live",
+          "exit_code": 0,
+          "wall_seconds": 10.718136500043329,
+          "started_utc": "2026-09-08T04:31:36Z",
+          "finished_utc": "2026-09-08T04:31:46Z",
+          "stdout_sha256": "162e657842a81b0759031559d47434180c80b517f5e16004695445394624a53b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "6f25d827a500eb1b6e6dc5fe4e2a29de0182b031a4cbb07c7d9a2a467572a52c",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "exact_output_replayed",
+        "candidate": "((fun (leantType170 : Type) => (fun [leantGiven2x0 : @_root_.«ContextProduction».«Dictionary» (leantType170)] => (fun (leantLocal5 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»))) (leantLocal9 : leantType170) => @(let leantHead104 : (leantType170 → @_root_.«ContextProduction».«Token») := @(let leantHead90 : (∀ [@_root_.«ContextProduction».«Dictionary» (leantType170)], (leantType170 → @_root_.«ContextProduction».«Token»)) := @(let leantHead65 : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], (leantBound0x0 → @_root_.«ContextProduction».«Token»)) := @leantLocal5; @leantHead65 (leantType170)); @leantHead90 leantGiven2x0); @leantHead104 (@leantLocal9 : leantType170))))) : (∀ (leantBound0x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound0x0)], ((∀ (leantBound1x0 : Type) [@_root_.«ContextProduction».«Dictionary» (leantBound1x0)], (leantBound1x0 → @_root_.«ContextProduction».«Token»)) → (leantBound0x0 → @_root_.«ContextProduction».«Token»))))",
+        "observation_sha256": "fc7b1a406846602281829937e9e3fdf3104667634c4cf6145339a52cc7e16538",
+        "owner": {
+          "engine": "djinn",
+          "variant_ordinal": 0,
+          "renderer_ordinal": 0,
+          "route": "RouteTypedCandidate",
+          "graph_node_count": 8,
+          "context_introductions": 1,
+          "context_applications": 1,
+          "root_closed": true,
+          "exact_rendering_and_erasure": true
+        },
+        "replay": {
+          "source_sha256": "f5c859bb4a923c7beb65ea05d1da558153153c6bf25e80198ad10b4fa9de4748",
+          "empty_axiom_inventory_count": 8,
+          "finite_payload_observation_count": 4,
+          "process": {
+            "label": "context_both_where_local_given-replay",
+            "exit_code": 0,
+            "wall_seconds": 0.7416931000188924,
+            "started_utc": "2026-09-08T04:31:46Z",
+            "finished_utc": "2026-09-08T04:31:47Z",
+            "stdout_sha256": "65695a3a3dd0489f0f185b4a4da5e8a3d548c4469d52dc531e08c2917e643a1d",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "behavioral_observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_both_where_reject_all",
+        "status": "passed",
+        "commands_sha256": "8d619c1a4cce38e3202716340969670b3367cff92334aba01bd2eecf4280f6e2",
+        "live": {
+          "label": "context_both_where_reject_all-live",
+          "exit_code": 0,
+          "wall_seconds": 7.363658299960662,
+          "started_utc": "2026-09-08T04:31:47Z",
+          "finished_utc": "2026-09-08T04:31:54Z",
+          "stdout_sha256": "81986ef2d36c607f6248efb441d9e5fe37c704b83857e64ba7867d0f22bfb9fe",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "37eaff992b3440b75891423b9fcb8464daebde716117e42b09d1e3cbb3ceb9c7",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "false_rejected",
+        "behavioral_observations": {
+          "passed": 0,
+          "falsified": 2,
+          "inconclusive": 0
+        }
+      },
+      {
+        "name": "context_both_where_higher_universe",
+        "status": "passed",
+        "commands_sha256": "0c4b0c47ef44bc829c5969c1648840c7b0cca28961a2867eb684330a545e0ef7",
+        "live": {
+          "label": "context_both_where_higher_universe-live",
+          "exit_code": 0,
+          "wall_seconds": 7.872922800015658,
+          "started_utc": "2026-09-08T04:31:54Z",
+          "finished_utc": "2026-09-08T04:32:02Z",
+          "stdout_sha256": "9ddd68ce7faa122d329a0c056ac268c19ee5a06025a9b20a2a1d256aa4e9ef79",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "d09391e7637f762170780e68f1c8ee2f68387a26d0c7f71f986583b1d054f348",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+      },
+      {
+        "name": "context_both_where_constant_universe",
+        "status": "preflight_failed",
+        "commands_sha256": "bd40c8d054c0a4696581b9ff9f232330eb146021b00ce62a9b7c279e039247d1",
+        "outcome": "fixture_syntax_preflight_failed_no_live_run",
+        "failure": "syntax or oracle preflight failed; live search was not run"
+      },
+      {
+        "name": "context_both_where_global_metadata",
+        "status": "passed",
+        "commands_sha256": "75a73a577e1dec2e1418093f461a55ba8475f18787bd4f6f3747aa22a5501e01",
+        "live": {
+          "label": "context_both_where_global_metadata-live",
+          "exit_code": 0,
+          "wall_seconds": 7.853972999961115,
+          "started_utc": "2026-09-08T04:32:02Z",
+          "finished_utc": "2026-09-08T04:32:10Z",
+          "stdout_sha256": "c64d21c9ac781185db4789ab935ba0a2b5892e2e2f6ecd1baec37c693ce85dfc",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "input_sha256": "eeb5ac9a95dd8dacaa1fb357ec0c6714b523ca0d8dcccd742f0a7d01f6206f7b",
+          "command_text_matches_after_crlf_normalization": true
+        },
+        "outcome": "expected_metadata_refusal",
+        "refusal": "context-source: global provider inventory requires complete source metadata"
+      }
+    ]
+  },
+  "corrected_fixture_followup": {
+    "only_source_change": {
+      "path": "test-context/run_production.py",
+      "before": "481ab3a4aa8ee532bf1047911d5d6f975497bf4c045007ea04caf11c37952a6b",
+      "after": "05614bef45511c5d9d2f88cfb29d4b46ac25ba4e76d346a947720f7dad5993c5"
+    },
+    "generated_syntax_changed_line": 4,
+    "before_line": "class ContextProduction.UniverseDictionary.{u} (α : Type) where evidence : ∀ β : Type u, True",
+    "after_line": "class ContextProduction.UniverseDictionary.{u} (α : Type) : Type where evidence : ∀ β : Type u, True",
+    "run": {
+      "original_result": {
+        "path": "dist-newstyle/context-production-owned-universe-v2/results.json",
+        "sha256": "71d6558f2220a59957fe99cdcd4ffec28303a06e53854c94d86ed035c84c17cc",
+        "status": "passed",
+        "runner_exit_code": 0,
+        "exit_code_provenance": "Coordinator observed terminal exit; original receipt status independently checked."
+      },
+      "raw_artifact_directory": "dist-newstyle/context-production-owned-universe-v2",
+      "artifact_naming": "Process labels name .stdout.txt/.stderr.txt and optional .input.txt captures; cell names name .commands.txt; kernel process labels name .lean sources.",
+      "process_manifest": {
+        "path": "dist-newstyle/context-production-owned-universe-v2/processes.json",
+        "sha256": "2cf43f21e1e0cc1790b03934a97373616e81d9b3fb8533ba32c6011819a785ef",
+        "process_count": 8,
+        "all_completed": true,
+        "process_guard_timeouts": 0
+      },
+      "summary": {
+        "fixture": 0,
+        "payload_observations": 0,
+        "live": 6,
+        "false": 0,
+        "accepted": 0,
+        "timeout": 0,
+        "replay_axioms": 0,
+        "refusal": 6
+      },
+      "settings": {
+        "window": 32,
+        "verify": 32,
+        "steps": 20000,
+        "budget": 20000,
+        "timeout": 45,
+        "process_timeout": 120,
+        "provider_cap": 80,
+        "strategy": "interleave",
+        "shown": 1,
+        "ranking": "balanced",
+        "debug": true,
+        "library": false,
+        "classical": false,
+        "providers": "off except explicit global_metadata refusal control"
+      },
+      "selected": {
+        "engines": [
+          "djinn",
+          "exference",
+          "both"
+        ],
+        "modes": [
+          "ordinary",
+          "where"
+        ],
+        "operations": [
+          "constant_universe"
+        ]
+      },
+      "observed_process_time": {
+        "first_started_utc": "2026-09-08T04:32:54Z",
+        "last_finished_utc": "2026-09-08T04:33:50Z",
+        "summed_child_wall_seconds": 55.54186579992529,
+        "boundary": "Per-process wall times are actual measurements. UTC endpoints are retained at their original one-second resolution, not claimed as an outer runner duration."
+      },
+      "executable": {
+        "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "sha256": "49d1dca002474e9a16ed35007110d40d8b3ecd2e46bb14e40ceb6a0a769aa26e",
+        "live_command": [
+          "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+          "--plain"
+        ]
+      },
+      "kernel": {
+        "path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "sha256_before": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "invocation": "direct absolute kernel executable; no PATH lookup or elan proxy",
+        "sha256_after": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810"
+      },
+      "integrity": {
+        "sources_unchanged": true,
+        "executable_unchanged": true,
+        "kernel_executable_unchanged": true,
+        "commands_unchanged": true,
+        "kernel_sources_unchanged": true
+      },
+      "source_manifest": {
+        "entries": 234,
+        "sha256": "446a0cac4f5c739a5b587b428335152ff697f2609e28d280a29d5f8d1d9a5d3a",
+        "before_equals_after": true,
+        "digest_format": "UTF-8 without BOM; each original SHA256, two spaces, repo-relative path normalized to forward slashes, LF; complete lines sorted ordinal, final LF included."
+      },
+      "preflights": [
+        {
+          "label": "constant_universe-syntax",
+          "status": "passed",
+          "source_sha256": "492d30cac940227f6bc5a66a626a42f7eccd4a759de5712a208bc829e9a2b80d",
+          "declared_inventory_count": 12,
+          "process": {
+            "label": "constant_universe-syntax",
+            "exit_code": 0,
+            "wall_seconds": 0.9295275000040419,
+            "started_utc": "2026-09-08T04:32:54Z",
+            "finished_utc": "2026-09-08T04:32:55Z",
+            "stdout_sha256": "621c3cb78f82004b3322fb8e456cd464485868a2b668e5a848f0f70ebd6cfbb8",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "constant_universe-oracle",
+          "status": "passed",
+          "source_sha256": "3e66d781064d9da79de4447954d6b771bf935b67ecffcc5c5488bcc691769719",
+          "declared_inventory_count": 11,
+          "process": {
+            "label": "constant_universe-oracle",
+            "exit_code": 0,
+            "wall_seconds": 0.8183126000221819,
+            "started_utc": "2026-09-08T04:32:55Z",
+            "finished_utc": "2026-09-08T04:32:55Z",
+            "stdout_sha256": "44483ba13e85dce652f45a52d1fd135e360d20a76cfc92b8d6f9437dfe03d207",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "cells": [
+        {
+          "name": "context_djinn_ordinary_constant_universe",
+          "status": "passed",
+          "commands_sha256": "a855aeb5144e217bcf22a70b68fb7ac56b6f3206336d56cb10012afce639ffcc",
+          "live": {
+            "label": "context_djinn_ordinary_constant_universe-live",
+            "exit_code": 0,
+            "wall_seconds": 15.52622339996742,
+            "started_utc": "2026-09-08T04:32:55Z",
+            "finished_utc": "2026-09-08T04:33:11Z",
+            "stdout_sha256": "ec16e182192b23cbc29883334f1787425c370c4c326cd5acb24cb58374157136",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "input_sha256": "7cd136c0d50132f138f01a09141feb1d9b43b79e48c61eb2297306f228774288",
+            "command_text_matches_after_crlf_normalization": true
+          },
+          "outcome": "expected_metadata_refusal",
+          "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+        },
+        {
+          "name": "context_djinn_where_constant_universe",
+          "status": "passed",
+          "commands_sha256": "532e6e4e5a529857b22ee0b506729e3db17385214ecbbb91530d7c3e21c96db4",
+          "live": {
+            "label": "context_djinn_where_constant_universe-live",
+            "exit_code": 0,
+            "wall_seconds": 8.675467599998228,
+            "started_utc": "2026-09-08T04:33:11Z",
+            "finished_utc": "2026-09-08T04:33:20Z",
+            "stdout_sha256": "78f8f4d713e22892a7e5bdbbf9e8c9b56af42d626b6b493db334eec6b90f58c8",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "input_sha256": "7f8c8e2c938e3d3a22c1822d78f47325cf4780d073aea5614e92eb924567a9de",
+            "command_text_matches_after_crlf_normalization": true
+          },
+          "outcome": "expected_metadata_refusal",
+          "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+        },
+        {
+          "name": "context_exference_ordinary_constant_universe",
+          "status": "passed",
+          "commands_sha256": "acc54c5491f5ebdf80e4ab8d2a0b8de1dcf6bd2ace5e48e8b2422fec2620d3d2",
+          "live": {
+            "label": "context_exference_ordinary_constant_universe-live",
+            "exit_code": 0,
+            "wall_seconds": 7.4244558999780566,
+            "started_utc": "2026-09-08T04:33:20Z",
+            "finished_utc": "2026-09-08T04:33:27Z",
+            "stdout_sha256": "0bfb80f264a71a929e6ebd8c1eec71ddbc3dfe550cd41ca2bed12820f0539ed6",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "input_sha256": "5f5443c993cad245d9e5a8cfa5f40ec310ea39ab5599d944d6166b602d2036f6",
+            "command_text_matches_after_crlf_normalization": true
+          },
+          "outcome": "expected_metadata_refusal",
+          "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+        },
+        {
+          "name": "context_exference_where_constant_universe",
+          "status": "passed",
+          "commands_sha256": "06c3d7af9ec85c59f8239f0f01974019a278fc8e73b3d26d8bbafa1538946d4b",
+          "live": {
+            "label": "context_exference_where_constant_universe-live",
+            "exit_code": 0,
+            "wall_seconds": 8.00283039995702,
+            "started_utc": "2026-09-08T04:33:27Z",
+            "finished_utc": "2026-09-08T04:33:35Z",
+            "stdout_sha256": "a465b4be8a4b079ad5e4bf52c5fd83b3333254faae648a335e75341630b69f62",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "input_sha256": "3165a07c8947f7906835134f59c6855e3d0b0304225db6d1655fb188f6fbcdeb",
+            "command_text_matches_after_crlf_normalization": true
+          },
+          "outcome": "expected_metadata_refusal",
+          "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+        },
+        {
+          "name": "context_both_ordinary_constant_universe",
+          "status": "passed",
+          "commands_sha256": "cb85746dca905f0759def1028c0c3a73e7c39b1f8e74adcce64cb07b2acc138b",
+          "live": {
+            "label": "context_both_ordinary_constant_universe-live",
+            "exit_code": 0,
+            "wall_seconds": 7.228377000021283,
+            "started_utc": "2026-09-08T04:33:35Z",
+            "finished_utc": "2026-09-08T04:33:43Z",
+            "stdout_sha256": "eb7f003977e763da53642d63958d21e9714c378dda627e9ce5116119107f9122",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "input_sha256": "937afc1f8a10c858d9713c82686b69da04fab52200c8be643c9c328bde6419c8",
+            "command_text_matches_after_crlf_normalization": true
+          },
+          "outcome": "expected_metadata_refusal",
+          "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+        },
+        {
+          "name": "context_both_where_constant_universe",
+          "status": "passed",
+          "commands_sha256": "8a8070eb61ab00a41836a4e396366ed8b89fbb2d63d7a04963cca0061970a24d",
+          "live": {
+            "label": "context_both_where_constant_universe-live",
+            "exit_code": 0,
+            "wall_seconds": 6.936671399977058,
+            "started_utc": "2026-09-08T04:33:43Z",
+            "finished_utc": "2026-09-08T04:33:50Z",
+            "stdout_sha256": "cb7686b07ef135bccea457ac50b5d0fcf427284f53fe40b37eaeaa1b72b4af9f",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "input_sha256": "eea50b108d8d8b96f85a6e34f6674afcc919833c3181217e3eb4ee38a6dc5071",
+            "command_text_matches_after_crlf_normalization": true
+          },
+          "outcome": "expected_metadata_refusal",
+          "refusal": "context-source: exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows"
+        }
+      ]
+    }
+  }
+}

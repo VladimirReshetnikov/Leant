@@ -147,7 +147,8 @@ Companion documents:
   identity ordinary/`where` full-type replays pass with their own accepted-variant
   provenance. The corrected [complete integration suite](test-context/receipts/unit-context-integration.json)
   passes all 678 tests in 283.51 seconds (283.64 seconds for the owned process).
-  The 39-cell contextual matrix remains open. The earlier configured 647-test
+  The contextual matrix has 35/39 accepted cells; four ordinary-query timeouts
+  remain open. The earlier configured 647-test
   suite passes in 343.79 seconds on its recorded source revision. Native fold `map` now also passes live synthesis and exact replay;
   append and length produce correct candidates but encounter backend request failures
   before acceptance. Next, validate the working integration of the accepted
@@ -182,11 +183,15 @@ Companion documents:
   suite passes **678/678**; its [receipt](test-context/receipts/unit-context-integration.json)
   preserves the earlier 675/678 result and the three stale source-routing
   assertion corrections. Production sources and bounds stayed unchanged.
-  The 39-cell ordinary/`where` contextual matrix remains open: a
-  `constant_universe` fixture failed preflight before live execution and needs
-  correction and affected-cell replay; an Exference ordinary forwarding cell
-  also reached its command timeout before any candidate. These outcomes remain
-  separate from the passing unit suite and do not establish matrix acceptance.
+  The [contextual matrix receipt](test-context/receipts/production-context-initial.json)
+  records **35/39 accepted cells across two runs**: 14 exact outputs, three
+  actual False controls and 18 metadata refusals. The initial run accepted 29;
+  a separate six-cell replay passed after explicitly declaring the universe
+  fixture's class as `Type`, with production unchanged. All nine named-`where`
+  positives pass. Four ordinary forwarding/local-Given queries in Exference
+  and Both still reach their 45-second command timeout. Source inspection
+  identifies pool collection before first verification; an incremental
+  collection patch is prepared but unapplied and unvalidated.
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked
