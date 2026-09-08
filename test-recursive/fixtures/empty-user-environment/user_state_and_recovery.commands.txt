@@ -1,0 +1,26 @@
+:set backend-timeout 30
+:set synth-library off
+:set synth-classical off
+:set synth-providers off
+:set synth-debug on
+:set synth-ranking balanced
+:set synth-shown 1
+:set synth-djinn-strategy interleave
+:set synth-provider-cap 80
+:set synth-window 4
+:set synth-verify 4
+:set synth-steps 4096
+:set synth-budget 100000
+:set synth-timeout 30
+:set synth-engine djinn
+:synth stateEmpty : {α : Type} → α → α where False
+def UserSentinel : Nat := 37
+:env
+:synth stateBefore : Nat → Nat where (stateBefore UserSentinel = UserSentinel) ∧ (stateBefore (UserSentinel + 1) = UserSentinel + 1)
+:set backend-timeout 1
+#eval IO.sleep 2000
+:set backend-timeout 30
+#check UserSentinel
+:env
+:synth stateRecovered : Nat → Nat where (stateRecovered UserSentinel = UserSentinel) ∧ (stateRecovered (UserSentinel + 1) = UserSentinel + 1)
+:quit

@@ -3,7 +3,8 @@
 The first native-verification fix to validate is reuse of the exact empty user
 environment. A matched command that timed out after 5.008 seconds without an
 environment id completed in 22.336 ms with a materialized empty root. This is
-diagnostic evidence; the production reuse change is still pending.
+diagnostic evidence from before the fix. The subsequent
+[production reuse acceptance](2026-09-07-empty-environment-reuse.md) now passes.
 
 The [durable receipt](../../test-recursive/receipts/request-correlation.json)
 records the implementation, validation, complete failed baseline captures,

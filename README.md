@@ -146,15 +146,14 @@ Companion documents:
   dictionary selection, methods and superclass evidence remain open.
   Canonical Djex's supported-fragment Haskell elaboration completes original
   priority 1; priorities 2–4 retain their broader requirements.
-  The [request-correlated diagnosis](docs/reports/2026-09-07-empty-environment-diagnosis.md)
-  identifies repeated empty-user-environment initialization as the next native
-  verification fix. An identical candidate check timed out after 5.008 seconds
-  without an environment id and completed in 22.336 ms with a materialized empty
-  root. The matched append control passes exact replay and actual False rejection;
-  production root reuse remains pending. The diagnostic strict build, 14 focused
-  controls and all 686 unit tests pass. Next are exact empty-root reuse with
-  isolation/recovery checks, broader Church behavior including all 19 explicit
-  defaults, and one described global `Type 0` provider under the current guard.
+  [Exact empty-user-environment reuse](docs/reports/2026-09-07-empty-environment-reuse.md)
+  now makes native append and length pass their original public queries, bounds,
+  actual False controls and independent full-type replay. Four lifecycle sessions
+  cover reuse, namespace isolation, real user-state precedence, reset and backend
+  death: 11 queries, four accepted replays and ten empty axiom inventories.
+  The strict build and complete 686-test suite pass. Next are broader supplied
+  fold/tree acceptance, Church behavior including all 19 explicit defaults,
+  and a described global `Type 0` provider under the current guard.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
 - **Checked conditional providers in canonical Djex.** The
   [conditional-Given implementation](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)

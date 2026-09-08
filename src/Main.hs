@@ -335,6 +335,10 @@ data ReplState = ReplState
   , rsProjectDir :: Maybe FilePath
   , rsEnv :: Maybe Integer
   , rsBaseEnv :: Maybe Integer
+  , rsEmptyUserCheckEnv :: Maybe Integer
+    -- ^ Materialized implicit-Init root for temporary behavioral checks when
+    -- rsEnv is Nothing. Never the richer synthesis environment, and never
+    -- installed as the user's base, history, current environment or undo state.
   , rsSnapshotBase :: Maybe SnapshotBase
     -- ^ opaque environment restored by :unpickle, replayed before the
     -- post-snapshot history after backend restart.  A Leant-created sibling
@@ -458,7 +462,8 @@ invalidateProviderWorld state = state
 -- observe it.
 invalidateDerivedEnvironments :: ReplState -> ReplState
 invalidateDerivedEnvironments state = state
-  { rsBrowseEnv = Nothing
+  { rsEmptyUserCheckEnv = Nothing
+  , rsBrowseEnv = Nothing
   , rsSynthBase = Nothing
   , rsSynthEnv = Nothing
   , rsComplCache = []
@@ -2425,7 +2430,14 @@ runBehavioralSynth st query = do
       prepared <- ensureSynthEnv st
       case prepared of
         Left failure -> reject failure
-        Right _ -> runPrepared
+        Right _ -> do
+          -- Match the existing preparation boundary: materializing the exact
+          -- empty user root is setup, before the first assertion/search clock.
+          state <- readIORef st
+          userEnvironment <- ensureBehavioralUserEnvironment st (rsTimeout state)
+          case userEnvironment of
+            Left failure -> reject failure
+            Right _ -> runPrepared
  where
   reject failure = emitLn st =<< cRed st
     ("behavioral query rejected before synthesis: " ++ failure)
@@ -2481,6 +2493,48 @@ behavioralCheckedResponse response
   | isNothing (respEnv response) = Left "Lean returned no checked command environment"
   | otherwise = Right ()
 
+-- Materialize only the exact implicit-Init environment selected by env:none.
+-- An empty command adds no declaration, import, option or synthesis helper.
+-- Backend-local ids are discarded by invalidateDerivedEnvironments. Keep this
+-- separate from rsEnv: the user's next real command must retain its ordinary
+-- fresh-header/import semantics. Existing nonempty session environments win.
+ensureBehavioralUserEnvironment :: St -> Maybe Int -> IO (Either String (Maybe Integer))
+ensureBehavioralUserEnvironment st limit = do
+  backendOr <- ensureBackend st
+  case backendOr of
+    Left failure -> pure (Left failure)
+    Right backend -> do
+      state <- readIORef st
+      case rsEnv state of
+        Just env -> pure (Right (Just env))
+        Nothing
+          | not (null (rsImports state)) || not (null (rsHistory state))
+              || isJust (rsSnapshotBase state) ->
+              pure (Left "the reconstructed user environment is unavailable")
+          | otherwise -> case rsEmptyUserCheckEnv state of
+              Just env -> pure (Right (Just env))
+              Nothing -> do
+                result <- requestWithTraceAnnotation backend limit
+                  (commandPayload Nothing "")
+                  (Just (JObj [("role", JStr "empty-user-environment")]))
+                case result of
+                  Left RequestTimeout -> do
+                    backendDied st
+                    pure (Left "empty user environment preparation timed out; the backend was retired")
+                  Left (ServerClosed stderrText) -> do
+                    backendDied st
+                    pure (Left ("the Lean server died preparing the empty user environment: " ++ trim stderrText))
+                  Left (BadResponse failure) -> do
+                    snapshotBackendTrace st
+                    pure (Left ("bad empty user environment response: " ++ failure))
+                  Right response -> case behavioralCheckedResponse response of
+                    Left failure -> pure (Left failure)
+                    Right () -> case respEnv response of
+                      Nothing -> pure (Left "empty user environment preparation returned no environment")
+                      Just env -> do
+                        modifyIORef' st (\s -> s { rsEmptyUserCheckEnv = Just env })
+                        pure (Right (Just env))
+
 -- Use the owned request timeout boundary, never an asynchronous timeout around
 -- a read from the shared protocol stream. A timed-out backend is retired and
 -- its session is replayed by the established recovery path before reuse.
@@ -2497,7 +2551,14 @@ runBehavioralCommand st active synthesisEnvironment code annotation = do
         Right backend -> do
           environmentOr <- if synthesisEnvironment
             then fmap (fmap Just) (ensureSynthEnv st)
-            else Right . rsEnv <$> readIORef st
+            else do
+              -- Recovery must not grant a new setup allowance to an active
+              -- query. A missing root uses only the current request/deadline
+              -- allowance; the actual check recomputes that allowance below.
+              rootSeconds <- behavioralRequestSeconds st active
+              case rootSeconds of
+                Nothing -> pure (Left "the synthesis deadline has no time for another check")
+                Just limit -> ensureBehavioralUserEnvironment st (Just limit)
           case environmentOr of
             Left failure -> pure (Left failure)
             Right environment -> do
@@ -5951,6 +6012,7 @@ run opts = do
         , rsProjectDir = project
         , rsEnv = Nothing
         , rsBaseEnv = Nothing
+        , rsEmptyUserCheckEnv = Nothing
         , rsSnapshotBase = Nothing
         , rsEnvStack = []
         , rsImports = optImports opts

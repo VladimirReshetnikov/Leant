@@ -2659,6 +2659,8 @@ hostBehavioralTests = testGroup "host behavioral synthesis"
             "behavioralCheckedResponse ::" sourceLines
       prepare <- expectMainSourcePosition "behavioral cold-start boundary"
         "prepared <- ensureSynthEnv st" entrance
+      userRoot <- expectMainSourcePosition "behavioral cold-start boundary"
+        "userEnvironment <- ensureBehavioralUserEnvironment st (rsTimeout state)" entrance
       preparedGuard <- expectMainSourcePosition "behavioral cold-start boundary"
         "Right _ -> runPrepared" entrance
       clock <- expectMainSourcePosition "behavioral cold-start boundary"
@@ -2666,7 +2668,8 @@ hostBehavioralTests = testGroup "host behavioral synthesis"
       preflight <- expectMainSourcePosition "behavioral cold-start boundary"
         "syntax <- runBehavioralCommand st initial True" entrance
       assertBool "cold setup consumed the assertion allowance or bypassed preparation failure"
-        $ prepare < preparedGuard && preparedGuard < clock && clock < preflight
+        $ prepare < userRoot && userRoot < preparedGuard
+            && preparedGuard < clock && clock < preflight
       assertMainSourceContains "unchanged behavioral request deadline" entrance
         "BehavioralRun query deadline observations"
       length (mainSourcePositions "started <- getCurrentTime" entrance) @?= 1

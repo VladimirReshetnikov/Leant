@@ -197,7 +197,13 @@ a claim about physical pipe byte encoding. The [diagnostic receipt](receipts/req
 records the strict build, 14 focused controls and all 686 unit tests passing,
 the complete failed append baseline, and the matched empty-session control.
 The control's actual False rejection passes while its trace exceeds the row
-cap; these are distinct outcomes. Production root reuse is still pending.
+cap; these are distinct outcomes. The subsequent
+[production reuse repair](../docs/reports/2026-09-07-empty-environment-reuse.md)
+passes the original native append/length workloads and four lifecycle sessions,
+including empty-session backend retirement and namespace isolation. Its
+[receipt](receipts/empty-user-environment.json) records all 686 unit tests passing
+and preserves the new native False traces' explicit 184-record omissions.
+Exact lifecycle command fixtures are in [fixtures/empty-user-environment](fixtures/empty-user-environment).
 
 The supplied family declares fresh FoldFixture.Seq, Tree, and Count datatypes,
 their equality instances, and two structurally recursive fold definitions.

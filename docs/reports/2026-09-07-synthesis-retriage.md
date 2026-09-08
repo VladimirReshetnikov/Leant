@@ -18,7 +18,7 @@ is complete. Priorities 2–4 retain their original requirements.
 
 | Order | Delivery | Required acceptance |
 | --- | --- | --- |
-| 1 | Reuse the exact empty user environment for native verification | Apply the request-correlated diagnosis without borrowing synthesis helpers or changing the real user state. Require the original append/length positive and False workloads at unchanged bounds, exact full-type kernel replay, empty-session reuse and namespace isolation, reset invalidation, and backend retirement/reconstruction. Initial setup and active-query recovery must retain their distinct deadline boundaries. |
+| 1 | Broaden supplied-fold acceptance after the native verification repair | Exact empty-user-root reuse now passes native Djinn append/length, lifecycle isolation/reset/recovery and the complete 686-test suite. Continue the remaining engine and supplied tree-fold/accumulator cases with exact provider inventories, full-signature behavior and termination-checked replay. Keep existing bounds and failure classifications. |
 | 2 | Execute broader Church behavior independently | Run additional totals and all 19 explicit-default counterparts in both Haskell engines and all three Lean modes. Require controlled providers, actual False controls and independent exact full-signature replay. Record success, timeout and inconclusive outcomes per cell. These cells need not wait for native fold repair. |
 | 3 | Admit one described global contextual provider | Extend the existing `Type 0` route with one fully described global provider while retaining the current non-overlap guard. Preserve complete source metadata, exact owned graph/renderer evidence and payload-sensitive replay; do not broaden instances or universes as part of this increment. |
 | 4 | Preserve selected dictionary identity before relaxing overlap guards | Carry the selected introduction occurrence and ordered slot through lowering and reconstruction. Require a forced equal-predicate outer/inner fixture whose faithful scoped capture preserves distinct payload behavior in Haskell and Lean replay. Graph IDs or successful compilation alone are insufficient. Methods, superclass evidence and further provider schemes remain separate extensions. |
@@ -82,8 +82,15 @@ initialization. The matched append control passes in 24.85 seconds with exact
 kernel replay, and its actual False control passes in 10.19 seconds. The latter
 trace retains 128 requests and explicitly omits 187, so its diagnostic capture
 remains incomplete. The [receipt](../../test-recursive/receipts/request-correlation.json)
-preserves all boundaries. Production root reuse, isolation, reset and backend
-recovery remain the next acceptance gate.
+preserves all boundaries. This diagnostic checkpoint is now followed by
+[accepted production root reuse](2026-09-07-empty-environment-reuse.md): the
+original append and length workloads pass, as do four lifecycle sessions with
+11 queries, four exact replays and ten empty axiom inventories. The strict build
+and complete 686-test suite pass in 335.32 seconds. Positive native traces are
+complete with no timeout; each actual False control passes with 87 falsifications
+while explicitly omitting 184 payload records at the unchanged row cap. The
+[production receipt](../../test-recursive/receipts/empty-user-environment.json)
+keeps those diagnostic omissions separate from behavioral acceptance.
 
 Both partial Church oracle preflights pass: 20 Lean files with 491 exact
 inventories (487 empty and four named observer/proof allowances), and 63 Haskell
@@ -104,7 +111,7 @@ error is repairable.
 
 | Idea | Promotion criterion |
 | --- | --- |
-| Exact accepted-candidate provenance and reproducible replay | Retain the accepted 39-cell/680-test boundaries, non-forcing diagnostics and direct kernel pinning. Retain bounded request capture and its whole-record omission accounting. Use the matched empty-environment diagnosis for the next fix; defer a general tracing framework. |
+| Exact accepted-candidate provenance and reproducible replay | Retain the accepted 39-cell/680-test boundaries, non-forcing diagnostics and direct kernel pinning. Retain bounded request capture and its whole-record omission accounting. Keep the accepted empty-environment repair and lifecycle controls as regressions; defer a general tracing framework. |
 | Routing-test maintenance | When touching a routing boundary, replace brittle source-text counts with executable routing or boundary controls where practical. Preserve coverage; this is incremental maintenance, not a separate cleanup milestone. |
 | Tree folds and accumulator programs | Extend after native verification is reliable, independently of dictionary work. Select a missing program with exact supplied-provider inventory, full-signature behavior and termination checking. |
 | Native Windows Length acquisition | Promote for a concrete Windows workflow. Require bounded acquisition, actual solver execution and independent replay; existing refusal behavior and Length tests do not implement the missing acquisition route. |

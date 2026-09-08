@@ -222,6 +222,8 @@ Reports are listed oldest first.
 
 - 2026-09-07 — [Exact request correlation and empty-session verification](2026-09-07-empty-environment-diagnosis.md)
 
+- 2026-09-07 — [Exact empty-user-environment reuse](2026-09-07-empty-environment-reuse.md)
+
 ## Standalone PDF reports
 
 Longer typeset surveys live in their own subdirectories:
