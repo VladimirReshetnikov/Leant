@@ -1,0 +1,66 @@
+{
+  "format": "global-method-integration-v1",
+  "status": "passed within the stated Type-0 method and cache diagnostic scope",
+  "djex_revision": "4a4ed0fc23f76d7b82b06496e03adfadbf374f84",
+  "archive": {
+    "path": "global-method-integration.zip",
+    "sha256": "0fd57d31c77aba0d3a495f5db70a3745df50072664c0c98d179057e02fd5041e",
+    "bytes": 11464229,
+    "members": 7576,
+    "all_member_hashes_verified": true
+  },
+  "reports": {
+    "methods": {
+      "archive_member": "runs/global-method-portable-native-v2/results.json",
+      "sha256": "e85fb700567f1246fbab9d8178eac9601603d060cc441d14fed6a4e531bf19fa"
+    },
+    "controls": {
+      "archive_member": "runs/global-method-portable-controls512-v1/results.json",
+      "sha256": "75e8792533a39bd9e0235e7d2ab5832f17ccefb820bac6b859b342c5abee8b13"
+    },
+    "local_context": {
+      "archive_member": "runs/global-method-local-regression-v1/results.json",
+      "sha256": "d55a256bf50dbf4a5a89a6fb8249c2837faa7aa87fa4e5c955858b0d47d47ed5"
+    },
+    "unit": {
+      "archive_member": "runs/global-method-full-unit-final-v2/results.json",
+      "sha256": "412b7e0a1416bf9c51813cdb241cfcb49c25ea48560cdcfd66cf3412b1b76cb8"
+    }
+  },
+  "counts": {
+    "method_cases": 6,
+    "method_payload_observations": 24,
+    "supplemental_sessions": 9,
+    "supplemental_replays": 21,
+    "cache_alternations": 6,
+    "literal_false_controls": 3,
+    "local_context_cells": 39,
+    "unit_tests": 701
+  },
+  "capture_rows": 512,
+  "capture_requests": {
+    "global_djinn_literal_false": 12,
+    "global_djinn_ordinary_cache": 99,
+    "global_djinn_where_cache": 102,
+    "global_exference_literal_false": 12,
+    "global_exference_ordinary_cache": 395,
+    "global_exference_where_cache": 398,
+    "global_both_literal_false": 15,
+    "global_both_ordinary_cache": 427,
+    "global_both_where_cache": 430
+  },
+  "unit_seconds": 370.42,
+  "historical_diagnostics": [
+    "global-method-full-unit-final-v1",
+    "global-method-portable-controls32-v1",
+    "global-method-original-window4-v1",
+    "global-context-full-unit-v2",
+    "global-method-local-metadata-diagnostic-v1"
+  ],
+  "boundaries": [
+    "The original four-slot cache query remains a failed search diagnostic.",
+    "The cache alternations use explicit 32-slot search/verification and 512-record capture settings; product defaults are unchanged.",
+    "Mixed inventories containing unsupported source packets, overlapping dictionaries and richer universes remain outside this increment.",
+    "This milestone adds no Church behavioral cells or tree-accumulator acceptance; the full priorities 1-4 goal remains open."
+  ]
+}

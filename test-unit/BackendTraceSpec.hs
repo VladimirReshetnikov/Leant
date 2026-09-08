@@ -229,6 +229,29 @@ backendTraceTests = testGroup "opt-in backend transport trace"
       (jLookup "omissions" capture >>= jLookup "row_limit") @?= Just (JInt 1)
       second <- readBackendTrace trace >>= requireCapture
       capture @?= second
+  , testCase "explicit request limit retains later owners without changing requests" $ do
+      trace <- newBackendTraceWithRequestLimit 130 0
+      withBackend (Just trace) "reflect" $ \backend -> do
+        replicateM_ 130 $ expectReceived payload =<< request backend (Just 5) payload
+        expectReceived payload =<< requestWithTraceAnnotation backend (Just 5) payload
+          (error "selected row-full capture evaluated metadata")
+      capture <- readBackendTrace trace >>= requireCapture
+      rows <- requireRows capture
+      jLookup "row_limit" capture @?= Just (JInt 130)
+      map (jLookup "request_id") rows @?= map (Just . JInt) [1 .. 130]
+      jLookup "omitted_records" capture @?= Just (JInt 1)
+      jLookup "total_byte_limit" capture @?= Just (JInt $ 4 * 1024 * 1024)
+  , testCase "request limit clamps excessive and negative diagnostic settings" $ do
+      large <- newBackendTraceWithRequestLimit 100000 0 >>= readBackendTrace >>= requireCapture
+      jLookup "row_limit" large @?= Just (JInt 1024)
+      zero <- newBackendTraceWithRequestLimit (-1) 0
+      withBackend (Just zero) "reflect" $ \backend ->
+        expectReceived payload =<< requestWithTraceAnnotation backend (Just 5) payload
+          (error "zero-row capture evaluated metadata")
+      empty <- readBackendTrace zero >>= requireCapture
+      jLookup "row_limit" empty @?= Just (JInt 0)
+      jLookup "requests" empty @?= Just (JArr [])
+      jLookup "omitted_records" empty @?= Just (JInt 1)
   , testCase "aggregate capture bound admits whole exact-size payloads only" $ do
       trace <- newBackendTraceWithRequests 0
       let exactSizePayload = JStr $ replicate (256 * 1024 - 2) 'x'

@@ -31,11 +31,15 @@ deadline and a separate 120-second process guard. Contextual ordinary queries
 verify bounded groups incrementally and present the assessed stream prefix;
 they do not rank an unobserved whole candidate pool.
 
-This accepts local `Type 0` contexts with complete source metadata. Global
-contextual providers, richer universe metadata and selection between equal
-active dictionaries remain separate implementation gates. An explicit refusal
+That receipt accepts local `Type 0` contexts with complete source metadata.
+The [global-method runner](global-methods/README.md) adds actual projection
+discovery, complete provider source packets and exact cache/verification
+correlation. Its [implementation report](../docs/reports/2026-09-08-global-contextual-providers.md)
+records the new integration gates and repeat local-context results. Unsupported
+provider packets, richer universe metadata and selection between equal active
+dictionaries remain separate implementation gates. An explicit refusal
 counts only for its designated unsupported case, never for a positive query.
-The [re-triage report](../../docs/reports/2026-09-07-synthesis-retriage.md)
+The [re-triage report](../docs/reports/2026-09-07-synthesis-retriage.md)
 records the remaining scope and preserved historical failures.
 
 `run_serializer.py` separately compiles the exact production synthesis prelude

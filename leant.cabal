@@ -137,6 +137,7 @@ Test-Suite leant-synth-tests
     BackendTraceSpec
     ContextRenderSpec
     ContextSourceSpec
+    GlobalContextProviderSpec
     Leant.Backend
     Leant.Backend.Isolated
     Leant.Options

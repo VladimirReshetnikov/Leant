@@ -1,0 +1,17 @@
+:set synth-library off
+:set synth-classical off
+:set synth-providers on
+:set synth-provider-cap 1
+:set synth-debug on
+:set synth-ranking balanced
+:set synth-shown 1
+:set synth-djinn-strategy interleave
+:set synth-window 32
+:set synth-verify 32
+:set synth-steps 20000
+:set synth-budget 20000
+:set synth-timeout 45
+class Ctx.C (α : Type) where out : Nat
+:set synth-engine both
+:synth ∀ (α : Type), [Ctx.C α] → Nat
+:quit

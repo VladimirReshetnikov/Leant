@@ -2170,6 +2170,18 @@ accepted group recover that erased fallback; an explicit empty exact evidence
 block emits no fact and has no assignment to replay. Djinn's erased projection
 keeps historical assignment behavior.
 
+Goals carrying a complete lexical-context source packet use a separate
+provider route. `ProviderFragWithContextSource` retains the provider's closed
+source scheme and structured Lean name; both engines prepare it alongside the
+exact goal metadata. Class constraints are resolved from the candidate's
+lexical Givens, retaining their introduction and ordered dictionary slot, rather
+than being promoted to inventory-global facts. Contextual discovery bypasses
+the legacy provider cache because its key does not distinguish source-wire
+modes. See the [global contextual-provider implementation and regression
+report](reports/2026-09-08-global-contextual-providers.md) for the supported
+Type-0 fragment, native method discovery, cache checks and remaining refusals.
+The specialization route described below retains its existing behavior.
+
 Provider-scheme and exact-assignment serialization may retain a bounded
 contextual binder as `FExactContext`: the node records the exact nominal Lean
 class head, each ordered argument's bounded ground-kind arity, and its body, so

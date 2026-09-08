@@ -61,6 +61,7 @@ module Leant.Synth.Fragment
   , serializerProgram
   , providerProgram
   , providerProgramWith
+  , contextualProviderProgramWith
   , defaultProviderCap
   , candidateVerificationProgram
   , parseUniqueGoalTranslation
@@ -93,7 +94,7 @@ import qualified Data.Set as Set
 import Text.Read (readMaybe)
 import Leant.Synth.ContextSource
   ( ContextSource, ContextSourceType (..), ContextSourceVisibility (..)
-  , mkContextSource, contextSourceType, contextSourceName
+  , mkContextSource, mkContextProviderSource, contextSourceType, contextSourceName
   )
 
 
@@ -356,6 +357,15 @@ data ProviderFrag
   = ProviderFrag
       { providerLeanName :: String
       , providerTypeFrag :: Frag
+      }
+  | ProviderFragWithContextSource
+      { providerLeanName :: String
+      , providerTypeFrag :: Frag
+      , providerSourceNameParts :: [String]
+      , providerContextSource :: Either String ContextSource
+        -- ^ Command-local complete source packet. It carries no instance
+        -- assignments or facts. Unsupported packets stay explicit instead
+        -- of falling back to a context-erased provider scheme.
       }
   | ProviderFragWithBinders
       { providerLeanName :: String
@@ -1566,6 +1576,33 @@ contextSourcePrelude =
   , "  | none => pure (\" (context-source unsupported \" ++ esc"
   , "      \"exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows\" ++ \")\")"
   , ""
+  , "-- Only registered direct projections of actual session classes gain session priority."
+  , "-- A namespace sibling, ordinary structure, or superclass/subobject projection does not."
+  , "def contextSessionClassProjections (env : Environment) (sessions : List String) : Array Name :="
+  , "  env.constants.fold (init := #[]) fun selected className information =>"
+  , "    if !sessions.contains className.toString || !Lean.isClass env className then selected"
+  , "    else match information, Lean.getStructureInfo? env className with"
+  , "    | .inductInfo declaration, some structureInfo =>"
+  , "      structureInfo.fieldInfo.foldl (fun methods field =>"
+  , "        if field.subobject?.isSome then methods"
+  , "        else match env.getProjectionFnInfo? field.projFn with"
+  , "        | some projection =>"
+  , "          if projection.fromClass && declaration.ctors.contains projection.ctorName"
+  , "              && !methods.contains field.projFn then methods.push field.projFn"
+  , "          else methods"
+  , "        | none => methods) selected"
+  , "    | _, _ => selected"
+  , ""
+  , "def contextProviderSourcePacket (name : Name) (levels : List Name) (e : Expr) : MetaM String := do"
+  , "  let owner := (contextName? name).getD \"(name)\""
+  , "  let packetPrefix := \"(context-provider \" ++ esc name.toString ++ \" \" ++ owner"
+  , "  if !levels.isEmpty then"
+  , "    return packetPrefix ++ \" unsupported \" ++ esc \"provider constant has unretained universe parameters\" ++ \")\""
+  , "  match ← contextSourceType? 256 0 [] e with"
+  , "  | some source => pure (packetPrefix ++ \" 1 \" ++ source ++ \")\")"
+  , "  | none => pure (packetPrefix ++ \" unsupported \" ++ esc"
+  , "      \"provider source requires a closed Type-0 scheme with supported lexical binders\" ++ \")\")"
+  , ""
   , "end LeantSynth"
   ]
 
@@ -1623,7 +1660,16 @@ defaultProviderCap = 80
 -- @:set synth-provider-cap@ setting); ranking and exclusion rules are the
 -- same, only the prefix length differs.
 providerProgramWith :: Int -> [String] -> ProviderQuery -> String
-providerProgramWith cap sessionNames query = unlines
+providerProgramWith = providerProgramWithSourceMode False
+
+-- Contextual discovery prioritizes direct session-class projections within
+-- the existing cap and requests their complete schemes, without resolver-
+-- derived global instance evidence. Ordinary discovery keeps its own policy.
+contextualProviderProgramWith :: Int -> [String] -> ProviderQuery -> String
+contextualProviderProgramWith = providerProgramWithSourceMode True
+
+providerProgramWithSourceMode :: Bool -> Int -> [String] -> ProviderQuery -> String
+providerProgramWithSourceMode exactSource cap sessionNames query = unlines $
   [ "open Lean Meta Elab Command in"
   , "set_option linter.unusedVariables false in"
   , "run_cmd do"
@@ -1636,6 +1682,10 @@ providerProgramWith cap sessionNames query = unlines
         (providerQueryResultHead query)
   , "    let sessions : List String := ["
       ++ intercalate ", " (map leanString sessionNames) ++ "]"
+  , "    let sessionMethods : Array Name := "
+      ++ (if exactSource then "LeantSynth.contextSessionClassProjections env sessions" else "#[]")
+  , "    let isSession (n : Name) : Bool :="
+  , "      sessions.contains n.toString || sessionMethods.contains n"
   , "    let aux : List String :="
   , "      [\"rec\", \"recOn\", \"casesOn\", \"brecOn\", \"binductionOn\","
   , "       \"below\", \"ibelow\", \"noConfusion\", \"noConfusionType\","
@@ -1655,16 +1705,16 @@ providerProgramWith cap sessionNames query = unlines
   , "      | _ => false"
   , "    let names := env.constants.fold (init := #[]) fun a n _ =>"
   , "      if keep n && (roots.contains n.getRoot.toString"
-  , "          || sessions.contains n.toString) then a.push n else a"
+  , "          || isSession n) then a.push n else a"
   , "    let shorter (a b : Name) : Bool :="
   , "      let sa := a.toString"
   , "      let sb := b.toString"
   , "      if sa.length == sb.length then sa < sb else sa.length < sb.length"
   , "    let sorted := names.qsort shorter"
   , "    let sessionCandidates := sorted.toList.filter fun n =>"
-  , "      sessions.contains n.toString"
+  , "      isSession n"
   , "    let otherCandidates := sorted.toList.filter fun n =>"
-  , "      !sessions.contains n.toString"
+  , "      !isSession n"
   , "    let mut sessionPreferred : Array Name := #[]"
   , "    let mut preferred : Array Name := #[]"
   , "    let mut sessionFallback : Array Name := #[]"
@@ -1680,7 +1730,7 @@ providerProgramWith cap sessionNames query = unlines
   , "        if typeLevel then pure () else"
   , "          let head \8592 LeantSynth.resultHead? info.type"
   , "          let exactHead := head.map (fun n => n.toString) == targetHead"
-  , "          let session := sessions.contains n.toString"
+  , "          let session := isSession n"
   , "          if session then"
   , "            if exactHead then"
   , "              sessionPreferred := sessionPreferred.push n"
@@ -1704,7 +1754,11 @@ providerProgramWith cap sessionNames query = unlines
   , "      match env.find? n with"
   , "      | none => pure ()"
   , "      | some info =>"
-  , "        let frag \8592 LeantSynth.go true false 80 0 [] info.type"
+  ] ++ (if exactSource then
+  [ "        let source ← LeantSynth.contextProviderSourcePacket n info.levelParams info.type"
+  , "        body := body ++ \" \" ++ source"
+  ] else
+  [ "        let frag \8592 LeantSynth.go true false 80 0 [] info.type"
   , "        let binders \8592 LeantSynth.leadingTypeBinderNames 80 info.type"
   , "        -- Exact assignments are optional evidence. A difficult instance"
   , "        -- branch must not erase this provider or earlier inventory entries."
@@ -1725,7 +1779,8 @@ providerProgramWith cap sessionNames query = unlines
   , "        body := body ++ \" (provider \" ++ LeantSynth.esc n.toString"
   , "          ++ \" (binders\" ++ binderText ++ \")\" ++ evidenceText"
   , "          ++ \" \" ++ frag ++ \")\""
-  , "    logInfo (\"(providers\" ++ body ++ \")\")"
+  ]) ++
+  [ "    logInfo (\"(providers\" ++ body ++ \")\")"
   ]
  where
   leanString s = '"' : concatMap escape s ++ "\""
@@ -1907,6 +1962,25 @@ parseProviderSexp text = do
     _ -> Left "malformed provider translation"
  where
   providers (TR : rest) = Right ([], rest)
+  providers (TL : TSym "context-provider" : TStr name : TL : TSym "name" : rest) = do
+    (parts, afterName) <- sourceNameParts 0 rest
+    (source, afterSource) <- case afterName of
+      TSym "1" : body -> do
+        (parsed, remaining) <- parseContextSourceType 256 body
+        pure (mkContextProviderSource parsed, remaining)
+      TSym "unsupported" : TStr reason : remaining ->
+        pure (Left $ "context-source: " ++ reason, remaining)
+      _ -> Left "context-source: malformed provider source-packet version"
+    case afterSource of
+      TR : more -> do
+        (tailProviders, final) <- providers more
+        let checkedSource
+              | null parts || contextSourceName parts /= name =
+                  Left "context-source: provider name does not match its structured owner"
+              | otherwise = source
+            fragment = either (const FDepth) contextSourceFragment checkedSource
+        pure (ProviderFragWithContextSource name fragment parts checkedSource : tailProviders, final)
+      _ -> Left "context-source: malformed provider source-packet delimiters"
   providers (TL : TSym "provider" : TStr name : rest) = do
     (binderMetadata, evidenceMetadata, fragTokens) <- providerMetadata rest
     (frag, rest') <- parseExactFrag fragTokens
@@ -1926,6 +2000,12 @@ parseProviderSexp text = do
         Right (provider : tailProviders, final)
       _ -> Left "malformed (provider ...)"
   providers _ = Left "malformed provider inventory"
+
+  sourceNameParts _ (TR : remaining) = Right ([], remaining)
+  sourceNameParts count (TStr part : remaining) | count < (64 :: Int) = do
+    (parts, final) <- sourceNameParts (count + 1) remaining
+    pure (part : parts, final)
+  sourceNameParts _ _ = Left "context-source: invalid global provider name"
 
   -- Accept the historical metadata-free form for caller-owned inventories
   -- and old snapshots. New live discovery always emits an aligned binder

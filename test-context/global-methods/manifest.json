@@ -1,0 +1,14 @@
+{
+  "format": "global-method-fixtures-v1",
+  "scope": "Exact cap-one class method; full source types and dictionary payload observations. Source/runtime inputs are pinned before and after each run.",
+  "files": [
+    {
+      "path": "MethodOracle.lean",
+      "sha256": "b0b3d2eeacf30169adb6420357e9434f414cff0f6413b59477547c3ecce13793"
+    },
+    {
+      "path": "ProjectionOracle.lean",
+      "sha256": "f8ec292ccb0fb23b547588c194e0e6063e04e5b9ff8a7a913a56a240b2d1511d"
+    }
+  ]
+}

@@ -149,8 +149,9 @@ Companion documents:
   explicit metadata refusals. Each accepted variant retains its own graph,
   renderer and engine; the replay kernel and inputs are pinned. Ordinary-data
   synthesis separately retains its 24 accepted cells. This bounded milestone
-  advances original priority 3; global contextual providers, equal-predicate
-  dictionary selection, methods and superclass evidence remain open.
+  advances original priority 3. The global-method increment below extends it;
+  mixed inventories, equal-predicate dictionary selection and superclass
+  evidence remain open.
   Canonical Djex's supported-fragment Haskell elaboration completes original
   priority 1; priorities 2–4 retain their broader requirements.
   [Exact empty-user-environment reuse](docs/reports/2026-09-07-empty-environment-reuse.md)
@@ -163,20 +164,18 @@ Companion documents:
   from unique coherent lexical class assumptions in both engines. Its strict
   build and all 2,304 tests in 15 complete suites pass; four public Haskell API
   cases retain full signatures and distinguish actual dictionary payloads.
-  The [latest integration triage](docs/reports/2026-09-08-integration-retriage.md)
-  records the working global-method prototype against `4a4ed0fc`: all 13 focused
-  tests, six native ordinary/where method cases with full-type replay and
-  24 observations, and three actual False controls pass. The published dependency
-  remains `a44f7057` until this prototype completes its regression gates.
-  The full suite passed 698/699; its corrected source-text test passes in isolation,
-  with a complete rerun still due. Cache/discovery and local-context regression
-  closure come first, followed by Haskell loaded-provider admission and
-  implicit-root behavioral scoping, missing Church constructions, and supplied
-  tree folds as an independent delivery. The cache diagnostic exposed an ordinary
-  verification trace mismatch; it does not establish a cache defect. The detailed
-  triage keeps the original four-slot search miss separate from the 32-slot
-  diagnostic. Two Exference ranking experiments still yielded 256 false
-  `maybeEither` candidates and were restored.
+  [Global contextual method synthesis](docs/reports/2026-09-08-global-contextual-providers.md)
+  now carries complete source schemes and lexical class assumptions through
+  discovery, both synthesis engines and Lean reconstruction. The pinned Djex
+  dependency is `4a4ed0fc`. Six ordinary/where method cases pass with exact
+  full-type replay and 24 dictionary-payload observations; nine cache/False
+  sessions, the fresh 39-cell local-context matrix, a strict build and all
+  701 boundary tests pass. Cache acceptance uses an explicit 32-candidate window
+  and 512-record diagnostic capture; the original four-candidate search still
+  misses its required implementation, and product defaults are unchanged.
+  Next come Haskell loaded-provider admission and implicit-root scoping, Lean
+  mixed inventories containing dictionary constructors, and missing Church
+  constructions. Supplied tree folds remain an independent delivery.
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
   now includes separate-run acceptance of 12/13 extended operations in each
   Haskell engine and 2/4 Exference explicit-default cases. Lean Exference's

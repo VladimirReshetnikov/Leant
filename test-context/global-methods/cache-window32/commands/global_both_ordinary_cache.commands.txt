@@ -1,0 +1,22 @@
+:set synth-library off
+:set synth-classical off
+:set synth-providers on
+:set synth-provider-cap 1
+:set synth-debug on
+:set synth-ranking balanced
+:set synth-shown 1
+:set synth-djinn-strategy interleave
+:set synth-window 32
+:set synth-verify 32
+:set synth-steps 20000
+:set synth-budget 20000
+:set synth-timeout 45
+class Ctx.C (α : Type) where out : Nat
+:set synth-engine both
+:set synth-window 32
+:synth global_both_ordinary_cache_legacy_first : ∀ (α : Type), Ctx.C α → Nat where (@global_both_ordinary_cache_legacy_first Nat (@Ctx.C.mk Nat 7) = 14) ∧ (@global_both_ordinary_cache_legacy_first Nat (@Ctx.C.mk Nat 11) = 22) ∧ (@global_both_ordinary_cache_legacy_first Bool (@Ctx.C.mk Bool 11) = 22) ∧ (@global_both_ordinary_cache_legacy_first Bool (@Ctx.C.mk Bool 7) = 14)
+:set synth-window 32
+:synth ∀ (α : Type), [Ctx.C α] → Nat
+:set synth-window 32
+:synth global_both_ordinary_cache_legacy_hit : ∀ (α : Type), Ctx.C α → Nat where (@global_both_ordinary_cache_legacy_hit Nat (@Ctx.C.mk Nat 7) = 14) ∧ (@global_both_ordinary_cache_legacy_hit Nat (@Ctx.C.mk Nat 11) = 22) ∧ (@global_both_ordinary_cache_legacy_hit Bool (@Ctx.C.mk Bool 11) = 22) ∧ (@global_both_ordinary_cache_legacy_hit Bool (@Ctx.C.mk Bool 7) = 14)
+:quit

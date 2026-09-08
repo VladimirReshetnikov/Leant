@@ -33,6 +33,7 @@ import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Time.LocalTime (getZonedTime)
 import Numeric.Natural (Natural)
+import Text.Read (readMaybe)
 import System.Console.Haskeline
 import System.Directory
   ( copyFile
@@ -173,6 +174,7 @@ import Leant.Synth.Fragment
   , parseProviderSexp
   , propAtoms
   , providerProgramWith
+  , contextualProviderProgramWith
   , defaultProviderCap
   , serializerProgram
   , stripRecCtors
@@ -791,8 +793,15 @@ runCmd st env code = runPayload st (commandPayload env code)
 -- 'ensureBackend'.  Environment ids are local to one backend process, so
 -- capturing @rsEnv@ before restart/replay can address an unrelated new id.
 runCurrentCmd :: St -> String -> IO (Either String JValue)
-runCurrentCmd st code = runPayloadAfterBackend st $ \state ->
-  commandPayload (rsEnv state) code
+runCurrentCmd st code = runCurrentCmdWithTraceAnnotation st code Nothing
+
+-- Optional local diagnostics share the same environment recovery and request
+-- boundary. They are not sent to Lean and remain lazy when capture is disabled.
+runCurrentCmdWithTraceAnnotation
+  :: St -> String -> Maybe JValue -> IO (Either String JValue)
+runCurrentCmdWithTraceAnnotation st code annotation =
+  runPayloadAfterBackendWithTraceAnnotation st
+    (\state -> commandPayload (rsEnv state) code) annotation
 
 commandPayload :: Maybe Integer -> String -> JValue
 commandPayload env code = JObj
@@ -835,13 +844,22 @@ runPayloadAfterBackend
   :: St
   -> (ReplState -> JValue)
   -> IO (Either String JValue)
-runPayloadAfterBackend st makePayload = do
+runPayloadAfterBackend st makePayload =
+  runPayloadAfterBackendWithTraceAnnotation st makePayload Nothing
+
+runPayloadAfterBackendWithTraceAnnotation
+  :: St
+  -> (ReplState -> JValue)
+  -> Maybe JValue
+  -> IO (Either String JValue)
+runPayloadAfterBackendWithTraceAnnotation st makePayload annotation = do
   backendOr <- ensureBackend st
   case backendOr of
     Left err -> pure (Left err)
     Right backend -> do
       state <- readIORef st
-      result <- request backend (rsTimeout state) (makePayload state)
+      result <- requestWithTraceAnnotation backend (rsTimeout state)
+        (makePayload state) annotation
       case result of
         Right v -> pure (Right v)
         Left RequestTimeout -> do
@@ -2452,7 +2470,7 @@ runBehavioralSynth st query = do
     observations <- newIORef []
     let initial = BehavioralRun query deadline observations
     syntax <- runBehavioralCommand st initial True (behavioralSyntaxProgram query)
-      (Just $ behavioralTraceAnnotation "syntax" (behavioralType query) Nothing)
+      (Just $ synthTraceAnnotation "syntax" (behavioralType query) Nothing)
     case syntax >>= behavioralCheckedResponse of
       Left failure -> reject failure
       Right () -> case resolveSynthCommandGoal state (behavioralType query) of
@@ -2463,7 +2481,7 @@ runBehavioralSynth st query = do
                 active = initial { behavioralRunQuery = checkedQuery }
             preflight <- runBehavioralCommand st active False
               (behavioralPreflightProgram checkedQuery)
-              (Just $ behavioralTraceAnnotation "preflight" translatedGoal Nothing)
+              (Just $ synthTraceAnnotation "preflight" translatedGoal Nothing)
             case preflight >>= behavioralCheckedResponse of
               Left failure -> reject failure
               Right () -> case startupLengthAssessmentRequest
@@ -2585,8 +2603,8 @@ runBehavioralCommand st active synthesisEnvironment code annotation = do
 -- request capture. A compatibility survivor can carry a deferred lookup over
 -- an opposing Both lane; diagnostics must never demand that optional recovery.
 -- These fields identify an invocation, not a graph or kernel certificate.
-behavioralTraceAnnotation :: String -> String -> Maybe DetailedVerificationVariant -> JValue
-behavioralTraceAnnotation role goal candidate = JObj
+synthTraceAnnotation :: String -> String -> Maybe DetailedVerificationVariant -> JValue
+synthTraceAnnotation role goal candidate = JObj
   [ ("role", JStr role)
   , ("requested_type", JStr goal)
   , ("candidate", maybe JNull (JStr . detailedVerificationVariantText) candidate)
@@ -3135,7 +3153,7 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
         SynthLaneRunRefuted True -> do
           providers <-
             if discoverProviders
-              then loadSynthProviders st (pgProviderQuery parsed)
+              then loadSynthProvidersForGoal st parsed
               else pure []
           if null providers
             then report deadline baseline
@@ -3150,7 +3168,7 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
     else do
       providers <-
         if discoverProviders
-          then loadSynthProviders st (pgProviderQuery parsed)
+          then loadSynthProvidersForGoal st parsed
           else pure []
       case refusal of
         Just reason
@@ -3163,7 +3181,7 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
   continueAfterBaseline runDeadline runLane discover ranking laneEngine baseline = do
     providers <-
       if discover
-        then loadSynthProviders st (pgProviderQuery parsed)
+        then loadSynthProvidersForGoal st parsed
         else pure []
     let accumulation = synthLaneRunAccumulation baseline
         checked = Set.fromList
@@ -3332,11 +3350,24 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
 -- provider failure degrades to structural synthesis: inventory discovery is
 -- an optimization and never weakens the ordinary Djinn/Exference boundary.
 loadSynthProviders :: St -> ProviderQuery -> IO [ProviderFrag]
-loadSynthProviders st query = do
-  cached <- atomicModifyIORef' st $ \state ->
-    let (result, cache') = lookupProviderCache
-          (rsProviderWorld state) query (rsProviderCache state)
-    in (state { rsProviderCache = cache' }, result)
+loadSynthProviders = loadSynthProvidersWithSourceMode False
+
+loadSynthProvidersForGoal :: St -> ParsedGoal -> IO [ProviderFrag]
+loadSynthProvidersForGoal st parsed = case parsedGoalContextSource parsed of
+  Nothing -> loadSynthProviders st $ pgProviderQuery parsed
+  Just _ -> loadSynthProvidersWithSourceMode True st $ pgProviderQuery parsed
+
+-- The legacy cache key has no source-wire mode. Exact contextual packets
+-- bypass that cache, so an earlier erased inventory cannot donate authority.
+-- Discovery is still once per provider entrance, bounded by the same cap and
+-- command deadline; no candidate failure reruns it or refunds search work.
+loadSynthProvidersWithSourceMode :: Bool -> St -> ProviderQuery -> IO [ProviderFrag]
+loadSynthProvidersWithSourceMode exactSource st query = do
+  cached <- if exactSource then pure Nothing else
+    atomicModifyIORef' st $ \state ->
+      let (result, cache') = lookupProviderCache
+            (rsProviderWorld state) query (rsProviderCache state)
+      in (state { rsProviderCache = cache' }, result)
   maybe discover pure cached
  where
   discover = do
@@ -3349,7 +3380,8 @@ loadSynthProviders st query = do
             sessionNames = nub
               (concatMap sessionDeclNames (rsHistory state))
         result <- runCmd st (Just env)
-          (providerProgramWith (rsSynthProviderCap state) sessionNames query)
+          ((if exactSource then contextualProviderProgramWith else providerProgramWith)
+            (rsSynthProviderCap state) sessionNames query)
         case result of
           Right response
             | not (hasErrors response), Nothing <- respFatal response ->
@@ -3361,7 +3393,7 @@ loadSynthProviders st query = do
                   ] of
                   translated : _ -> case parseProviderSexp translated of
                     Right providers -> do
-                      modifyIORef' st $ \current ->
+                      unless exactSource $ modifyIORef' st $ \current ->
                         if rsProviderWorld current == world
                           then current
                             { rsProviderCache = insertProviderCache
@@ -4267,7 +4299,8 @@ synthVerify successQuota st goal groups = do
     -- and every group beyond the success quota are absent.
     modifyIORef' reverseAttempts (variant :)
     let term = detailedVerificationVariantText variant
-    result <- runCurrentCmd st (candidateVerificationProgram goal term)
+    result <- runCurrentCmdWithTraceAnnotation st (candidateVerificationProgram goal term)
+      (Just $ synthTraceAnnotation "type-verification" goal $ Just variant)
     pure $ case result of
       Left _ -> VariantRejected BackendRequestFailure
       Right response
@@ -4309,7 +4342,7 @@ synthVerifyBehavioral active successQuota st goal groups = do
     result <- runBehavioralCommand st active False
       (candidateVerificationProgram (goal ++ "\n")
         (detailedVerificationVariantText variant ++ "\n"))
-      (Just $ behavioralTraceAnnotation "type-verification" goal $ Just variant)
+      (Just $ synthTraceAnnotation "type-verification" goal $ Just variant)
     case result of
       Left failure -> debugRequestFailure "type-verification" variant failure
       Right _ -> pure ()
@@ -4331,7 +4364,7 @@ synthVerifyBehavioral active successQuota st goal groups = do
     result <- runBehavioralCommand st active False
       (behavioralProofProgram method negatePredicate query
         $ detailedVerificationVariantText variant)
-      (Just $ behavioralTraceAnnotation role goal $ Just variant)
+      (Just $ synthTraceAnnotation role goal $ Just variant)
     case result of
       Left failure -> debugRequestFailure role variant failure
       Right _ -> pure ()
@@ -6001,7 +6034,9 @@ run opts = do
         Just path | not (null path) -> do
           absolute <- makeAbsolute path
           captureRequests <- (== Just "1") <$> lookupEnv "LEANT_BACKEND_TRACE_REQUESTS"
-          trace <- (if captureRequests then newBackendTraceWithRequests
+          captureRows <- fromMaybe 128 . (>>= readMaybe) <$>
+            lookupEnv "LEANT_BACKEND_TRACE_REQUEST_LIMIT"
+          trace <- (if captureRequests then newBackendTraceWithRequestLimit captureRows
                     else newBackendTrace) 16384
           pure $ Just (absolute, trace)
         _ -> pure Nothing

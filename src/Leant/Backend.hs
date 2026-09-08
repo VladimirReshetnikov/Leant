@@ -20,6 +20,7 @@ module Leant.Backend
   , BackendTraceSnapshot (..)
   , newBackendTrace
   , newBackendTraceWithRequests
+  , newBackendTraceWithRequestLimit
   , readBackendTrace
   , spawnBackendWithTrace
   , killBackend
@@ -180,7 +181,8 @@ data BackendTrace = BackendTrace
 -- Private, strict UTF-8 copies cannot retain a lazy candidate/source environment.
 -- Only whole records are admitted, independently of the transport event ring.
 data TraceRequestCapture = TraceRequestCapture
-  { capturedRequestBytes :: !Int
+  { capturedRequestRowLimit :: !Int
+  , capturedRequestBytes :: !Int
   , capturedRequestRows :: !(Seq.Seq TraceRequestRecord)
   , omittedRequestRows :: !Integer
   , omittedRequestPayloads :: !Integer
@@ -277,8 +279,14 @@ newBackendTrace = newBackendTraceWithCapture Nothing
 -- payload, 8 KiB per annotation and 4 MiB total retained UTF-8. These limits
 -- affect observation only, never the request or synthesis admission policy.
 newBackendTraceWithRequests :: Int -> IO BackendTrace
-newBackendTraceWithRequests capacity = do
-  capture <- newIORef $ TraceRequestCapture 0 Seq.empty 0 0 0 0 0
+newBackendTraceWithRequests = newBackendTraceWithRequestLimit requestRowLimit
+
+-- | Larger opt-in diagnostics may retain up to 1024 whole requests. The
+-- per-record and aggregate byte limits are unchanged; zero rows never demand
+-- optional metadata. The selected (clamped) limit is included in each snapshot.
+newBackendTraceWithRequestLimit :: Int -> Int -> IO BackendTrace
+newBackendTraceWithRequestLimit rows capacity = do
+  capture <- newIORef $ TraceRequestCapture (max 0 $ min 1024 rows) 0 Seq.empty 0 0 0 0 0
   newBackendTraceWithCapture (Just capture) capacity
 
 newBackendTraceWithCapture :: Maybe (IORef TraceRequestCapture) -> Int -> IO BackendTrace
@@ -376,7 +384,7 @@ captureTraceRequest
   omit omission = atomicModifyIORef' reference $ \state ->
     (omitTraceRequest omission state, ())
   fullCapture state
-    | Seq.length (capturedRequestRows state) >= requestRowLimit = Just RequestRowLimit
+    | Seq.length (capturedRequestRows state) >= capturedRequestRowLimit state = Just RequestRowLimit
     | capturedRequestBytes state >= requestByteLimit = Just RequestByteLimit
     | otherwise = Nothing
 captureTraceRequest _ _ _ _ = pure ()
@@ -410,7 +418,7 @@ traceRequestCaptureJson :: TraceRequestCapture -> JValue
 traceRequestCaptureJson state = JObj
   [ ("format", JStr "leant-backend-request-capture-v1")
   , ("encoding", JStr "canonical encodeJson UTF-8 without protocol framing")
-  , ("row_limit", JInt $ toInteger requestRowLimit)
+  , ("row_limit", JInt $ toInteger $ capturedRequestRowLimit state)
   , ("payload_byte_limit", JInt $ toInteger requestPayloadLimit)
   , ("annotation_byte_limit", JInt $ toInteger requestAnnotationLimit)
   , ("total_byte_limit", JInt $ toInteger requestByteLimit)

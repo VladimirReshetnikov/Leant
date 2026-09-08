@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "test-church"), str(ROOT / "lib/Djex/test-church")]
 
 import behavior_runtime as runtime
+import behavior_partial_probe as runtime_pins
 from run_corpus import reported_axioms, validate_settings
 
 
@@ -439,6 +440,9 @@ def validate_live(transcript, source, case):
 def source_inventory():
     paths = {Path(__file__).resolve(), ROOT / "test-context/test_production.py", ROOT / "leant.cabal", ROOT / "cabal.project",
              ROOT / "test-church/run_corpus.py",
+             ROOT / "test-church/behavior_partial_probe.py",
+             ROOT / "test-church/behavior_extended_probe.py",
+             ROOT / "test-church/behavior_probe.py",
              ROOT / "lib/Djex/test-church/behavior_runtime.py", ROOT / "lib/Djex/test-church/behavior_spec.py",
              ROOT / "lib/Djex/djex.cabal"}
     for directory in ["src", "test-unit", "lib/Djex/src", "lib/Djex/synthesis/src",
@@ -456,6 +460,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--leant", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--backend", type=Path)
     parser.add_argument("--engine", action="append", choices=("djinn", "exference", "both"))
     parser.add_argument("--mode", action="append", choices=("ordinary", "where"))
     parser.add_argument("--operation", action="append", choices=tuple(specifications()))
@@ -517,7 +522,12 @@ def main():
     if args.prepare_only:
         print(f"Prepared {len(cases)} isolated queries; no processes run.", flush=True)
         return 0
-    executable = args.leant.resolve()
+    args.lean, args.toolchain = str(args.lean_runtime), ""
+    report["source_hashes"] = {}
+    selected_executable, backend, lake, runtime_hashes = runtime_pins.runtime_identity(args, runtime, report)
+    executable = Path(selected_executable)
+    pinned_runtime_sources = dict(report["source_hashes"])
+    report["runtime_hashes_before"] = runtime_hashes
     digest = runtime.sha256(executable)
     report.update(status="running", executable=str(executable), executable_sha256=digest, kernel=kernel)
     processes = runtime.Processes(output, args.process_timeout)
@@ -546,8 +556,8 @@ def main():
                 if not unchanged(executable, digest):
                     raise ValueError("pinned Leant executable changed before execution")
                 source = Path(prepared["path"]).read_text(encoding="utf-8")
-                live = processes.run(case["name"] + "-live", [executable, "--plain"], source=source,
-                                     cwd=ROOT, env=dict(os.environ, LEANT_SYNTH_TIMEOUT=str(args.timeout)))
+                live = processes.run(case["name"] + "-live", [executable, "--plain", "--lake", str(lake)], source=source,
+                                     cwd=ROOT, env=dict({key: value for key, value in os.environ.items() if key not in ("LEANT_BACKEND_TRACE", "LEANT_BACKEND_TRACE_REQUESTS", "LEANT_BACKEND_TRACE_REQUEST_LIMIT")}, LEANT_BACKEND=str(backend), LEANT_SYNTH_TIMEOUT=str(args.timeout)))
                 if live.returncode:
                     raise ValueError("live Leant process exited unsuccessfully")
                 result = validate_live(live.stdout + live.stderr, source, case)
@@ -574,6 +584,9 @@ def main():
                       explicit_metadata_refusal_count=sum(row["status"] == "passed" and row.get("live", {}).get("status") == "unsupported"
                                                          for row in report["results"]))
     finally:
+        report["runtime_hashes_after"] = {str(Path(path)): runtime.sha256(path) for path in runtime_hashes}
+        report["runtime_sources_after"] = {str(Path(path)): runtime.sha256(path) for path in pinned_runtime_sources}
+        report["runtime_pins_unchanged"] = (report["runtime_hashes_after"] == runtime_hashes and report["runtime_sources_after"] == pinned_runtime_sources)
         report["source_hashes_after"] = hashes(source_inventory())
         report["sources_unchanged"] = report["source_hashes_after"] == before
         report["executable_unchanged"] = unchanged(executable, digest)
@@ -581,7 +594,7 @@ def main():
         report["kernel_executable_unchanged"] = kernel["sha256_after"] == kernel["sha256_before"]
         report["commands_unchanged"] = all(unchanged(case["commands"]["path"], case["commands"]["sha256"]) for case in cases)
         report["kernel_sources_unchanged"] = all(unchanged(item["path"], item["sha256"]) for item in generated)
-        if not all(report[key] for key in ("sources_unchanged", "executable_unchanged", "kernel_executable_unchanged", "commands_unchanged", "kernel_sources_unchanged")):
+        if not all(report[key] for key in ("runtime_pins_unchanged", "sources_unchanged", "executable_unchanged", "kernel_executable_unchanged", "commands_unchanged", "kernel_sources_unchanged")):
             report.update(status="failed", provenance_failure="source, executable, query, kernel executable or kernel input changed during acceptance")
         if report["status"] == "running":
             report.update(status="interrupted", failure="prepared acceptance inventory did not finish")

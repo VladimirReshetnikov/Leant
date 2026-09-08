@@ -287,7 +287,8 @@ import Leant.Synth.Fragment
   , renameFragBinder
   )
 import Leant.Synth.ContextSource
-  ( ContextSource, PreparedContextSource, prepareContextSource
+  ( ContextSource, PreparedContextSource, prepareContextSource, prepareContextSourceProviders
+  , contextSourceName
   , renderPreparedContextGraph
   )
 import Leant.Synth.Render
@@ -1504,15 +1505,28 @@ synthesizeContextualWithProvidersSkippingDetailedWith
   -> [ProviderFrag] -> ContextSource -> Frag -> Either String DetailedSynthOutcome
 synthesizeContextualWithProvidersSkippingDetailedWith streaming limits engine steps checked
     providers source frag = do
-  unless (null providers) $
-    Left "context-source: global provider inventory requires complete source metadata"
+  mapM_ contextualProviderPacket providers
   unless (frag == contextSourceFragment source) $
     Left "context-source: packet does not own the supplied search fragment"
   let run = runTunedSynthesisWithContext (Just source) streaming limits True engine steps
-        (synthLimitWindow limits, synthLimitBudget limits) checked [] [] frag frag
+        (synthLimitWindow limits, synthLimitBudget limits) checked providers [] frag frag
   -- Exact-context collection is incremental in both command modes. The
   -- Boolean still owns behavioral search policy, including unused inputs.
   Right $ deferDetailedOutcome run
+
+-- Only the command-local source wire can authorize a contextual value. Its
+-- complete scheme owns the fragment; ordinary snapshots remain unsupported.
+contextualProviderPacket :: ProviderFrag -> Either String ([String], ContextSource)
+contextualProviderPacket provider = case provider of
+  ProviderFragWithContextSource _ fragment parts packet -> do
+    source <- either
+      (Left . ("context-source: global provider inventory requires complete source metadata: " ++))
+      Right packet
+    unless (providerLeanName provider == contextSourceName parts
+        && fragment == contextSourceFragment source) $
+      Left "context-source: provider packet does not own its name and scheme"
+    pure (parts, source)
+  _ -> Left "context-source: global provider inventory requires complete source metadata"
 
 -- | Named behavioral queries consume the same bounded backend trace as it
 -- arrives, rather than waiting to rank a complete frontend candidate pool.
@@ -1673,10 +1687,13 @@ prepareSynthesisWithContext
   -> [(String, Frag)] -> Frag -> Frag -> Either String PreparedSynthesis
 prepareSynthesisWithContext contextSource recursiveProjection activeProviders extras engineFrag fitFrag = do
   when (contextSource /= Nothing) $ do
-    unless (null activeProviders && null extras && engineFrag == fitFrag) $
+    mapM_ contextualProviderPacket activeProviders
+    unless (null extras && engineFrag == fitFrag) $
       Left "context-source: provider, premise or changed fitting target lacks exact metadata"
   translation <- prepareProviderGroundFactTranslation
-    recursiveProjection activeProviders extras engineFrag
+    (if isJust contextSource
+      then recursiveProjection { providerContextProjection = RetainProviderContexts }
+      else recursiveProjection) activeProviders extras engineFrag
   let sourceGoal = translationSourceGoal translation
       draftProviderBindings = translationProviderBindings translation
       callerPremises = translationCallerPremises translation
@@ -1704,8 +1721,14 @@ prepareSynthesisWithContext contextSource recursiveProjection activeProviders ex
   contextual <- traverse (\source -> do
     unless (null constructorPremises && null callerPremises) $
       Left "context-source: constructor or caller premises require source metadata"
-    prepareContextSource (translationContextClasses translation)
-      (translationContextNominals translation) sourceGoal source) contextSource
+    goalMetadata <- prepareContextSource (translationContextClasses translation)
+      (translationContextNominals translation) sourceGoal source
+    providerMetadata <- mapM (\binding -> do
+      (parts, packet) <- contextualProviderPacket $ providerBindingSource binding
+      pure (providerBindingPrivateName binding, parts, providerBindingScheme binding, packet))
+      draftProviderBindings
+    prepareContextSourceProviders (translationContextClasses translation)
+      (translationContextNominals translation) providerMetadata goalMetadata) contextSource
   (providerBindings, providerDeclarations) <-
     providerDeclarationsFromBindings
       (translationDeclarations translation) draftProviderBindings
@@ -4336,6 +4359,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                 providerFrag = projectedProviderFrag index provider
                 binderNames = case provider of
                   ProviderFrag{} -> Nothing
+                  ProviderFragWithContextSource{} -> Nothing
                   ProviderFragWithBinders
                       { providerTypeBinderNames = names } -> Just names
                   ProviderFragWithEvidence

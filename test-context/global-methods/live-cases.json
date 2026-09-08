@@ -1,0 +1,107 @@
+{
+  "status": "prepared; unexecuted",
+  "cases": [
+    {
+      "name": "method_djinn_ordinary",
+      "engine": "djinn",
+      "mode": "ordinary",
+      "type": "\u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat",
+      "predicate": "(@method_djinn_ordinary Nat (@Ctx.C.mk Nat 7) = 7) \u2227 (@method_djinn_ordinary Nat (@Ctx.C.mk Nat 11) = 11) \u2227 (@method_djinn_ordinary Bool (@Ctx.C.mk Bool 11) = 11) \u2227 (@method_djinn_ordinary Bool (@Ctx.C.mk Bool 7) = 7)",
+      "command": ":synth \u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat",
+      "command_path": "commands/method_djinn_ordinary.commands.txt",
+      "command_sha256": "c645b840032ddc96b82c2a4e090b9451c95766fcb48ed4e7299800c3eb5dd36b",
+      "expected_provider_inventory": [
+        "Ctx.C.out"
+      ],
+      "expected_provider_cap": 1,
+      "required_global_private_name": "leantProvider0",
+      "required_explicit_dictionary_application": true,
+      "required_exact_original_type_replay": true
+    },
+    {
+      "name": "method_djinn_where",
+      "engine": "djinn",
+      "mode": "where",
+      "type": "\u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat",
+      "predicate": "(@method_djinn_where Nat (@Ctx.C.mk Nat 7) = 7) \u2227 (@method_djinn_where Nat (@Ctx.C.mk Nat 11) = 11) \u2227 (@method_djinn_where Bool (@Ctx.C.mk Bool 11) = 11) \u2227 (@method_djinn_where Bool (@Ctx.C.mk Bool 7) = 7)",
+      "command": ":synth method_djinn_where : \u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat where (@method_djinn_where Nat (@Ctx.C.mk Nat 7) = 7) \u2227 (@method_djinn_where Nat (@Ctx.C.mk Nat 11) = 11) \u2227 (@method_djinn_where Bool (@Ctx.C.mk Bool 11) = 11) \u2227 (@method_djinn_where Bool (@Ctx.C.mk Bool 7) = 7)",
+      "command_path": "commands/method_djinn_where.commands.txt",
+      "command_sha256": "7fe9e7aaace00bd00da98faf6d7cc8862b89b7b1538c99b6a7ef328409a8f07f",
+      "expected_provider_inventory": [
+        "Ctx.C.out"
+      ],
+      "expected_provider_cap": 1,
+      "required_global_private_name": "leantProvider0",
+      "required_explicit_dictionary_application": true,
+      "required_exact_original_type_replay": true
+    },
+    {
+      "name": "method_exference_ordinary",
+      "engine": "exference",
+      "mode": "ordinary",
+      "type": "\u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat",
+      "predicate": "(@method_exference_ordinary Nat (@Ctx.C.mk Nat 7) = 7) \u2227 (@method_exference_ordinary Nat (@Ctx.C.mk Nat 11) = 11) \u2227 (@method_exference_ordinary Bool (@Ctx.C.mk Bool 11) = 11) \u2227 (@method_exference_ordinary Bool (@Ctx.C.mk Bool 7) = 7)",
+      "command": ":synth \u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat",
+      "command_path": "commands/method_exference_ordinary.commands.txt",
+      "command_sha256": "4c4f4d1e9ebf43a6a17ba77fcc8be74def3968a19f4f811ca705a07a856b0f09",
+      "expected_provider_inventory": [
+        "Ctx.C.out"
+      ],
+      "expected_provider_cap": 1,
+      "required_global_private_name": "leantProvider0",
+      "required_explicit_dictionary_application": true,
+      "required_exact_original_type_replay": true
+    },
+    {
+      "name": "method_exference_where",
+      "engine": "exference",
+      "mode": "where",
+      "type": "\u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat",
+      "predicate": "(@method_exference_where Nat (@Ctx.C.mk Nat 7) = 7) \u2227 (@method_exference_where Nat (@Ctx.C.mk Nat 11) = 11) \u2227 (@method_exference_where Bool (@Ctx.C.mk Bool 11) = 11) \u2227 (@method_exference_where Bool (@Ctx.C.mk Bool 7) = 7)",
+      "command": ":synth method_exference_where : \u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat where (@method_exference_where Nat (@Ctx.C.mk Nat 7) = 7) \u2227 (@method_exference_where Nat (@Ctx.C.mk Nat 11) = 11) \u2227 (@method_exference_where Bool (@Ctx.C.mk Bool 11) = 11) \u2227 (@method_exference_where Bool (@Ctx.C.mk Bool 7) = 7)",
+      "command_path": "commands/method_exference_where.commands.txt",
+      "command_sha256": "7f88cd045b77fc7a7bc1005380a567f350cb7ac7ecccee34204b7490ba1f7bb5",
+      "expected_provider_inventory": [
+        "Ctx.C.out"
+      ],
+      "expected_provider_cap": 1,
+      "required_global_private_name": "leantProvider0",
+      "required_explicit_dictionary_application": true,
+      "required_exact_original_type_replay": true
+    },
+    {
+      "name": "method_both_ordinary",
+      "engine": "both",
+      "mode": "ordinary",
+      "type": "\u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat",
+      "predicate": "(@method_both_ordinary Nat (@Ctx.C.mk Nat 7) = 7) \u2227 (@method_both_ordinary Nat (@Ctx.C.mk Nat 11) = 11) \u2227 (@method_both_ordinary Bool (@Ctx.C.mk Bool 11) = 11) \u2227 (@method_both_ordinary Bool (@Ctx.C.mk Bool 7) = 7)",
+      "command": ":synth \u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat",
+      "command_path": "commands/method_both_ordinary.commands.txt",
+      "command_sha256": "949aedcf6c28456d1215cb6dc3629610c0c89835e338c64d14314588eb824e3e",
+      "expected_provider_inventory": [
+        "Ctx.C.out"
+      ],
+      "expected_provider_cap": 1,
+      "required_global_private_name": "leantProvider0",
+      "required_explicit_dictionary_application": true,
+      "required_exact_original_type_replay": true
+    },
+    {
+      "name": "method_both_where",
+      "engine": "both",
+      "mode": "where",
+      "type": "\u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat",
+      "predicate": "(@method_both_where Nat (@Ctx.C.mk Nat 7) = 7) \u2227 (@method_both_where Nat (@Ctx.C.mk Nat 11) = 11) \u2227 (@method_both_where Bool (@Ctx.C.mk Bool 11) = 11) \u2227 (@method_both_where Bool (@Ctx.C.mk Bool 7) = 7)",
+      "command": ":synth method_both_where : \u2200 (\u03b1 : Type), [Ctx.C \u03b1] \u2192 Nat where (@method_both_where Nat (@Ctx.C.mk Nat 7) = 7) \u2227 (@method_both_where Nat (@Ctx.C.mk Nat 11) = 11) \u2227 (@method_both_where Bool (@Ctx.C.mk Bool 11) = 11) \u2227 (@method_both_where Bool (@Ctx.C.mk Bool 7) = 7)",
+      "command_path": "commands/method_both_where.commands.txt",
+      "command_sha256": "3f729ad913696acb5703a6379c1052aed9700ce14e0c790f78c94d06f758f98d",
+      "expected_provider_inventory": [
+        "Ctx.C.out"
+      ],
+      "expected_provider_cap": 1,
+      "required_global_private_name": "leantProvider0",
+      "required_explicit_dictionary_application": true,
+      "required_exact_original_type_replay": true
+    }
+  ]
+}

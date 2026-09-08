@@ -4,9 +4,9 @@
 -- actual introduction/application witnesses, never recovered from erasure.
 module Leant.Synth.ContextSource
   ( ContextSource, ContextSourceType (..), ContextSourceVisibility (..)
-  , mkContextSource, contextSourceType, contextSourceHasGiven
+  , mkContextSource, mkContextProviderSource, contextSourceType, contextSourceHasGiven
   , contextSourceName
-  , PreparedContextSource, prepareContextSource
+  , PreparedContextSource, prepareContextSource, prepareContextSourceProviders
   , renderPreparedContextGraph
   ) where
 
@@ -53,11 +53,19 @@ contextSourceHasGiven source = case source of
   ContextVariable{} -> False
 
 mkContextSource :: ContextSourceType -> Either String ContextSource
-mkContextSource source = do
+mkContextSource = validateContextSource True
+
+-- A provider may be context-free, but still needs a closed, complete source
+-- scheme. The goal entrance continues to require an actual lexical Given.
+mkContextProviderSource :: ContextSourceType -> Either String ContextSource
+mkContextProviderSource = validateContextSource False
+
+validateContextSource :: Bool -> ContextSourceType -> Either String ContextSource
+validateContextSource requireGiven source = do
   (_, classes, nominals) <- inspect 4096 Set.empty Map.empty Map.empty source
   unless (Map.null $ Map.intersection classes nominals) $
     Left "context-source: a class identity also occurs as an ordinary nominal type"
-  unless (contextSourceHasGiven source) $
+  when (requireGiven && not (contextSourceHasGiven source)) $
     Left "context-source: packet has no lexical Given context"
   _ <- sourceUniverse source
   pure $ ContextSource source
@@ -112,6 +120,7 @@ data PreparedContextSource = PreparedContextSource
   { preparedContextRoot :: LeanType String
   , preparedContextClasses :: Map.Map Name LeanClassInfo
   , preparedContextNominals :: Map.Map Name LeanNominalInfo
+  , preparedContextProviders :: Map.Map Name (LeanProviderInfo String)
   } deriving (Eq, Show)
 
 -- The two maps come directly from the same completed translation state as
@@ -125,7 +134,7 @@ prepareContextSource
 prepareContextSource classes nominals goal (ContextSource source) = do
   (projection, classEntries, nominalEntries) <- project source
   aligned <- alignProjection Map.empty projection goal
-  pure $ PreparedContextSource aligned (Map.fromList classEntries) (Map.fromList nominalEntries)
+  pure $ PreparedContextSource aligned (Map.fromList classEntries) (Map.fromList nominalEntries) Map.empty
  where
   project current = case current of
     ContextVariable variable -> pure (LeanVariable variable, [], [])
@@ -176,6 +185,45 @@ prepareContextSource classes nominals goal (ContextSource source) = do
   first (value, _, _) = value
   second (_, value, _) = value
   third (_, _, value) = value
+
+-- All entries are the actual value bindings of one completed translation.
+-- A source packet is never recovered from a generated application or its
+-- neighbor. Duplicate private or foreign provider owners are refused.
+prepareContextSourceProviders
+  :: Map.Map String (Name, [Int])
+  -> Map.Map String (Name, Int)
+  -> [(Name, [String], T.Type String, ContextSource)]
+  -> PreparedContextSource
+  -> Either String PreparedContextSource
+prepareContextSourceProviders classes nominals bindings initial =
+  foldM add initial bindings
+ where
+  add prepared (private, parts, scheme, source) = do
+    foreignName <- either (Left . show) Right $ mkLeanName parts
+    when (Map.member private (preparedContextProviders prepared)
+        || any ((== foreignName) . contextProviderLeanName)
+          (Map.elems $ preparedContextProviders prepared)) $
+      Left "context-source: duplicate global provider owner"
+    provider <- prepareContextSource classes nominals scheme source
+    unless (Set.null $ T.freeVariables scheme) $
+      Left "context-source: global provider scheme is open"
+    combinedClasses <- merge (preparedContextClasses prepared) (preparedContextClasses provider)
+    combinedNominals <- merge (preparedContextNominals prepared) (preparedContextNominals provider)
+    when (any (\classInfo -> any
+        ((== contextClassLeanName classInfo) . contextNominalLeanName)
+        (Map.elems combinedNominals)) (Map.elems combinedClasses)) $
+      Left "context-source: class identity also occurs as an ordinary nominal type"
+    pure prepared
+      { preparedContextClasses = combinedClasses
+      , preparedContextNominals = combinedNominals
+      , preparedContextProviders = Map.insert private
+          (LeanProviderInfo foreignName $ preparedContextRoot provider)
+          (preparedContextProviders prepared)
+      }
+  merge left right = do
+    unless (and $ Map.elems $ Map.intersectionWith (==) left right) $
+      Left "context-source: conflicting provider source declarations"
+    pure $ Map.union left right
 
 -- Alignment renames only lexical binders. Free identities must already be
 -- present in the caller's actual graph scope; no alpha-key pool grants them.
@@ -251,11 +299,21 @@ renderPreparedContextGraph prepared graph = do
   (_, ProjectionState _ nodes selections) <- runProject
     (check Set.empty Map.empty (Q.termGraphRoot graph) projection)
     (ProjectionState 65536 Map.empty Map.empty)
+  providers <- fmap Map.fromList $ mapM
+    (\(name, metadata) -> do
+      source <- maybe (Left "context-source: global provider lacks a complete source packet") Right $
+        Map.lookup name $ preparedContextProviders prepared
+      pure (name, LeanProviderInfo (contextProviderLeanName source) metadata))
+    [ (name, metadata)
+    | (owner, metadata) <- Map.toList nodes
+    , Just current <- [Q.lookupTermNode owner graph]
+    , Q.TypedGlobal _ name <- [Q.termNodeForm current]
+    ]
   rendered <- either (Left . ("context-render: " ++) . show) Right $
     renderLeanContextGraph ContextRenderEnvironment
       { contextRenderClasses = preparedContextClasses prepared
       , contextRenderNominals = preparedContextNominals prepared
-      , contextRenderProviders = Map.empty
+      , contextRenderProviders = providers
       , contextRenderNodeTypes = nodes
       , contextRenderSelectedTypes = selections
       , contextRenderUniverseParameters = Set.empty
@@ -316,7 +374,10 @@ renderPreparedContextGraph prepared graph = do
     inferred <- case Q.termNodeForm current of
       Q.TypedLocal _ variable -> checked $ maybe
         (Left "context-source: local has no source-owned binder metadata") Right $ Map.lookup variable locals
-      Q.TypedGlobal{} -> checked $ Left "context-source: global provider lacks a complete source packet"
+      Q.TypedGlobal _ name -> checked $ do
+        provider <- maybe (Left "context-source: global provider lacks a complete source packet") Right $
+          Map.lookup name $ preparedContextProviders prepared
+        alignProjection Map.empty (contextProviderSourceType provider) $ Q.termNodeType current
       Q.TypedApply function argument _ -> do
         functionType <- infer scope locals function
         case functionType of

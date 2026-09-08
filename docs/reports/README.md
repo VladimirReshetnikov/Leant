@@ -272,3 +272,4 @@ a forward-looking proposal rather than a dated record:
   worked traces.
 
 - 2026-09-08 — [Expanded Church behavioral coverage and remaining delivery gates](2026-09-07-priority4-behavioral-coverage.md)
+- 2026-09-08 — [Global contextual providers and exact verification traces](2026-09-08-global-contextual-providers.md)

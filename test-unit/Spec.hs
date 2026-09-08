@@ -104,6 +104,7 @@ import Test.Tasty.HUnit ((@?=), assertBool, assertEqual, assertFailure, testCase
 
 import qualified ContextRenderSpec
 import qualified ContextSourceSpec
+import qualified GlobalContextProviderSpec
 import qualified BackendTraceSpec
 
 import qualified Language.Haskell.Djex as Djex
@@ -780,6 +781,7 @@ main = do
       , visibleTypeApplicationTests
       , ContextRenderSpec.tests
       , ContextSourceSpec.tests
+      , GlobalContextProviderSpec.tests
       ]
 
 commandLineTests :: TestTree
@@ -4780,6 +4782,7 @@ translationPreparationTests = testGroup "prepared synthesis translation"
               $ zip (inspectedProviderAssignments binding) sourceAssignments
             let binderNames = case provider of
                   ProviderFrag{} -> Nothing
+                  ProviderFragWithContextSource{} -> Nothing
                   ProviderFragWithBinders
                     { providerTypeBinderNames = names } -> Just names
                   ProviderFragWithEvidence
@@ -16983,12 +16986,12 @@ assertLengthAssessmentMainLaneSeam = do
     , "attempts <- reverse <$> readIORef reverseAttempts"
     , "pure (verification, attempts)"
     , "modifyIORef' reverseAttempts (variant :)"
-    , "result <- runCurrentCmd st (candidateVerificationProgram goal term)"
+    , "result <- runCurrentCmdWithTraceAnnotation st (candidateVerificationProgram goal term)"
     ]
   traceAppend <- expectMainSourcePosition "callback trace"
     "modifyIORef' reverseAttempts (variant :)" callbackSection
   backendAttempt <- expectMainSourcePosition "callback trace"
-    "result <- runCurrentCmd st" callbackSection
+    "result <- runCurrentCmdWithTraceAnnotation st" callbackSection
   assertBool "Main moved the callback trace after the backend attempt"
     $ traceAppend < backendAttempt
   assertBool "Main substituted the full checked frontier for callback attempts"
@@ -17700,9 +17703,11 @@ assertLengthAssessmentMainParallelBaseline = do
       engineContextPreparationSection)
     [ "prepareSynthesis = prepareSynthesisWithContext Nothing"
     , "prepareSynthesisWithContext contextSource recursiveProjection activeProviders extras engineFrag fitFrag = do"
-    , "when (contextSource /= Nothing) $ do unless (null activeProviders && null extras && engineFrag == fitFrag)"
+    , "when (contextSource /= Nothing) $ do mapM_ contextualProviderPacket activeProviders"
+    , "unless (null extras && engineFrag == fitFrag)"
     , "Left \"context-source: provider, premise or changed fitting target lacks exact metadata\""
-    , "(translationContextNominals translation) sourceGoal source) contextSource"
+    , "(translationContextNominals translation) sourceGoal source"
+    , "prepareContextSourceProviders (translationContextClasses translation) (translationContextNominals translation) providerMetadata goalMetadata) contextSource"
     , "semanticOriginContextSource = contextual"
     ]
   mapM_ (\parallelToken -> assertBool

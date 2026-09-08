@@ -1,5 +1,11 @@
 # Further synthesis improvements: integration closure before expansion
 
+**Later September 8 follow-up:** the [global-method integration](2026-09-08-global-contextual-providers.md)
+now passes its complete bounded acceptance gates, including all 701 unit tests.
+The [current roadmap](2026-09-07-synthesis-retriage.md) moves frontend gaps and
+Church construction ahead of the integration work recorded below. This report
+retains the earlier documentation checkpoint and its historical failures.
+
 This September 8, 2026 re-triage preserves the original priorities 1–4 and
 changes their execution order. The [current roadmap](2026-09-07-synthesis-retriage.md)
 retains the full scope. This is a documentation checkpoint: the global-method

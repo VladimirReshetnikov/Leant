@@ -1,0 +1,57 @@
+{
+  "format": "global-method-cache-fixtures-v1",
+  "status": "fixture definition; acceptance is recorded by run_controls.py",
+  "legacy_window": 4,
+  "contextual_window": 32,
+  "steps": 20000,
+  "budget": 20000,
+  "timeout_seconds": 45,
+  "historical_manifest_sha256": "92ce553e98b8d5ab0d56c6d4ba8a63ca3fecd51d79aa3782fcff46a1fb935b87",
+  "scope": "The four-slot probe is the original failed search workload. The explicitly selected 32-slot probe diagnoses cache reuse after the required legacy implementation becomes reachable. Neither setting changes product defaults.",
+  "files": [
+    {
+      "path": "commands\\global_both_literal_false.commands.txt",
+      "sha256": "021a0a224110033278720724f8ca55c8d7eabd6c219354ee273415de31365c18"
+    },
+    {
+      "path": "commands\\global_both_ordinary_cache.commands.txt",
+      "sha256": "aa04dbc5e9ff6ddb046d4bb7a7f6ebe06cddbbc9d2c134f4452c4d3741a9c8fd"
+    },
+    {
+      "path": "commands\\global_both_where_cache.commands.txt",
+      "sha256": "f28232dd911a0ad7ca995899db6d490bf9c3f7ebe0f26d7653a16e33e8148d57"
+    },
+    {
+      "path": "commands\\global_djinn_literal_false.commands.txt",
+      "sha256": "610ca272428ebf0b41a783f4779a588b8f4f3e0da7a27cd8d1a937210ea2590b"
+    },
+    {
+      "path": "commands\\global_djinn_ordinary_cache.commands.txt",
+      "sha256": "c07549ec286677b58f77fc21eee1044f8aa6ca7512173a7696c5d579380331cb"
+    },
+    {
+      "path": "commands\\global_djinn_where_cache.commands.txt",
+      "sha256": "0b479014ba8730e1c47d9a3eea8e21e8f88c5f71831ad02b083542e8aae295cd"
+    },
+    {
+      "path": "commands\\global_exference_literal_false.commands.txt",
+      "sha256": "dc6562af64fbfb079cf8718af5106ed1e19271a4732ea3b6f953c427adc7f4d0"
+    },
+    {
+      "path": "commands\\global_exference_ordinary_cache.commands.txt",
+      "sha256": "53e34f032d1715a21ce7fc3978e89768872f711ab817367e0d4367e6e263db40"
+    },
+    {
+      "path": "commands\\global_exference_where_cache.commands.txt",
+      "sha256": "03b2b0f6bb43660e23207e722de37990eac10aaf158aa4a2a4210ed25ae29039"
+    },
+    {
+      "path": "NativeCacheOracle.lean",
+      "sha256": "0198ac2f34fe0a29576c09991e8c63badba2c7fa27449a2749f7fd844277b352"
+    },
+    {
+      "path": "sessions.json",
+      "sha256": "44f0ba61e37dfdd1cf375ad8b7318ad589892d923811361a5f4489fd30cdb597"
+    }
+  ]
+}
