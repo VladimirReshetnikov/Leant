@@ -9,10 +9,15 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-**September 8 re-triage after loaded-provider acceptance: prioritize missing
-Church programs, then bounded frontend usability and tree folds.** Broader
-contextual support remains required, but is no longer a prerequisite for those
-deliveries. This changes execution order without narrowing priorities 1–4.
+**September 8 re-triage after complete extended Exference acceptance:**
+close the remaining Church matrix and validate the newer engine in Lean;
+then finish bounded frontend usability, tree folds and contextual evidence.
+The [focused introduction report](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-focused-forall-search.md) records a fresh **13/13 extended
+Haskell Exference run**, exact full-signature replay, positive/wrong-reference
+controls and an actual False query at unchanged limits. Strict builds,
+**2,308 regression tests in 15 suites**, and **350 signatures in each Haskell
+engine** pass. This closes Exference's observed `maybeEither` miss.
+It does not establish Djinn parity or native Lean acceptance of the change.
 
 The [loaded-provider report](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-loaded-contextual-providers.md)
 records accepted ordinary Haskell source-scheme transport and explicit-`forall`
@@ -36,7 +41,7 @@ reopening the now-completed trace/correlation work.
 
 | Order | Delivery | Why now and required acceptance |
 | --- | --- | --- |
-| 1 | Synthesize missing Church programs and close coverage (priority 4) | Diagnose `maybeEither` rule admission, substitutions and queue decisions at the original bounds, then `foldl1` and the remaining cells. Establish whether a needed construction is unavailable or merely delayed before changing search. Accept a generic fix only through the original public queries, exact full-signature replay and False controls. Reference implementations stay outside search inventories. |
+| 1 | Close Church engine parity, explicit defaults and native integration (priority 4) | Preserve fresh Exference 13/13 acceptance; reproduce and repair Djinn `maybeEither`, then Exference `foldl1`/`at` and all remaining default cells. Validate the newer Djex revision in Lean before advancing its pin, with affected context/recursor regressions and all three engine modes. Require original public queries, exact full-signature replay, provider inventories and False controls; reference programs remain outside search. |
 | 2 | Finish bounded Haskell frontend usability (priority 3) | Preserve implicit root binder order and lexical scope, and make ordinary contextual output independently usable. Test explicit and implicit signatures, expression and definition output, and ordinary and named-`where` routes. The worker must check the exact displayed implementation at the original signature. Derived class-method extraction is a separate increment in delivery 4. |
 | 3 | Accept supplied tree folds with accumulators (priority 2) | Execute the prepared polymorphic tree fixture in both Haskell engines and all three Lean modes. Require exact provider inventories, order-sensitive observations, full-type replay, termination checking and False controls. Preparation alone is not acceptance; do not add a new general-recursion mechanism before this fixture identifies a need. |
 | 4 | Extend contextual source coverage (priority 3) | Complete Haskell derived class-method schemes and Lean mixed inventories containing constructors and methods. The existing `ContextProduction.Dictionary.mk` refusal requires source representation/admission, not a larger provider cap. Retain rejected packets and precise unsupported outcomes; integrate a newer Djex pin only with its own native validation. |
@@ -59,22 +64,33 @@ validation serialized and run affected acceptance cells with each increment.
 
 The full priority-4 obligation remains **all 13 extended operations and all
 19 explicit-default counterparts**, across Haskell Djinn/Exference and Lean
-Djinn/Exference/Both. The accepted 12/13 Haskell extended operations, selected
-2/4 Exference defaulted cases and selected 6/6 Lean Exference operations are
-unions of recorded subsets. They do not close that obligation. Run outstanding
-cells alongside relevant increments; do not redefine completion around an
-easier batch. Heavy runtime acceptance remains serialized.
+Djinn/Exference/Both. Exference's 13/13 extended Haskell result is now a fresh
+complete run. Djinn's 12/13 extended Haskell result, the selected 2/4 Exference
+defaults and the selected 6/6 Lean Exference operations remain historical
+unions at their recorded revisions. They do not close the full obligation.
+Run outstanding cells alongside relevant increments, with heavy runtime
+acceptance serialized. A supplied witness or an oracle preflight is not a
+synthesized program.
+
+Delivery 1 is a sequence of publishable increments, not a reason to postpone
+the prepared frontend and tree fixtures indefinitely. After each accepted
+engine repair, update the coverage register and execute the next relevant
+native or prepared fixture. If a cell exposes a distinct missing construction,
+record its exact failure and pursue that bounded repair; do not spend another
+milestone collecting equivalent traces or blindly changing ranking weights.
 
 ## What changed in this re-triage
 
-The canonical [parenthesized-forall checking follow-up](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-parenthesized-forall-checking.md)
-repairs a Haskell worker regression exposed by the unchanged Church query.
-Its actual branch trace reaches both injection obligations at step 73, then
-observes a priority drop when the first is opened. No compatible descendant
-is popped again in the original 256-candidate prefix. An introduction-cost
-estimate still produces 256 false candidates and was removed. Queue retention
-and competing completions remain the next diagnostic target. Leant retains
-its independently accepted Djex pin; this is not new native acceptance.
+The [focused introduction change](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-focused-forall-search.md) follows the actual unfinished
+`maybeEither` branch to the queue boundary. It remains at position 1,002 of
+8,192 after the original prefix; it was delayed, not capacity-pruned.
+Completing determined goal groups before interleaving siblings, together with
+retaining the forall estimate until arrow parameters enter scope, finds a
+matching program in the original 256-candidate window. Ordering alone failed;
+the combined generic change passes the full extended corpus and regressions.
+This supersedes the earlier Exference search-miss diagnosis below. The
+parenthesized-forall worker correction remains a separate accepted repair.
+Leant still pins `4a4ed0fc`; advancing that dependency requires native validation.
 
 The [accepted integration follow-up](2026-09-08-global-contextual-providers.md) supersedes the earlier
 working-prototype and incomplete-regression status below. The following
@@ -579,7 +595,7 @@ solver execution, and independent replay together.
 | Further improvement | Current disposition and promotion criterion |
 | --- | --- |
 | Both progress and cancellation | Retain raw-slot alternation and the now-passing tuple/default cases as regressions. Broader preemption needs a measured case where one engine step still blocks a reachable result or violates cancellation latency. |
-| Search/checker performance | Instrument within current deliveries. Measure startup, first acceptance, search, checking, replay, exhaustion, and memory; retain the 147-second Exference rejection fixture. Change defaults only after a controlled comparison. |
+| Search/checker performance | First validate the canonical focused-introduction change in Lean. Further tuning needs a measured remaining miss or cost, distinguishing startup, first acceptance, checking, replay, exhaustion and memory. Retain the 147-second rejection fixture and unchanged defaults until a controlled comparison supports a change. |
 | Failure diagnostics and capability receipts | Include now. Distinguish graph absence, compiler rejection, false assertions, inconclusive checking, and exhausted search; retain exact sources, settings, engine ownership, and per-cell replay outcomes on failure. |
 | Semantic provider retrieval | Investigate when a realistic query misses a useful provider; measure recall as well as latency. |
 | Shared subgoal graphs, caches, and cooperative internal search | Defer broad changes until a profile identifies repeated work or blocking as material, preserving source identity and budget charging. |

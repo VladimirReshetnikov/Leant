@@ -183,15 +183,16 @@ Companion documents:
   coverage first, then bounded Haskell frontend usability and supplied tree
   folds. Broader contextual source/evidence support follows; it is not a
   prerequisite for the provider-free Church fixtures.
-  The subsequent canonical [parenthesized-forall checking correction](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-parenthesized-forall-checking.md)
-  repairs Haskell preflight at the unchanged Church signatures. Its search
-  trace identifies a priority drop before constructing an `Either` injection;
-  a further ranking experiment still misses and was removed. This adds no
-  Church coverage or native acceptance at a newer dependency revision. The
-  canonical correction passes a strict build and all 2,307 tests in 15 suites.
+  The canonical [focused introduction change](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-focused-forall-search.md) now synthesizes
+  all **13 extended Church operations in one fresh Haskell Exference run**,
+  including `maybeEither`, at unchanged search limits. Exact full-signature GHC
+  replay, 28 oracle controls and a live False query pass. Strict builds, all
+  **2,308 tests in 15 suites**, and **350 signatures per Haskell engine** pass.
+  Leant still pins Djex `4a4ed0fc`; integrating the newer search change requires
+  its own native kernel replay and regression acceptance.
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
-  now includes separate-run acceptance of 12/13 extended operations in each
-  Haskell engine and 2/4 Exference explicit-default cases. Lean Exference's
+  now includes fresh 13/13 Haskell Exference acceptance and historical
+  separate-run 12/13 Haskell Djinn and 2/4 Exference explicit-default acceptance. Lean Exference's
   selected first six now accept 6/6 as a composite of five historical exact
   replays and the fresh native-length follow-up. The full 13-operation/19-default coverage
   across engines is still open.

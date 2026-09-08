@@ -1,11 +1,18 @@
 # Priority 4 behavioral coverage: accepted subsets and remaining cells
 
-Updated 2026-09-08 from separately completed runs. Receipt timestamps and input
-hashes identify each execution; this union is not a fresh whole-matrix run.
+The [focused introduction milestone](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-focused-forall-search.md) accepts all **13 extended
+Haskell Exference operations in one fresh run**, including `maybeEither`, with
+exact original-signature replay, 28 oracle controls and a live False query.
+The 256-candidate, 100,000-step and 8,192-node queue limits are unchanged.
+All 2,308 regression tests and 350 signatures per Haskell engine also pass.
+
+Other rows retain their historical receipts and harness pins. This is not a
+fresh complete matrix across languages, engines and the 19 explicit defaults.
+Leant still pins Djex `4a4ed0fc`; the canonical change awaits native acceptance.
 
 | Language and engine | Accepted subset | Remaining within that subset |
 | --- | ---: | --- |
-| Haskell Exference, two disjoint extended batches | 12/13 | `maybeEither` |
+| Haskell Exference, fresh complete extended run | 13/13 | None within the 13 extended operations |
 | Haskell Djinn, first six, repaired length, and disjoint remaining seven | 12/13 | `maybeEither` |
 | Haskell Exference, selected explicit defaults | 2/4 (`last`, `atKey`) | `foldl1`, `at` |
 | Lean Exference, first six with independent repaired-length follow-up | 6/6 | None; the remaining seven and Djinn/Both are outside this subset |
