@@ -1,6 +1,6 @@
 # Synthesis re-triage: bounded contexts, reliable checking, and behavior
 
-This 2026-09-07 update preserves the active goal to implement priorities 1–4
+This report, updated on 2026-09-08, preserves the active goal to implement priorities 1–4
 from the [original roadmap](../../lib/Djex/docs/reports/2026-09-06-synthesis-next-priorities.md).
 The [completion register](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/docs/reports/2026-09-07-synthesis-priorities-1-4.md)
 retains the full scope. The current canonical
@@ -9,44 +9,90 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-**Bounded local Lean contexts are accepted: all 39 public cells and the complete
-680-test suite pass.** The validated dependency is Djex
-`38435709bf4e70c4b53c541c462b0bbd35837bf2`. This completes the bounded integration
-milestone within original priority 3; that priority remains open for richer
-contextual evidence. Original priority 1's supported-fragment Haskell elaboration
-is complete. Priorities 2–4 retain their original requirements.
+**September 8 re-triage: fix constraint-only provider instantiation next, then
+the missing Church construction paths.** The global-method prototype has a
+small reproducible failure; two simple search-ranking experiments have failed
+their behavioral gate and were restored. This changes delivery order, not the
+scope of original priorities 1–4.
+
+Priority 1's supported-fragment Haskell elaboration remains accepted. The
+published local `Type 0` context route passes its 39-cell matrix; the latest
+published Leant graph integration passes nine native cells and all 686 unit
+tests. These results belong to their recorded revisions. The newer global
+provider prototype builds but fails all six focused positive cases, while
+seven negative controls pass. It has no full-suite or native-method acceptance.
 
 | Order | Delivery | Required acceptance |
 | --- | --- | --- |
-| 1 | Complete expanded Church behavior and its concrete failures | Both Haskell engines accept 12/13 extended operations from separate batches; maybeEither remains missing. The supplied witness's graph/elaboration gate and Leant's nine-cell nested-result integration pass. Inspect the unchanged all-false search prefix and the foldl1 construction path, then finish all 19 explicit-default counterparts and remaining Lean cells. Preserve exact providers, actual False controls, full-signature replay and per-cell limits. |
-| 2 | Broaden supplied-fold acceptance after the native verification repair | Exact empty-user-root reuse now passes native Djinn append/length, lifecycle isolation/reset/recovery and the complete 686-test suite. Continue the remaining engine and supplied tree-fold/accumulator cases with exact provider inventories, full-signature behavior and termination-checked replay. Keep existing bounds and failure classifications. |
-| 3 | Admit one described global contextual provider | Extend the existing `Type 0` route with one fully described global provider while retaining the current non-overlap guard. Preserve complete source metadata, exact owned graph/renderer evidence and payload-sensitive replay; do not broaden instances or universes as part of this increment. |
-| 4 | Preserve selected dictionary identity before relaxing overlap guards | Carry the selected introduction occurrence and ordered slot through lowering and reconstruction. Require a forced equal-predicate outer/inner fixture whose faithful scoped capture preserves distinct payload behavior in Haskell and Lean replay. Graph IDs or successful compilation alone are insufficient. Methods, superclass evidence and further provider schemes remain separate extensions. |
+| 1 | Infer a method's type arguments from its lexical class assumptions (priority 3) | Keep the forced `Ctx.C.out : {α : Type} → [Ctx.C α] → Nat` fixture and its goal `∀ (α : Type), [Ctx.C α] → Nat`. Infer only fresh provider parameters; preserve exact source schemes, scopes, provider ownership and dictionary evidence. First close the six focused positives, then ordinary/where × Djinn/Exference/Both native replay, payload-sensitive observations, actual False controls, discovery/cache isolation, the existing local-context matrix and the complete unit suite. |
+| 2 | Make missing Church constructions reachable within the existing limits (priority 4) | Diagnose `maybeEither` branch admission and `foldl1`'s flexible-goal construction separately from rendering. Require a generic rule change supported by a concrete failed derivation, followed by the original live queries, exact full-signature replay and unchanged false controls. Keep reference witnesses out of provider inventories. Extend the remaining total/defaulted cells with each accepted change. |
+| 3 | Accept a supplied tree fold with an accumulator (priority 2; independent of steps 1–2) | Use the prepared polymorphic `foldTree`/constructor inventory and order-sensitive observations in both Haskell engines and all three Lean modes. Require full-type behavior, termination-checked replay, actual False controls and the original limits. The fixture is prepared, not executed; reliable native verification is already an accepted foundation. |
+| 4 | Preserve selected dictionary identity, then extend evidence derivation (priority 3) | Keep overlap guards until a forced equal-predicate outer/inner fixture retains the selected introduction and ordered slot, including distinct payload behavior in Haskell and Lean. Follow with conditional providers and superclass projections as separately checked extensions. A unique type substitution does not identify a dictionary occurrence. |
 
-These are delivery steps, not replacement priority numbers: step 1 advances
-priority 4, step 2 advances priority 2, and steps 3–4 advance priority 3.
-Independent cells may proceed while heavy runtime work remains serialized.
-Tree folds and accumulator programs depend on reliable native verification,
-not on completing dictionary selection.
+The full priority-4 obligation remains **all 13 extended operations and all
+19 explicit-default counterparts**, across Haskell Djinn/Exference and Lean
+Djinn/Exference/Both. The accepted 12/13 Haskell extended operations, selected
+2/4 Exference defaulted cases and selected 6/6 Lean Exference operations are
+unions of recorded subsets. They do not close that obligation. Run outstanding
+cells alongside relevant increments; do not redefine completion around an
+easier batch. Heavy runtime acceptance remains serialized.
 
-The [nested-result integration](2026-09-08-nested-forall-graphs.md) now vendors
-Djex `a44f70570c9287d3fc377e9df18978e1c6a692fa`. All nine native cells pass:
-six exact full-type outputs, 24 finite observations, three actual False
-controls and 16 empty axiom inventories. The closed graph roots retain both
-actual forall introductions and their own renderer/engine association.
-The final strict build and all 686 unfiltered unit tests pass in 358.12 seconds.
-This closes a frontend evidence gate. It does not add Church behavioral
-coverage: the unchanged public Exference `maybeEither` query still checks
-256 false candidates, with zero errors or timeouts after five same-candidate
-elaboration repairs. Search admission and construction now take precedence
-over further changes to that successfully checked witness's representation.
+## What changed in this re-triage
+
+The [diagnostic receipt](https://github.com/VladimirReshetnikov/Djex/blob/12ec0a2002a4e15b48aae1bfbbbd887a1fd431af/test-church/receipts/synthesis-retriage-diagnostics.json) embeds selected process captures, the failed
+method fixture, tested heuristic diffs and source hashes. It is a diagnostic
+extraction from completed local runs, not a new acceptance matrix. Full raw
+prefix artifacts remain in the hash-addressed local runs identified there.
+
+**The class-method boundary is now specific.** In the forced fixture, `α`
+occurs only in the provider's class constraint, so the `Nat` result cannot
+determine it. Djinn reaches exact lexical-Given lookup with a fresh unresolved
+type variable. Exference returns no checked group; the same inference gap is
+a source-supported hypothesis, but its terminal path has not yet been isolated.
+Adding a term argument of type `α` would avoid the failing case and would not
+meet this delivery gate.
+
+Start with a unique coherent substitution obtained from in-scope Givens. Match
+only fresh provider variables, check all constraints together, and retain the
+ordinary scope/occurs checks and graph witnesses. Do not mutate a goal's rigid
+type variables or recover dictionary authority from a printed class name.
+Multiple possible instantiations need bounded alternatives with their own
+evidence; equal predicates need the selected dictionary occurrence. Those are
+distinct extensions, so an ambiguity refusal may remain in the first milestone.
+
+**The `maybeEither` prefix is now matched to the real frontend.** An empty user
+workspace still loads intrinsic list, unit and tuple constructors. A manually
+empty environment produced a different order and failed the first diagnostic's
+correspondence gate. The corrected loader-based capture reproduces the original
+CLI samples at positions 63, 117 and 119. It observes 256 graph-backed, typed
+candidates in 3,346 batches, with 31,165 queue prunings. Of those candidates,
+199 have extra result-argument applications; 232 contain three forall
+introductions and 24 contain four. The supplied checked reference has five.
+These shapes do not prove which rule produced a candidate, that five
+introductions are necessary, or that every equivalent solution is unreachable.
+The public observer exposes no pending goals or actual search-rule history.
+
+Counting forall bodies/bound variables in the complexity heuristic passed its
+83 focused engine tests but still produced 256 false candidates. Combining that
+change with an extra-arrow application penalty also produced 256 false
+candidates. Both runs had zero behavioral errors/timeouts and passed their
+separate False/oracle controls. Neither experiment was adopted; baseline source
+was restored and rebuilt. A new ranking proposal now needs an observed branch
+or queue diagnosis and a successful original behavioral query.
+
+**`foldl1` has a valid reference construction, not synthesis acceptance.** Its
+supplied continuation-carrier witness compiles at the original full signature
+and passes all 36 original observations. That run performs no search. Inspect
+the point where a flexible goal would need function structure, and establish
+whether a general construction or scheduling rule is missing before changing
+defaults. This witness does not prove every equivalent derivation needs that
+same rule.
 
 ## Current evidence and its limits
 
-The 2026-09-08 coverage update uses separate receipt boundaries. The latest
-failed batches make concrete behavioral failures the next delivery gate; this
-supersedes the earlier native-fold-first order. Independent preparation can
-continue in parallel while heavy execution stays serialized.
+The evidence below records accepted milestones and historical diagnostics.
+The September 8 decision table above supersedes their earlier delivery order;
+their recorded source revisions and acceptance limits remain unchanged.
 
 The [contextual acceptance receipt](../../test-context/receipts/ordinary-context-streaming.json) records a **fresh complete 39/39
 public matrix**: 18 exact displayed outputs with full-type replay, 72 finite
@@ -68,8 +114,9 @@ failures. Those historical failures do not replace the fresh complete results.
 
 The accepted route is a local `Type 0` subset. It refuses unrecorded universe
 arguments, selected polytypes without complete metadata, and global/caller
-premises without source packets. The current provider map is empty and rejects
-typed globals. Equal active dictionaries remain unsupported. Rank-N constrained
+premises without source packets. The published accepted provider map is empty
+and rejects typed globals; the newer working-tree prototype remains unaccepted.
+Equal active dictionaries remain unsupported. Rank-N constrained
 forwarding is covered; richer nested forall/Given combinations outside the
 accepted bounded forms remain open. This acceptance does not establish methods, superclass
 search, global contextual providers, arbitrary universes or complete recursion.
@@ -146,10 +193,14 @@ error is repairable.
 | --- | --- |
 | Exact accepted-candidate provenance and reproducible replay | Retain the accepted 39-cell/680-test boundaries, non-forcing diagnostics and direct kernel pinning. Retain bounded request capture and its whole-record omission accounting. Keep the accepted empty-environment repair and lifecycle controls as regressions; defer a general tracing framework. |
 | Routing-test maintenance | When touching a routing boundary, replace brittle source-text counts with executable routing or boundary controls where practical. Preserve coverage; this is incremental maintenance, not a separate cleanup milestone. |
-| Tree folds and accumulator programs | Extend after native verification is reliable, independently of dictionary work. Select a missing program with exact supplied-provider inventory, full-signature behavior and termination checking. |
+| Constraint-only provider instantiation | Next implementation milestone: close the six forced method positives while retaining the seven negative controls, then native and aggregate acceptance. A unique provider type substitution and a selected dictionary occurrence are separate obligations. |
+| Tree folds and accumulator programs | Independent next recursion delivery; the polymorphic tree-accumulator fixture is prepared but unexecuted. Require exact supplied-provider inventory, order-sensitive full-signature behavior and termination checking. Native verification repair is already accepted. |
+| Flexible-goal construction and branch diagnostics | Next Church-search investigation: trace actual rule admission, substitutions and queue decisions for a missing derivation. Preserve budgets and distinguish an unavailable construction from an admitted but delayed branch. Public graph histograms alone do not locate the cause. |
+| Further heuristic tuning | Demoted: the two tested Exference changes both leave `maybeEither` at 256 false candidates. Require a measured branch/queue diagnosis and successful original query before adoption. |
+| Counterexample-guided search | Conditional follow-up when repeated expensive rejection remains material after construction gaps close. Reuse only exact-candidate observations under the same environment/predicate; finite agreement cannot justify general equivalence or unsound pruning. |
 | Native Windows Length acquisition | Promote for a concrete Windows workflow. Require bounded acquisition, actual solver execution and independent replay; existing refusal behavior and Length tests do not implement the missing acquisition route. |
 | Measured performance | Profile rejected contextual slots, native request waits, duplicate checking and retained memory separately. Preserve source ownership and original budget charges; do not increase defaults to hide failures. |
-| Provider retrieval | Require a useful provider excluded by inventory selection and measured recall/latency. A larger inventory alone is not useful synthesis. |
+| Provider retrieval | Require a useful provider excluded by inventory selection and measured recall/latency. The forced method fixture already supplies the provider, so retrieval cannot resolve that failure. A larger inventory alone is not useful synthesis. |
 | Broader architecture | Defer engine rewrites, general caching, shared subgoal graphs, equality saturation and arbitrary frontier expansion until a concrete missing program or measured bottleneck justifies them. |
 
 ## Accepted baselines and earlier execution recommendation

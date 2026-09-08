@@ -158,9 +158,14 @@ Companion documents:
   actual False controls and independent full-type replay. Four lifecycle sessions
   cover reuse, namespace isolation, real user-state precedence, reset and backend
   death: 11 queries, four accepted replays and ten empty axiom inventories.
-  The strict build and complete 686-test suite pass. Next are the observed
-  Church failures and remaining defaulted cells, then broader fold/tree acceptance,
-  and a described global `Type 0` provider under the current guard.
+  The strict build and complete 686-test suite pass at that accepted revision.
+  The next milestone is a global method whose type parameter appears only in
+  its class constraint: the prototype builds, but all six focused positive
+  cases fail and seven negative controls pass. It remains unaccepted. Then
+  address missing Church construction paths and remaining defaulted cells;
+  supplied tree folds are an independent delivery. Two Exference ranking
+  experiments still yielded 256 false `maybeEither` candidates and were restored.
+  The detailed re-triage records these diagnostics and the next acceptance gates.
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
   now includes separate-run acceptance of 12/13 extended operations in each
   Haskell engine and 2/4 Exference explicit-default cases. Lean Exference's
