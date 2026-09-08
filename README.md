@@ -183,6 +183,12 @@ Companion documents:
   coverage first, then bounded Haskell frontend usability and supplied tree
   folds. Broader contextual source/evidence support follows; it is not a
   prerequisite for the provider-free Church fixtures.
+  The subsequent canonical [parenthesized-forall checking correction](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-parenthesized-forall-checking.md)
+  repairs Haskell preflight at the unchanged Church signatures. Its search
+  trace identifies a priority drop before constructing an `Either` injection;
+  a further ranking experiment still misses and was removed. This adds no
+  Church coverage or native acceptance at a newer dependency revision. The
+  canonical correction passes a strict build and all 2,307 tests in 15 suites.
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
   now includes separate-run acceptance of 12/13 extended operations in each
   Haskell engine and 2/4 Exference explicit-default cases. Lean Exference's

@@ -67,6 +67,15 @@ easier batch. Heavy runtime acceptance remains serialized.
 
 ## What changed in this re-triage
 
+The canonical [parenthesized-forall checking follow-up](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-parenthesized-forall-checking.md)
+repairs a Haskell worker regression exposed by the unchanged Church query.
+Its actual branch trace reaches both injection obligations at step 73, then
+observes a priority drop when the first is opened. No compatible descendant
+is popped again in the original 256-candidate prefix. An introduction-cost
+estimate still produces 256 false candidates and was removed. Queue retention
+and competing completions remain the next diagnostic target. Leant retains
+its independently accepted Djex pin; this is not new native acceptance.
+
 The [accepted integration follow-up](2026-09-08-global-contextual-providers.md) supersedes the earlier
 working-prototype and incomplete-regression status below. The following
 diagnoses and counts remain historical evidence at their recorded revisions.
@@ -237,7 +246,7 @@ error is repairable.
 | Constraint-only provider instantiation | Engine/API, bounded native integration and loaded Haskell explicit-forall behavioral use are accepted. Retain the 701-test native and 2,306-test canonical receipts at their distinct revisions. Implicit-root scoping and ordinary presentation are delivery 2; derived method schemes and mixed Lean inventories are delivery 4. |
 | Tree folds and accumulator programs | Independent next recursion delivery; the polymorphic tree-accumulator fixture is prepared but unexecuted. Require exact supplied-provider inventory, order-sensitive full-signature behavior and termination checking. Native verification repair is already accepted. |
 | Flexible-goal construction and branch diagnostics | Promoted to the first delivery: trace actual rule admission, substitutions and queue decisions for a missing derivation. Preserve budgets and distinguish an unavailable construction from an admitted but delayed branch. Public graph histograms alone do not locate the cause. |
-| Further heuristic tuning | Demoted: the two tested Exference changes both leave `maybeEither` at 256 false candidates. Require a measured branch/queue diagnosis and successful original query before adoption. |
+| Further heuristic tuning | Demoted: three tested Exference changes leave `maybeEither` at 256 false candidates. The newest trace locates a priority drop while opening an injection, but a body-cost estimate still fails. Inspect the exact branch's queue fate and require a successful original query before adoption. |
 | Counterexample-guided search | Conditional follow-up when repeated expensive rejection remains material after construction gaps close. Reuse only exact-candidate observations under the same environment/predicate; finite agreement cannot justify general equivalence or unsound pruning. |
 | Native Windows Length acquisition | Promote for a concrete Windows workflow. Require bounded acquisition, actual solver execution and independent replay; existing refusal behavior and Length tests do not implement the missing acquisition route. |
 | Measured performance | Profile rejected contextual slots, native request waits, duplicate checking and retained memory separately. Preserve source ownership and original budget charges; do not increase defaults to hide failures. |
