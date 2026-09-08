@@ -1,0 +1,1408 @@
+{
+  "status": "passed",
+  "scope": "one context-free nested-result type; no MaybeEither search claim",
+  "type": "{α : Type} → α → {β : Type} → β → β",
+  "observations": [
+    "@{f} Nat 17 Bool true = true",
+    "@{f} Bool false Nat 23 = 23",
+    "@{f} Nat 99 Nat 7 = 7",
+    "@{f} Unit () (List Nat) [2, 5] = [2, 5]"
+  ],
+  "expected_cells": 9,
+  "source_hashes": {
+    "cabal.project": "5c3a4c4d485b6e682eb0233c9d9385353c009978cd45013cad3a516b1c3d1554",
+    "leant.cabal": "bd4fe90af79b85e61ead01436e3ec2c61775e084a68542e8eea05838c630f496",
+    "lib\\Djex\\djex.cabal": "f7a4539753505757513750b03d014ae61b2a1de50192d8517e04f2925331ac18",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Core.hs": "c554426dba6cd00e7fe6b2d3e7c5e5075d43444ae825d761069d908651f03414",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\Declaration.hs": "ba19aab9c20d514e1f13fae2ab6798874846e61850f708e91462b294034245a1",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\Environment.hs": "abdb9153494d4ef79dec18139d782318067bf788610b4932ce4dd1acd78bc406",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\Generated.hs": "f4a1387fbb766e6cbc154392b2738df6994c57bf9c373ae49b007e1b9a2f1885",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\HCheck\\Implementation.hs": "f68567a5cb74b69f1916baa0c6ff5664d5999605156deee87465ee4bf0b621c9",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\HCheck.hs": "21eaaa63fd7576b41b1fe6319904beb55ff1388fbc65bbb27e02ef2d8bbde1dd",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\HIdentifier.hs": "cf3d23fde83786e15f715480e2fe76f815fc38afc385990e6b0ae40d847c672b",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\HTypes.hs": "7fe1ffb615ef4a43203efc0f465b96b6edd3839e130323d07f1aaf0d5856e7fd",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\LJT.hs": "970c2fa05a9cf8537de3a09076b14477986aa9e3cbf979bc280b176a07885ac2",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\LJTFormula.hs": "b621b70974f3b12d2b4b40361c30eb22c83aa1947143697dbae3d1cb6615eabf",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\ProofCheck.hs": "7a488d12c2277f11522267e67a7c1f7cbbb5d971c32da20a158343956e709151",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\ProofEnv.hs": "4641e7cd525ed31f63275018eab868240b1bb566f3ec1d17618af4d6c0b6c8e8",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\Type.hs": "ac713e5b2793b75152d82a8a9c47d743356c99a373b16021f16abb16451423ab",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\TypeFormula.hs": "b9d6b5aaee94eef4473eea4fe1a0fcbb32734adea335d55c0c8a2c265caa1950",
+    "lib\\Djex\\djinn\\src-core\\Language\\Haskell\\Djex\\Djinn\\Internal\\Request.hs": "215253025b233ab3cbcb268538ed382750fcc373e6171b911e7e403c8da87141",
+    "lib\\Djex\\djinn\\src-core\\Language\\Haskell\\Djex\\Djinn\\Internal\\Session.hs": "72830a88cc23cd95f98120ba89ef1a3133811018c2de4e81e4b883f5801180aa",
+    "lib\\Djex\\djinn\\src-core\\Language\\Haskell\\Djex\\Djinn.hs": "3f9145592dbeb10c53b9c1f55f130f882bf5b190f7a227564a223f434dd3ea8a",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\CheckedCandidate.hs": "050daa7c9c3b287658a81c55b02d6f677d74ccf8e427794bb00b6d799c010835",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\ContextualInstantiation.hs": "1ff93b4fbbf1e63d6fea36d033ab9b862f7485abaae3983410f08e6e8edb0d0c",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\DirectedInstantiation.hs": "d5b051b839e5bc1533d78b202cafc05dbb1b5d36cba15be74635306b64c8fa0e",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\GeneratedDeduplication.hs": "462532e4abcf701b85ab14390f0e5a3bcb74c939187931a0ee606eca5a02f33f",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\Instantiation.hs": "49b874dc6d0e0e747ef400833ff784846c92c262fe9bbd6273259b1af9a47195",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\InstantiationEvidence.hs": "62504461f0275f939f6914875b3ae5d1487133349d0b2ff5d2c1c1f0f9eaf91f",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\PlanFamily.hs": "5ec0798f05486163b8688bddb8dd4c746eecc93e3610453e1cb7817b16578a68",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\ProofCheck\\Evidence.hs": "04391366ef681cf824338a819b7aae61d535949ab1612b0a4f066e700f7be071",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\ProofToGenerated.hs": "c0f04f6c286ec0486b82ac3cb8442dbd8b9353f675ca82c727ffa7b7fe2d9576",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\SourceEvidence.hs": "d4e88a63c7413a98d6373f44aa806e90f9e7cdb672190af1692f70f630005afc",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\SourceGraph.hs": "ff0f9dc3ac4e01076070c0990110e6cd70213b0061a809e545e0d15561182844",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\SourceGraphKinds.hs": "f86934dfbe33f3800e84bf3bf687c026bfa57fe6d98d01db8aa853b182823a57",
+    "lib\\Djex\\djinn\\src-internal\\Djinn\\Internal\\SourceTypingContext.hs": "657d7a14301079878c2fe7bcd1de54ee3afac3dfbfa9ed843309f00d090d5fa1",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Djex\\Exference\\Internal\\Request.hs": "a2cdffc3882e36463ac8593ae8a70ef2cfe7906fbebe0e1e255ce3ece3b1423d",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Djex\\Exference\\Internal\\Session.hs": "3946875f9e6941b26d6e1a42766641f11b0446189e325436b3e14a2182265fd7",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Djex\\Exference.hs": "8df14d9a7bb207561287a3c3b4a7130ff7e55f43eb5e5a0b1c9b1dac7205a767",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Candidate.hs": "4d39970bfe9098b9208ce614fd73bd64c1644254ccab67fb6d5a05f21f4dc80e",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\ConstraintSolver.hs": "6a82482a37adfe5dbb0949df94cabbdf4c9e00fe53b42e8d7b385179fb405cdb",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Declaration.hs": "e84e894e1b2e024111c31729eab3df524dddd68e818aeca7b088cece461ea69d",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\ExferenceStats.hs": "2e783b989ef2bfb12319a30d8e85f24da1b4adef3940bfb42b2a773ce08cd3e7",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Expression.hs": "4abd20f3eed1d354f0cf9d2d237da82ef1e4673c369060cf16da3d6b2b217f8e",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\ExpressionCheck.hs": "94d94bd4a47e89027d06dc4162d0ee0ed1a2bd52493457ff7106a592dff8d574",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\ExpressionSimplify.hs": "dc90de03524e890ae863996742873bd4e211ddc49999a2fe87fc98cb401a09c4",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\FunctionBinding.hs": "a1445a4d29918bc7fa9e8238cff36d860cbd2beaf66292ddc74793ccf253a620",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\Candidate.hs": "2d3cc458de2089d7d45b145fa79fed5ddc286172327cd58ec886191c71d6737f",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\Exference.hs": "b6a5d1b03a23fc878eeb0a252a37b9f0c5571a4ac46c5871e4abe676ae0d7fb8",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\ExferenceNode.hs": "2b15a56f559c42258aafdd9c8b8f06d235513d170b85d643e8235a5e404df7f1",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\ExferenceNodeBuilder.hs": "7876abbb5657860e44574708849e8ac30ed5788d87f6c2c4f742aac3b901c55e",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\ExpressionCheck.hs": "10c3275ec4910103645253cbce153946a310e249eb5ec0db306d6645518677b7",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\FlexibleIds.hs": "4c2b66c85fe3766e2c4bafe963922ff3695767aa8685aa3c988469e8d9c89011",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\Options.hs": "183aee939fac7883ea14c686c8c28e36c38f26e0d4efa8aa517e07a0f0f235e6",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\Polytype.hs": "453cd46ceffd6f0ebd271c8df21ac265be7b3669986a7daa6966ef47edf6c508",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\RigidScope.hs": "a9555df7bf5bf020ac4b4066d88d5f275107dedec50d7b3ee7271bbf83ecb37e",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\Scope.hs": "4487853f5633ac1d63c2542a8eae02632cd3e3792f3724ce99806f58257be22e",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\ScopedConstraint.hs": "4749eb325227fcb7bda0c415cce36edffd846a89746d66eecfcaf24a920a4d33",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\SearchControl.hs": "e80083ae5b158e7ce52c2196ea60ea40dbb92cbff976c2d6b855c4d62fca5eeb",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\SourceNames.hs": "201f65d6755a6d2d919087c982117e22ddf366e0bfe6f4fa1d9b79e7c5d032f1",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\VariableSupply.hs": "987718d704beeb56e7aa6f0ec9cebb5223321e44c1636dd8ea387ed22f967115",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Name.hs": "f24ce7b929b5fe74dd00362ce8e12db2941b47537a842259013027d3bf6f4562",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\RigidInstantiation.hs": "6dc0cda5ec2d804012a8dafc9d5aa7e76e688ad6cd6622cdf7b0fccb6f889b7b",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Score.hs": "6c2515640c17f21d89e9af92df10fe36adf153e3489708007b0d7e4f204b76b4",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Types.hs": "253fda537c69a7d3ba1d06e2700afc9b47c7e16e876f0e96f10d74572e90f5be",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\TypeUtils.hs": "1fb4292c3814215bdb3d84dc3725d87f916d3b19745e6c40b44b85a99f17f849",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core\\Unify.hs": "f0bf239b3e5f5fe9584431dcde25cdc983243153a19e173db2cacdac70f002df",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Core.hs": "8b85d5442b068854cc3c943078b06cc2f3feab8d1a20d9050d4bdd74a4784b40",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\Diagnostic.hs": "ddc782f5482516ebe95165ad8de7d7c63c9662884071e0aeba57f37840e2eba7",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference\\SimpleDict.hs": "618529ea30c78d12aca373692e0d2db95ba1afef6f93a10f7e24455b7e056399",
+    "lib\\Djex\\exference\\src-core\\Language\\Haskell\\Exference.hs": "b6d73fff5dc913a8e25d68685a9ff543bc90c68883033744c8515847d0d5b67e",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\CLI.hs": "d9bc826ead7195bbbc5db90b8083f8c3e48023fc8af8a54b938b41db85fb5647",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\Command\\Output.hs": "3578bef3cfd8c124e7c143fcf02d7907b58204881fb9da3ebf034e1c3b142e87",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\Command.hs": "dcf7134fcced3fcd87b971897a899ca5722ab81f37711d70d68d96452ed88870",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\HaskellSrc.hs": "ff52bb66912ef4ada9a43d1baa280164be5ae48fee32118332bacfff404332f3",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\Internal\\DependencyGraph.hs": "3facef560d3e4486fe6de8fa8cb05fb733d855823d06cae4d6a17dee7542d60e",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\Internal\\ImplicitPrelude.hs": "9cd560537b4e2ef31002b5bcaf62391a83160126818f9b497122ccf02aa54f08",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\Package.hs": "70465bff7c5bd912843be39d5bc90e5c13f964648538dde25b9999e6a59d68ed",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\Behavioral.hs": "2f5257f2a89deebd3c27e77e8e39e1142f7948be0204df3663d7dfe02ae7adfb",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\BehavioralWorker.hs": "37672f747d5f8adaaf11c2259306ec41682dd7f79e1104731cca02f8bb6e7341",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\Command.hs": "0f10b2118ffbce1d5fe23be212831977b55bd1044967449bde672525efc55eb8",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\DjinnScope.hs": "29a2d12e21ed55417abac68484243f63b015ad24ca1578848aa2d821c327bec6",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\Driver.hs": "63a62540a1b4933c10f1130d18e7d615d3a67226dc76fdb8cd2aecefb558ef4b",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\Eval.hs": "d34186c322d89d5c9948423fdb9f07a74057729bece456536b7827d70900831d",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\Kind.hs": "8b0d09e0835e8c66e3d95830790a8843856c4bf4790e14afaedf05fe5a820513",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\LengthWhere.hs": "2f987d3f904ada8cfed01f548d06387b3bb80ec3673c46adf41c025dcf8ed0f4",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\Parallel.hs": "83a741138a30d10c732cd59543000f27abdbc627d5be89c0409caaf1a13a1ba3",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\Scope.hs": "e9f6d11eec0598fa159e0e76d9f4b6beaed9e10aba9e9a60c66f92524c8345b2",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\Type.hs": "d539bddfa7499a7e08afb4fe9b8b736813ee0b45dcaaf2deed262a75e2a4105d",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL\\Workspace.hs": "ee41767666476bc73c4a25d1dd5cfbf5e5cb8e106d41d3275a89910eef8dc1b6",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\REPL.hs": "ac90a8c836695743de49047d955a1309a3ca9389a9dab391d04b7104a742b0e9",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex\\Text.hs": "4bb8eb0a9202d6a25b34553feb88495e4b2252106c0e31d1c123ba4ab251bb4a",
+    "lib\\Djex\\src\\Language\\Haskell\\Djex.hs": "43b4ac1ae2aa8cb41bff2f0663a24500b0b8d1172f59aec0f4e4296aee5902d6",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Alpha.hs": "19167e01c77c1a4e97fe6b58c45f2d02ebf9bb1fcbe345669c813a24bc1cc345",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\ClassResolution.hs": "fe6e82260fe4c2428923128d65e3d4a5a88cb0637f60f5183550e06c92efb524",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Fingerprint\\Type.hs": "dffe2ae00e4627aacfeb7dfcef14ce7c348f23d17ed714665a5203150381fded",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Fingerprint.hs": "85d99f4a9bfd3d3b92049f5980dd096b4b8a521a51a54e7479439bcf7b82facc",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\CounterexampleBank.hs": "5483b3da59f8c644ef59e0593743e205e3cda5c8cae39200bb942720e6a69b3c",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\Problem\\Candidate.hs": "cc565c80f9a1fe369a21c20471b30dea7a3dbcbfc13f79af98eb265900b6df49",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\Problem.hs": "31dbfb05f829077169a64dba99ae3053d7e1176301663cd45a429dfdcf1f67a5",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib\\Execution.hs": "564677ba72eede3a69ae7dc83bb960aec1f80f8a99447b0afc2f417b7bcb34f2",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib\\Observation.hs": "a27089f4de47ff0768d7087deaffbab7cce760bc6ea11d7ecf5e7a80858d4f3d",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib\\Protocol\\SpinePair.hs": "24d64e69b7d724e719e309f5528b9dca0040e27659a0815eb773d4fbdca7699c",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib\\Protocol.hs": "abdbba337dd465855bb0d02009ab31add45dfd466748c91dd1c212c61376cb55",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib\\Response.hs": "bfa957c78b74f06e951d3b030c6d190056851f18049d9fbaf80b267d1a1555e0",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib\\Session\\Capability.hs": "3aa8c2b155bdfcf8404a1221be0390b561c434745123e115bd4260375d4dcc41",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib\\Session\\Process.hs": "7ca603c87496e25fa08acdbc9e61c99159a0a7006ec9b6d5168b033cce119307",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib\\Session\\Transport.hs": "112f32d00cafe2ff513d6e83d6a79f160a091ba8014e7cba432a264d2469d1df",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib\\Session.hs": "0b50ec1c04af0ffd37fbe5631fef23e1d615ccfcf84138134d0cc2bfa1c3cda7",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length\\SMTLib.hs": "dac0da2fde776a01fe3aa307ad31dfc3d330c3e95fbad4e48d0411f4e974b8cc",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Length.hs": "1a77bddd4d0facdf853498ad6bff47d51ca7c41a746880fa363f92eaece3c892",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\Semantic\\Problem.hs": "b60e8238761ea2f139c00fed51ace591d15612e5fe82b3f80b0929c1b0410b26",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Causal\\BoundaryWhitespace.hs": "f826dd770c4679baa129e912549694ab7decce0d8bf0d1a75da9588493c546b0",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Causal\\Driver.hs": "6ea367ffa5263c0d9001e4ef78f02f30d1487a4cbf355b41c6f2a82497d60b10",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Causal\\StdoutChunk.hs": "be898d84837dc7c51dcf74fa26637f0ff0876e826f2484256633510ff144a343",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Causal\\Stream.hs": "64332d471cbae1087871fe3afe775a6f16a6e52890ffbb61778c467c6d3190a2",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Causal.hs": "46e36045e40323a92916ca9928719254c0d05238e70da9f69c8e48877f518ad4",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Lexical.hs": "5de63b3d110bb24b7d64675910ceb4535b063dfeae7e490c672f814467d4c033",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\QFLIA.hs": "14fb86f0b59b3c83c52fcfa8caa88f2a814021ac8a0586fcd889d424b0045dd8",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Response\\Standard.hs": "f3444ca409eb5fb2f1064a855473caedf8cdc6ee6084fe5ab9ffd5970cc44705",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Response.hs": "19c0713675fed93cfbcd19a2a7600d10f4be7b9f00094756d316e999a5ad9153",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Stream.hs": "f297b24b044775e5f8f87ee4787802638f9ee6092a87bd2008b60a7d641fb642",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Z3\\Execution.hs": "93e11f9f4c6a55fa7b1cd03530def351db5744da1e0a573b5b0d3f638c2716c8",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\SMTLib\\Z3\\Process.hs": "0c8cf26deac0e5525dae4860560be4fd3e9c2f496e2faaa9774c8eb096914e15",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\TypedCandidate.hs": "a5d334500054552ddbfec775680999c680da2fc3c81aed3b2d7c57c38dee263e",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\TypedGenerated\\Certificate\\Association.hs": "e636596c34fedd2dbc1eb654572ca180695837a034bd01e6b47357df5db610eb",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\TypedGenerated\\Certificate.hs": "02717e963411b4e037c344fe6aa49038343fa4243bf94fe8b46da92f2a29404b",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\TypedGenerated\\Fingerprint.hs": "c25a4041c7594b05e7afacdf03717d65974616cc5d976fcafbcd8c958971014f",
+    "lib\\Djex\\synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\TypeInstantiation.hs": "5dbb8e4e759e3ce94b8d08645ed4df797de8f12f8dcfd473472e519ad62ea34a",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Behavioral.hs": "1385c325e3563839b7c94f4e6195b10100450789b6da072cf5ea628ad1db5df7",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Candidate.hs": "47d5ccc6b746a6b151209a90acf9df70e8913054e9423512a9321de6197a80f2",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\CandidateQuality.hs": "51831127b3d41a758ff54547bde7bd2c992e63f8d6d3e13bfac424d5f843702c",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Class.hs": "f4d6ef709f87d520c9f40bab301c61dedd905ef4047e96a736f7574c9bca2175",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Collection.hs": "a3a8a276c7bf2c91dc6b1cb3cecf5078de7be7b665a4c843ea2e51a609d3cf3f",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Constraint.hs": "1c833edec51d6a7bf61610002c46a9bdfd95b71559e33f9f7fb4f56e6a4e3e58",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Count.hs": "8d3db530bec9f364d7d6c2caa3bfecc307dd3c950342dd666453a9f1f9d3ca4b",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Declaration.hs": "3f5fb6dcec1103f0130d6d2bc29bade0e6a49db9e6109cda4f3055727a2fe975",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Diagnostic.hs": "41a7801b21337e2649511bf290eb95b711b3b899aecb33538acb0a1a2faa61e3",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Environment.hs": "42a165e81c0ea9a856c1bc72ac85f97a521353f13e13dadefdbdc90b6d56692c",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Fingerprint.hs": "8a363e877321b70e9ea29e3da1db3a3856b59db88f82613f45eb9c09a2fdbd22",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Fresh.hs": "53fad7309574f39377e6e009d77b725925ab77419dda34baebeef9e010b6a16d",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Generated.hs": "5937f3ed06f31acd8c02bcc39f7a3c6abd8cd57b71f15c5e76013c055061c6d1",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Internal\\InstanceHead.hs": "c5824685d4e9dd80910156dd44a9a87514d635e003314b5e2575427be3cece66",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Inventory.hs": "997e3725cdc4701c77dbfb94c0a6dc98dfd26b26bdb68344e595fc495575616a",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Kind.hs": "8e8e1310b60d65d8f6c8a152a26d1b8ad7f0f1da9edbc14db3df2f4a8c0f25f8",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\KindInference.hs": "df73647ec293a6c97d83e0f86b9498c74eb1642153816da069b40047e3f886e5",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Name.hs": "332c9cafa88eea6343691d9b5c1cd8de39b5d83ae1df7679f730aee06ef2045d",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Observability.hs": "095429544dd83f760ee96dc41f0feec36560082576627078c5df54185bc9dd3c",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Qualification.hs": "d567454e71c2349c912aaeecf3547f407baee543e93e4638922254dc2727cfea",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Query.hs": "2a7700614d0e59efa45a77b19a37ca3824eeb64c4872216adc2e7368771cbb5f",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Search.hs": "63eb8450ebe6280a7f5d195081d572ba8ea0e1dc7c1ef4a67a466361f702a269",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Selection.hs": "9d1a62e25bb465e6c0f5b1b83119b56fa385202a5ad6cd5007208fb284b34f9c",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length\\CounterexampleBank.hs": "611bac9b782206502a6ec0cfa9444f72b371cf433aa98efb2ab35d7f66b974b5",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length\\Evaluate.hs": "0451618f8ec99eb266419562e1f5c281d10125220f3e3301424124117cd4098a",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length\\Problem.hs": "b6f748311ea81b252fc8c4e0ee48f4e542fcc712941e00bb87fe2b095a42541f",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length\\SMTLib\\Execution.hs": "322382bea8b73e03555ac3f406d8b828871b4ca101795160b1f5f0e790d7e106",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length\\SMTLib\\Live.hs": "1e0c3c011803041ecf5601a2646b9fe00e1d0fd9b50bbe65f0665094817136c1",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length\\SMTLib\\Observation.hs": "8378e7c3bea5d482faf899039c99f88684e176c40beb7a5913f7756fd369e5eb",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length\\SMTLib\\Response.hs": "376811d1c465886f2a8590ce36a75dfe2d515cb0fed760dea49abadc7ee15db7",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length\\SMTLib.hs": "286581ea4589d0b91ddfad9ac52ed8923cee72bffcc67f32685fc5ae92568165",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length\\Where.hs": "506e0c75a700f9a3fc0a15b0fa23cd0a14ef25164f49ac170ec9d5f4099265ea",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Length.hs": "2b19f89b5ff661dd142fb13168cd2c7239e3946dc9840bbb7a6cde9783792330",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Observation.hs": "9050dafd6a9c97261a6f0d3915a5095b9ae5694585ba4f7ee58b00cf63905e73",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Semantic\\Problem.hs": "39abb740f2abf36c55b9fb9b51426875384ab38ecfd9c80de0474e7346b87e18",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\Type.hs": "26145a7c401f0be451ae9202e888d8915d11a277a46c9ff9b6342a17bff7ec99",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\TypeAtom.hs": "fd31e0e695d4f1eaca804583ed883e354951ac68e0298668f182de2b8a7578c1",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\TypedCandidate.hs": "71d1c0d8b5dbb0d176d6d4db12a6abd659805c1bf395bff21a3247ef81c3820a",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\TypedGenerated\\Fingerprint.hs": "3314ae4928166a11d5f96184ad624931df45e56adbd6bb57ced0099388a18b45",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\TypedGenerated\\Haskell.hs": "d878ffa3c945aea747e4c5c34949a8eeb315833032fa8f294af9710c1b6beb1c",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\TypedGenerated.hs": "d18ed416b15ece590ac58d3f4b398b2dd1a9434779a2b7ae82434620aa0fc3e5",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\TypeInstantiation.hs": "c22e76440a54686e0c9fd224dd60b2f3415e7f99e0a436637be78f2cedd6f016",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\TypeRender.hs": "f505e16c836b5644a16a964eb6bdc302977b6588021c5292e52fa535a8479541",
+    "lib\\Djex\\synthesis\\src\\Language\\Haskell\\Synthesis\\TypeSynonym.hs": "ae36df45cc20387e6fea006d2be180a353fc0f8b578fcd901063140d6d82f7d2",
+    "lib\\Djex\\test-church\\behavior_runtime.py": "610aba95c2be827c72b2756c6b88b074166921b733523a3d40c1c23d99a3007a",
+    "lib\\Djex\\test-church\\behavior_spec.py": "0adee4ac9eaad21c525b91930ca835a2fe5da27a94228ed3265a029b6854f797",
+    "src\\Leant\\Backend\\Isolated.hs": "22485927a2fbdf648549cbb3bd06bad9e848246759a08b2db1e099ca608d3e81",
+    "src\\Leant\\Backend.hs": "f60a6a1eb5e451eb0312d6ee43580116b4db3b104fa0486675e6a2006c78f519",
+    "src\\Leant\\Builtins.hs": "ccf1abe57474a798443c1c2619a03e2f273689b18ec5dd1a38f9f4a253062840",
+    "src\\Leant\\Classify.hs": "7da055e424055073886f6f897fd095b5ad6b0991cd84a18e982de843bebec603",
+    "src\\Leant\\Format.hs": "6929220a7b4d3e26012d0a18f5501a5b35f089e733c430898beee35ff83c38f2",
+    "src\\Leant\\Json\\Bounded.hs": "b722a7e6fe50407864fff4a90dc474a7f8043ed11dfe4da1c717624de3b6be10",
+    "src\\Leant\\Json.hs": "13782ed23040276f648ed64a70e855a9808666f76554ab8a5e6d8a9b756b2367",
+    "src\\Leant\\Options.hs": "1dd439b910ed5878901b9b64de932ba539d4d794223cfdd545ca4cda9b7218ce",
+    "src\\Leant\\Session\\Replay.hs": "a1ed05ffea7181fccb8ab18de6ab30be3beb65544b2fc998bf1b45f4a73a5a24",
+    "src\\Leant\\Session\\Snapshot.hs": "9f5e6a3106f6ab6b3b1779243aa2f4f3a5abc01f764043fd1c0985077a90fd0b",
+    "src\\Leant\\Synth\\Behavioral.hs": "79faad0b7e5e0e6e24f50fb662c26dcc5ea4a37460a59c7aea40b8b4db489ea0",
+    "src\\Leant\\Synth\\BehavioralSelection\\Internal.hs": "b78745b197bb07a5cc3bc327f5d2b0c62a3c7ea4e84f8065ddec1020cfbbecd8",
+    "src\\Leant\\Synth\\BehavioralSelection.hs": "ba324fe2c5a9d3f397293f17b631b505c941d0dae501a6f1555f9e3877a2e1d3",
+    "src\\Leant\\Synth\\CandidateObservation.hs": "d26a4ccb39591829822dc6f798dcb87494ca5a3547b1a0e28eb7e4442b097984",
+    "src\\Leant\\Synth\\ContextRender.hs": "90552057926790c8873e77558f0ad35420af79f41a80210416f9aa2f860cd4c5",
+    "src\\Leant\\Synth\\ContextSource.hs": "582509b2a98c764cfc5452b85b8f5be44befe0327e711242870ce9359ff3a2ff",
+    "src\\Leant\\Synth\\Engine\\Parallel.hs": "7340f68cff4e7d4a96db6bf5db56c90ddcb3fe062533715840b18058570e2446",
+    "src\\Leant\\Synth\\Engine.hs": "400bf73433a2bd181e6a11eb6bb729509f27c3930c75f2f71838604b0222e256",
+    "src\\Leant\\Synth\\Fragment.hs": "850a682a4e3553162e60c84c207069f0532ab09f5597e719de4566842ffeb58b",
+    "src\\Leant\\Synth\\Length\\Adapter.hs": "5a2980e2b4e7a808ab51e2b80b8c64e358b6f7a3a5cc6f7e676283cd2bbb4413",
+    "src\\Leant\\Synth\\Length\\Command.hs": "8836634f4b8636b6d42b5768d843f256819762a5ac5c408e601dae6fe6e5d547",
+    "src\\Leant\\Synth\\Length\\Configuration\\File\\Acquire.hs": "68659d65445b894d935b960823b1a74210b2503039ab988413d022b29a88b8ab",
+    "src\\Leant\\Synth\\Length\\Configuration\\File.hs": "fdc56b3a4221e711491eefc8798163e362313cb22041371c9371182e9a7e2ba0",
+    "src\\Leant\\Synth\\Length\\Configuration.hs": "7b8277c1632b677b4722e36340ac92bbee8cc5195e1cf678521d6afe80bd89ef",
+    "src\\Leant\\Synth\\Length\\Contract\\File\\Acquire.hs": "e5cd018fc9d78ef15314954413b58ec58bb88140157ec83167fcdaf9448571e1",
+    "src\\Leant\\Synth\\Length\\Contract\\File.hs": "de6a8781fe9e8bb485f3a5381e9de7aa381c862723c242e49a6e0fd112895652",
+    "src\\Leant\\Synth\\Length\\Contract.hs": "7a3552a75a2fed8d5153d0c662b5bf858128113a356d3054acaf103e5d3fe40f",
+    "src\\Leant\\Synth\\Length\\CounterexampleBank\\Internal.hs": "c07d90a7494ec8eb35b987be00ad0f112c82c731c35e728cde003b95abd10282",
+    "src\\Leant\\Synth\\Length\\File\\Acquire.hs": "ec4c1e79c5f735b460ea83eb01665f87bfbcb3dc2bd3d132c6d72138802e39ab",
+    "src\\Leant\\Synth\\Length\\Handoff.hs": "f4e926327111198b7c28ca594fd30808859ddafdf30ce8a0de1b41281bd075ee",
+    "src\\Leant\\Synth\\Length\\Integration.hs": "a11dd942cc1af0e844fc0b706b2dade6226132b1ea44534f63090d7f93c929ed",
+    "src\\Leant\\Synth\\Length\\PostVerification\\Internal.hs": "49d62de181e9b1fc7871e9f358fd14f7bb5a0a4310f0b2bf95b345fc8c6e2b96",
+    "src\\Leant\\Synth\\Length\\PostVerification.hs": "32cb15747bd971f53d218206f5e382e48380445bfa12c28d00ef6545147181f6",
+    "src\\Leant\\Synth\\Length\\Presentation.hs": "87b7b2106eb40f0a33d2011ca63e05bf5128806bb6f460b01c77a006269df8de",
+    "src\\Leant\\Synth\\Length\\Ranking\\Generic.hs": "eb979b2c9bf6426e9bc7941d098b57386da5fce9977a977230ce435f68c01e83",
+    "src\\Leant\\Synth\\Length\\Ranking\\Internal.hs": "a15bd9878b6e22044551d067868bcb9aa8d4b0f30bc85850c95a1ec20aba08d4",
+    "src\\Leant\\Synth\\Length\\Ranking.hs": "22050178ca5a5b6a3557f2db8c8b72f79e6aa242fc0f3c5a5b9d46b078d8f43c",
+    "src\\Leant\\Synth\\Length\\Selection\\Generic.hs": "56f001ee6de3366e031f909dc11976fda5538d9d28a5384f6158488561e64871",
+    "src\\Leant\\Synth\\Length\\Selection\\Internal.hs": "411b211067bc3ea7cf821af5cbcd5487568341f49b935f412c5cd5e22542788a",
+    "src\\Leant\\Synth\\Length\\Selection.hs": "df2a51ffa0c86d94aa4ae6b9be301a515ddc6983cc7154f7cdf280c53be520fa",
+    "src\\Leant\\Synth\\Length\\SpinePair\\PostVerification\\Internal.hs": "58e4eacf6008e689aaa4954435bb30a8419f5be47a605b578de34dd7766afa11",
+    "src\\Leant\\Synth\\Length\\SpinePair\\PostVerification.hs": "0f2caf730c11f8293636fc68da47cfe074ca527936d6692183c757dc8fc4f15c",
+    "src\\Leant\\Synth\\Length\\SpinePair\\Ranking\\Internal.hs": "26c3b03a7b2464e6c405cfe0a37ac9884d39f86a771401b348d6cfe5a172278f",
+    "src\\Leant\\Synth\\Length\\SpinePair\\Ranking.hs": "05bac42e3da48c741f087fc61c2f3daa31257d1a9c3f94e673ac77e053eae3d7",
+    "src\\Leant\\Synth\\Length\\SpinePair\\Selection\\Internal.hs": "a1e229d48c52d360537f9e23c8d7bc533e19871084cc6570d54f84503bd45fa5",
+    "src\\Leant\\Synth\\Length\\SpinePair\\Selection.hs": "317db2a42f59f20ca5b4792ecdc53eb8f54821ca45e52a91ebb3329f0d90c35c",
+    "src\\Leant\\Synth\\Length\\Where.hs": "775cdf39958ee2348c0049392c76a3dfad114da812ebab9892bb79cd7fde7437",
+    "src\\Leant\\Synth\\Observability.hs": "c056cc5270585749bd0753904fe10c323f56c055d0e46639609b5e8f13ad8744",
+    "src\\Leant\\Synth\\PostVerification.hs": "b2f1374db9689e6d49ee1d7770f70e5b7e9bceada187dbd3af1c186b536c46d7",
+    "src\\Leant\\Synth\\ProviderCache.hs": "f439d68acb6781210168bbffa7292bc6e4588b37a9a8f315b7f50d2fbf5b496f",
+    "src\\Leant\\Synth\\Render.hs": "ec2bce85d3e03504e71f7ee7a92f8f4fce72d85adc55e2af10d4e4e742beae55",
+    "src\\Leant\\Synth\\Replay.hs": "42ef1df6dd9586ade2e6582264ead4086b662b532e7ba1109989daa8d7c900e7",
+    "src\\Leant\\Synth\\Verification\\Parallel.hs": "59c9fb1266ab08044f486be58f33671ef36bb184ed3d0b566caafa5ee5ed189f",
+    "src\\Leant\\Synth\\Verification.hs": "4045c4cb2560704694d87bc7f20f378f0503ebda77daa492b068bd46e596bc88",
+    "src\\Main.hs": "6ecc560417e4d9250068f4d9fe68e6f6e15591cbb18904794707949a0e79ca81",
+    "test-church\\behavior_extended_probe.py": "a38c3ee34f4a087657ea34556f1af0f32c5ea96da7d2e03f04b6a4df554821b2",
+    "test-church\\behavior_partial_probe.py": "cb82c8ca6c67a40486acfca4cef0143f28e076959da56b2fe9844579f940254e",
+    "test-church\\behavior_probe.py": "c891f561faf266fc1e96e79f98b97ca14559177beda8b6a1da38e4fa3d2dcbfe",
+    "test-church\\nested_forall_probe.py": "8b159249ff0dcbc2462567c105ba4eb7d2ead90a17f5304f3410b35cac5ce406",
+    "test-church\\run_corpus.py": "a6a8034272ce50cdafd1dcfd6a4a3cdfab3ddbd58a1c4eb26ef3cebf64f6873a",
+    "test-context\\run_production.py": "05614bef45511c5d9d2f88cfb29d4b46ac25ba4e76d346a947720f7dad5993c5",
+    "test-context\\test_production.py": "6f72fff3a9bc2ca065bb61687e6c8a87c28c8bf003dbdf806270f7cc5f0d0d84",
+    "test-unit\\BackendTraceSpec.hs": "14be77d44a663f281b9c535f591e631b4e7b46fc10cf489b6a14a6369916fde6",
+    "test-unit\\ContextRenderSpec.hs": "6df0d12d6ee91cf3390f251d9e72c8eb7c268360affe80c97bf492807ce1997c",
+    "test-unit\\ContextSourceSpec.hs": "d094e9cfbb666423b84a0ce1d502d85712bddbebdb94c51da655cac46c721a0d",
+    "test-unit\\Spec.hs": "4791f2415a234549f5433e6f0e367ea0050e16380b1579c5143191a6fb248fc6",
+    "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\lean-toolchain": "56a12c348c1fb7bb3e6475757349976a7e93e94fa2918bf92811b1b2e9634504",
+    "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\lakefile.toml": "32f149d6d26f8b5892ceae3259a109013b965779c659ac5b49135b321125b697",
+    "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\lake-manifest.json": "38f64dc4d77d0d38e5ece038ff04aa11373f08ba913df0dbb74e105a1de9f537"
+  },
+  "settings": {
+    "shown": 1,
+    "window": 60,
+    "verify_per_lane": 12,
+    "steps": 4096,
+    "queue": 1024,
+    "budget": null,
+    "strategy": "depth-first",
+    "timeout": 20,
+    "process_guard": 120
+  },
+  "cases": [
+    {
+      "name": "nested_djinn_ordinary",
+      "engine": "djinn",
+      "operation": "nested_result",
+      "mode": "ordinary",
+      "expected": "candidate",
+      "type": "{α : Type} → α → {β : Type} → β → β",
+      "predicate": "(@nested_djinn_ordinary Nat 17 Bool true = true) ∧ (@nested_djinn_ordinary Bool false Nat 23 = 23) ∧ (@nested_djinn_ordinary Nat 99 Nat 7 = 7) ∧ (@nested_djinn_ordinary Unit () (List Nat) [2, 5] = [2, 5])",
+      "command": ":synth {α : Type} → α → {β : Type} → β → β",
+      "commands": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_ordinary.commands.txt",
+        "sha256": "4e8d30292fb047c83ade5e1143cc66bdd653523c41e5494783aea171a8c9bc23",
+        "declarations": [],
+        "status": "prepared"
+      }
+    },
+    {
+      "name": "nested_djinn_where",
+      "engine": "djinn",
+      "operation": "nested_result",
+      "mode": "where",
+      "expected": "candidate",
+      "type": "{α : Type} → α → {β : Type} → β → β",
+      "predicate": "(@nested_djinn_where Nat 17 Bool true = true) ∧ (@nested_djinn_where Bool false Nat 23 = 23) ∧ (@nested_djinn_where Nat 99 Nat 7 = 7) ∧ (@nested_djinn_where Unit () (List Nat) [2, 5] = [2, 5])",
+      "command": ":synth nested_djinn_where : {α : Type} → α → {β : Type} → β → β where (@nested_djinn_where Nat 17 Bool true = true) ∧ (@nested_djinn_where Bool false Nat 23 = 23) ∧ (@nested_djinn_where Nat 99 Nat 7 = 7) ∧ (@nested_djinn_where Unit () (List Nat) [2, 5] = [2, 5])",
+      "commands": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_where.commands.txt",
+        "sha256": "db28247cc767331a1015b8144ec2badcb5206baa08ca8be5a069a9161cc4a710",
+        "declarations": [],
+        "status": "prepared"
+      }
+    },
+    {
+      "name": "nested_djinn_false",
+      "engine": "djinn",
+      "operation": "nested_result",
+      "mode": "where",
+      "expected": "no_candidate",
+      "type": "{α : Type} → α → {β : Type} → β → β",
+      "predicate": "False",
+      "command": ":synth nested_djinn_false : {α : Type} → α → {β : Type} → β → β where False",
+      "commands": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_false.commands.txt",
+        "sha256": "f2ccc4a84efd79eec07574bee0efc7c9f3ec85782d081b06c4d4e35732a2d0fd",
+        "declarations": [],
+        "status": "prepared"
+      }
+    },
+    {
+      "name": "nested_exference_ordinary",
+      "engine": "exference",
+      "operation": "nested_result",
+      "mode": "ordinary",
+      "expected": "candidate",
+      "type": "{α : Type} → α → {β : Type} → β → β",
+      "predicate": "(@nested_exference_ordinary Nat 17 Bool true = true) ∧ (@nested_exference_ordinary Bool false Nat 23 = 23) ∧ (@nested_exference_ordinary Nat 99 Nat 7 = 7) ∧ (@nested_exference_ordinary Unit () (List Nat) [2, 5] = [2, 5])",
+      "command": ":synth {α : Type} → α → {β : Type} → β → β",
+      "commands": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_ordinary.commands.txt",
+        "sha256": "76b4a2befd5fa1889baf5c3d2133ff22ab32a155228777223d93152fbd3ff141",
+        "declarations": [],
+        "status": "prepared"
+      }
+    },
+    {
+      "name": "nested_exference_where",
+      "engine": "exference",
+      "operation": "nested_result",
+      "mode": "where",
+      "expected": "candidate",
+      "type": "{α : Type} → α → {β : Type} → β → β",
+      "predicate": "(@nested_exference_where Nat 17 Bool true = true) ∧ (@nested_exference_where Bool false Nat 23 = 23) ∧ (@nested_exference_where Nat 99 Nat 7 = 7) ∧ (@nested_exference_where Unit () (List Nat) [2, 5] = [2, 5])",
+      "command": ":synth nested_exference_where : {α : Type} → α → {β : Type} → β → β where (@nested_exference_where Nat 17 Bool true = true) ∧ (@nested_exference_where Bool false Nat 23 = 23) ∧ (@nested_exference_where Nat 99 Nat 7 = 7) ∧ (@nested_exference_where Unit () (List Nat) [2, 5] = [2, 5])",
+      "commands": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_where.commands.txt",
+        "sha256": "88c6f0729c14e7c98e17f1b438fbaf45892c7cfe2f59c73abd410c704be810f2",
+        "declarations": [],
+        "status": "prepared"
+      }
+    },
+    {
+      "name": "nested_exference_false",
+      "engine": "exference",
+      "operation": "nested_result",
+      "mode": "where",
+      "expected": "no_candidate",
+      "type": "{α : Type} → α → {β : Type} → β → β",
+      "predicate": "False",
+      "command": ":synth nested_exference_false : {α : Type} → α → {β : Type} → β → β where False",
+      "commands": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_false.commands.txt",
+        "sha256": "ad096b4e2e8cf3de97182da91cb896dec5e8f8732fee1e5e3ad806ad254d3b2f",
+        "declarations": [],
+        "status": "prepared"
+      }
+    },
+    {
+      "name": "nested_both_ordinary",
+      "engine": "both",
+      "operation": "nested_result",
+      "mode": "ordinary",
+      "expected": "candidate",
+      "type": "{α : Type} → α → {β : Type} → β → β",
+      "predicate": "(@nested_both_ordinary Nat 17 Bool true = true) ∧ (@nested_both_ordinary Bool false Nat 23 = 23) ∧ (@nested_both_ordinary Nat 99 Nat 7 = 7) ∧ (@nested_both_ordinary Unit () (List Nat) [2, 5] = [2, 5])",
+      "command": ":synth {α : Type} → α → {β : Type} → β → β",
+      "commands": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_ordinary.commands.txt",
+        "sha256": "621435876b9fba4ea27aa3bb865638cd6b428dd8e96c8066a264845d1e9e16fe",
+        "declarations": [],
+        "status": "prepared"
+      }
+    },
+    {
+      "name": "nested_both_where",
+      "engine": "both",
+      "operation": "nested_result",
+      "mode": "where",
+      "expected": "candidate",
+      "type": "{α : Type} → α → {β : Type} → β → β",
+      "predicate": "(@nested_both_where Nat 17 Bool true = true) ∧ (@nested_both_where Bool false Nat 23 = 23) ∧ (@nested_both_where Nat 99 Nat 7 = 7) ∧ (@nested_both_where Unit () (List Nat) [2, 5] = [2, 5])",
+      "command": ":synth nested_both_where : {α : Type} → α → {β : Type} → β → β where (@nested_both_where Nat 17 Bool true = true) ∧ (@nested_both_where Bool false Nat 23 = 23) ∧ (@nested_both_where Nat 99 Nat 7 = 7) ∧ (@nested_both_where Unit () (List Nat) [2, 5] = [2, 5])",
+      "commands": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_where.commands.txt",
+        "sha256": "6acd113430ec41c8e011a11e5ea2f51ccd087f7788496384119f96c44e401a02",
+        "declarations": [],
+        "status": "prepared"
+      }
+    },
+    {
+      "name": "nested_both_false",
+      "engine": "both",
+      "operation": "nested_result",
+      "mode": "where",
+      "expected": "no_candidate",
+      "type": "{α : Type} → α → {β : Type} → β → β",
+      "predicate": "False",
+      "command": ":synth nested_both_false : {α : Type} → α → {β : Type} → β → β where False",
+      "commands": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_false.commands.txt",
+        "sha256": "d89115724cd5e4e681af86924c5e6e28e3b738843d5f0ebaeae40b725ee02933",
+        "declarations": [],
+        "status": "prepared"
+      }
+    }
+  ],
+  "results": [
+    {
+      "name": "nested_djinn_ordinary",
+      "engine": "djinn",
+      "mode": "ordinary",
+      "status": "passed",
+      "live": {
+        "name": "nested_djinn_ordinary",
+        "type": "{α : Type} → α → {β : Type} → β → β",
+        "mode": "ordinary",
+        "output": "{α : Type} → α → {β : Type} → β → β\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FArr (FVar \"s0\") (FAll False \"s1\" (FArr (FVar \"s1\") (FVar \"s1\"))))\ndebug 1: fun _ => fun x => x\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\n  it1  fun _ => fun x => x\ndebug accepted-candidate: {\"schema\":1,\"label\":\"it1\",\"term\":\"fun _ => fun x => x\",\"route\":\"RouteTypedCandidate\",\"variant_ordinal\":0,\"origin\":{\"engine\":\"djinn\",\"renderer_ordinal\":0,\"rendering\":{\"term\":\"fun _ => fun x => x\",\"matches_verified_text\":true},\"graph\":{\"root\":\"TermNodeId 77\",\"root_type\":\"ForallType [FlexibleVariable \\\"v0\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v0\\\")) (ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\")))))\",\"root_closed\":true,\"node_count\":5,\"erasure_matches_compatibility\":true,\"globals\":[],\"forall_introductions\":[{\"node\":\"TermNodeId 44\",\"occurrence\":\"OccurrenceId 35\",\"child\":\"TermNodeId 27\",\"source\":\"ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\")))\",\"variable\":\"TypeVariable (RigidVariable \\\"$djinn$source$5\\\")\",\"body\":\"FunctionType (TypeVariable (RigidVariable \\\"$djinn$source$5\\\")) (TypeVariable (RigidVariable \\\"$djinn$source$5\\\"))\",\"node_matches_source\":true,\"child_matches_body\":true},{\"node\":\"TermNodeId 77\",\"occurrence\":\"OccurrenceId 65\",\"child\":\"TermNodeId 54\",\"source\":\"ForallType [FlexibleVariable \\\"v0\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v0\\\")) (ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\")))))\",\"variable\":\"TypeVariable (RigidVariable \\\"$djinn$source$0\\\")\",\"body\":\"FunctionType (TypeVariable (RigidVariable \\\"$djinn$source$0\\\")) (ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\"))))\",\"node_matches_source\":true,\"child_matches_body\":true}],\"implicit_type_applications\":[],\"context_introductions\":[],\"context_applications\":[]}}}",
+        "status": "candidate",
+        "candidate": "fun _ => fun x => x",
+        "accepted_variant": {
+          "observation": {
+            "schema": 1,
+            "label": "it1",
+            "term": "fun _ => fun x => x",
+            "route": "RouteTypedCandidate",
+            "variant_ordinal": 0,
+            "origin": {
+              "engine": "djinn",
+              "renderer_ordinal": 0,
+              "rendering": {
+                "term": "fun _ => fun x => x",
+                "matches_verified_text": true
+              },
+              "graph": {
+                "root": "TermNodeId 77",
+                "root_type": "ForallType [FlexibleVariable \"v0\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v0\")) (ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\")))))",
+                "root_closed": true,
+                "node_count": 5,
+                "erasure_matches_compatibility": true,
+                "globals": [],
+                "forall_introductions": [
+                  {
+                    "node": "TermNodeId 44",
+                    "occurrence": "OccurrenceId 35",
+                    "child": "TermNodeId 27",
+                    "source": "ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\")))",
+                    "variable": "TypeVariable (RigidVariable \"$djinn$source$5\")",
+                    "body": "FunctionType (TypeVariable (RigidVariable \"$djinn$source$5\")) (TypeVariable (RigidVariable \"$djinn$source$5\"))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  },
+                  {
+                    "node": "TermNodeId 77",
+                    "occurrence": "OccurrenceId 65",
+                    "child": "TermNodeId 54",
+                    "source": "ForallType [FlexibleVariable \"v0\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v0\")) (ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\")))))",
+                    "variable": "TypeVariable (RigidVariable \"$djinn$source$0\")",
+                    "body": "FunctionType (TypeVariable (RigidVariable \"$djinn$source$0\")) (ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\"))))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  }
+                ],
+                "implicit_type_applications": [],
+                "context_introductions": [],
+                "context_applications": []
+              }
+            }
+          },
+          "observation_sha256": "0811cce6070e5bc5849ab67d5753d82261a9b919dc6a2d5efc636e282b8ddbb0"
+        },
+        "finite_observation_count": 4
+      },
+      "replay": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_ordinary-replay.lean",
+        "sha256": "7794e3dec48317e1b1ff2dd2792fa4a192f975f1cd79c6033715bb44dc61fb15",
+        "declarations": [
+          "NestedReplay.accepted",
+          "NestedReplay.passes"
+        ],
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "NestedReplay.accepted": [],
+          "NestedReplay.passes": []
+        }
+      }
+    },
+    {
+      "name": "nested_djinn_where",
+      "engine": "djinn",
+      "mode": "where",
+      "status": "passed",
+      "live": {
+        "name": "nested_djinn_where",
+        "type": "{α : Type} → α → {β : Type} → β → β",
+        "mode": "where",
+        "output": "nested_djinn_where : {α : Type} → α → {β : Type} → β → β where (@nested_djinn_where Nat 17 Bool true = true) ∧ (@nested_djinn_where Bool false Nat 23 = 23) ∧ (@nested_djinn_where Nat 99 Nat 7 = 7) ∧ (@nested_djinn_where Unit () (List Nat) [2, 5] = [2, 5])\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FArr (FVar \"s0\") (FAll False \"s1\" (FArr (FVar \"s1\") (FVar \"s1\"))))\ndebug 1: fun _ => fun x => x\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\n  it1  fun _ => fun x => x\ndebug accepted-candidate: {\"schema\":1,\"label\":\"it1\",\"term\":\"fun _ => fun x => x\",\"route\":\"RouteTypedCandidate\",\"variant_ordinal\":0,\"origin\":{\"engine\":\"djinn\",\"renderer_ordinal\":0,\"rendering\":{\"term\":\"fun _ => fun x => x\",\"matches_verified_text\":true},\"graph\":{\"root\":\"TermNodeId 77\",\"root_type\":\"ForallType [FlexibleVariable \\\"v0\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v0\\\")) (ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\")))))\",\"root_closed\":true,\"node_count\":5,\"erasure_matches_compatibility\":true,\"globals\":[],\"forall_introductions\":[{\"node\":\"TermNodeId 44\",\"occurrence\":\"OccurrenceId 35\",\"child\":\"TermNodeId 27\",\"source\":\"ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\")))\",\"variable\":\"TypeVariable (RigidVariable \\\"$djinn$source$5\\\")\",\"body\":\"FunctionType (TypeVariable (RigidVariable \\\"$djinn$source$5\\\")) (TypeVariable (RigidVariable \\\"$djinn$source$5\\\"))\",\"node_matches_source\":true,\"child_matches_body\":true},{\"node\":\"TermNodeId 77\",\"occurrence\":\"OccurrenceId 65\",\"child\":\"TermNodeId 54\",\"source\":\"ForallType [FlexibleVariable \\\"v0\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v0\\\")) (ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\")))))\",\"variable\":\"TypeVariable (RigidVariable \\\"$djinn$source$0\\\")\",\"body\":\"FunctionType (TypeVariable (RigidVariable \\\"$djinn$source$0\\\")) (ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\"))))\",\"node_matches_source\":true,\"child_matches_body\":true}],\"implicit_type_applications\":[],\"context_introductions\":[],\"context_applications\":[]}}}\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)",
+        "observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "status": "candidate",
+        "candidate": "fun _ => fun x => x",
+        "accepted_variant": {
+          "observation": {
+            "schema": 1,
+            "label": "it1",
+            "term": "fun _ => fun x => x",
+            "route": "RouteTypedCandidate",
+            "variant_ordinal": 0,
+            "origin": {
+              "engine": "djinn",
+              "renderer_ordinal": 0,
+              "rendering": {
+                "term": "fun _ => fun x => x",
+                "matches_verified_text": true
+              },
+              "graph": {
+                "root": "TermNodeId 77",
+                "root_type": "ForallType [FlexibleVariable \"v0\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v0\")) (ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\")))))",
+                "root_closed": true,
+                "node_count": 5,
+                "erasure_matches_compatibility": true,
+                "globals": [],
+                "forall_introductions": [
+                  {
+                    "node": "TermNodeId 44",
+                    "occurrence": "OccurrenceId 35",
+                    "child": "TermNodeId 27",
+                    "source": "ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\")))",
+                    "variable": "TypeVariable (RigidVariable \"$djinn$source$5\")",
+                    "body": "FunctionType (TypeVariable (RigidVariable \"$djinn$source$5\")) (TypeVariable (RigidVariable \"$djinn$source$5\"))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  },
+                  {
+                    "node": "TermNodeId 77",
+                    "occurrence": "OccurrenceId 65",
+                    "child": "TermNodeId 54",
+                    "source": "ForallType [FlexibleVariable \"v0\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v0\")) (ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\")))))",
+                    "variable": "TypeVariable (RigidVariable \"$djinn$source$0\")",
+                    "body": "FunctionType (TypeVariable (RigidVariable \"$djinn$source$0\")) (ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\"))))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  }
+                ],
+                "implicit_type_applications": [],
+                "context_introductions": [],
+                "context_applications": []
+              }
+            }
+          },
+          "observation_sha256": "0811cce6070e5bc5849ab67d5753d82261a9b919dc6a2d5efc636e282b8ddbb0"
+        },
+        "finite_observation_count": 4
+      },
+      "replay": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_where-replay.lean",
+        "sha256": "7794e3dec48317e1b1ff2dd2792fa4a192f975f1cd79c6033715bb44dc61fb15",
+        "declarations": [
+          "NestedReplay.accepted",
+          "NestedReplay.passes"
+        ],
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "NestedReplay.accepted": [],
+          "NestedReplay.passes": []
+        }
+      }
+    },
+    {
+      "name": "nested_djinn_false",
+      "engine": "djinn",
+      "mode": "where",
+      "status": "passed",
+      "live": {
+        "name": "nested_djinn_false",
+        "type": "{α : Type} → α → {β : Type} → β → β",
+        "mode": "where",
+        "output": "nested_djinn_false : {α : Type} → α → {β : Type} → β → β where False\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FArr (FVar \"s0\") (FAll False \"s1\" (FArr (FVar \"s1\") (FVar \"s1\"))))\ndebug 1: fun _ => fun x => x\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\nthe engine proposed 1 candidate(s) but none passed both Lean verification and the supplied assertion\nsupplied behavioral assertion: 0 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)",
+        "observations": {
+          "passed": 0,
+          "falsified": 1,
+          "inconclusive": 0
+        },
+        "status": "no_candidate"
+      }
+    },
+    {
+      "name": "nested_exference_ordinary",
+      "engine": "exference",
+      "mode": "ordinary",
+      "status": "passed",
+      "live": {
+        "name": "nested_exference_ordinary",
+        "type": "{α : Type} → α → {β : Type} → β → β",
+        "mode": "ordinary",
+        "output": "{α : Type} → α → {β : Type} → β → β\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FArr (FVar \"s0\") (FAll False \"s1\" (FArr (FVar \"s1\") (FVar \"s1\"))))\ndebug 1: fun _ => fun x => x\ndebug 2: fun _ => fun x => let a := ⟨⟩; match a with | _ => x\ndebug 3: fun _ => let a := ⟨⟩; match a with | _ => (fun x => x)\ndebug metric: typed-candidate-rendered=3\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\n  it1  fun _ => fun x => x\ndebug accepted-candidate: {\"schema\":1,\"label\":\"it1\",\"term\":\"fun _ => fun x => x\",\"route\":\"RouteTypedCandidate\",\"variant_ordinal\":0,\"origin\":{\"engine\":\"exference\",\"renderer_ordinal\":0,\"rendering\":{\"term\":\"fun _ => fun x => x\",\"matches_verified_text\":true},\"graph\":{\"root\":\"TermNodeId 120\",\"root_type\":\"ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))\",\"root_closed\":true,\"node_count\":5,\"erasure_matches_compatibility\":true,\"globals\":[],\"forall_introductions\":[{\"node\":\"TermNodeId 120\",\"occurrence\":\"OccurrenceId 120\",\"child\":\"TermNodeId 137\",\"source\":\"ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))\",\"variable\":\"TypeVariable (RigidVariable 0)\",\"body\":\"FunctionType (TypeVariable (RigidVariable 0)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5))))\",\"node_matches_source\":true,\"child_matches_body\":true},{\"node\":\"TermNodeId 155\",\"occurrence\":\"OccurrenceId 155\",\"child\":\"TermNodeId 174\",\"source\":\"ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))\",\"variable\":\"TypeVariable (RigidVariable 2)\",\"body\":\"FunctionType (TypeVariable (RigidVariable 2)) (TypeVariable (RigidVariable 2))\",\"node_matches_source\":true,\"child_matches_body\":true}],\"implicit_type_applications\":[],\"context_introductions\":[],\"context_applications\":[]}}}\nnote: search truncated: candidate limit reached (60)",
+        "status": "candidate",
+        "candidate": "fun _ => fun x => x",
+        "accepted_variant": {
+          "observation": {
+            "schema": 1,
+            "label": "it1",
+            "term": "fun _ => fun x => x",
+            "route": "RouteTypedCandidate",
+            "variant_ordinal": 0,
+            "origin": {
+              "engine": "exference",
+              "renderer_ordinal": 0,
+              "rendering": {
+                "term": "fun _ => fun x => x",
+                "matches_verified_text": true
+              },
+              "graph": {
+                "root": "TermNodeId 120",
+                "root_type": "ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))",
+                "root_closed": true,
+                "node_count": 5,
+                "erasure_matches_compatibility": true,
+                "globals": [],
+                "forall_introductions": [
+                  {
+                    "node": "TermNodeId 120",
+                    "occurrence": "OccurrenceId 120",
+                    "child": "TermNodeId 137",
+                    "source": "ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))",
+                    "variable": "TypeVariable (RigidVariable 0)",
+                    "body": "FunctionType (TypeVariable (RigidVariable 0)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5))))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  },
+                  {
+                    "node": "TermNodeId 155",
+                    "occurrence": "OccurrenceId 155",
+                    "child": "TermNodeId 174",
+                    "source": "ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))",
+                    "variable": "TypeVariable (RigidVariable 2)",
+                    "body": "FunctionType (TypeVariable (RigidVariable 2)) (TypeVariable (RigidVariable 2))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  }
+                ],
+                "implicit_type_applications": [],
+                "context_introductions": [],
+                "context_applications": []
+              }
+            }
+          },
+          "observation_sha256": "6dffae2b10d5d7a884face4107759ca93eda68a278a9c99224500e42e4810fe6"
+        },
+        "finite_observation_count": 4
+      },
+      "replay": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_ordinary-replay.lean",
+        "sha256": "7794e3dec48317e1b1ff2dd2792fa4a192f975f1cd79c6033715bb44dc61fb15",
+        "declarations": [
+          "NestedReplay.accepted",
+          "NestedReplay.passes"
+        ],
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "NestedReplay.accepted": [],
+          "NestedReplay.passes": []
+        }
+      }
+    },
+    {
+      "name": "nested_exference_where",
+      "engine": "exference",
+      "mode": "where",
+      "status": "passed",
+      "live": {
+        "name": "nested_exference_where",
+        "type": "{α : Type} → α → {β : Type} → β → β",
+        "mode": "where",
+        "output": "nested_exference_where : {α : Type} → α → {β : Type} → β → β where (@nested_exference_where Nat 17 Bool true = true) ∧ (@nested_exference_where Bool false Nat 23 = 23) ∧ (@nested_exference_where Nat 99 Nat 7 = 7) ∧ (@nested_exference_where Unit () (List Nat) [2, 5] = [2, 5])\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FArr (FVar \"s0\") (FAll False \"s1\" (FArr (FVar \"s1\") (FVar \"s1\"))))\ndebug 1: fun _ => fun x => x\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\n  it1  fun _ => fun x => x\ndebug accepted-candidate: {\"schema\":1,\"label\":\"it1\",\"term\":\"fun _ => fun x => x\",\"route\":\"RouteTypedCandidate\",\"variant_ordinal\":0,\"origin\":{\"engine\":\"exference\",\"renderer_ordinal\":0,\"rendering\":{\"term\":\"fun _ => fun x => x\",\"matches_verified_text\":true},\"graph\":{\"root\":\"TermNodeId 120\",\"root_type\":\"ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))\",\"root_closed\":true,\"node_count\":5,\"erasure_matches_compatibility\":true,\"globals\":[],\"forall_introductions\":[{\"node\":\"TermNodeId 120\",\"occurrence\":\"OccurrenceId 120\",\"child\":\"TermNodeId 137\",\"source\":\"ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))\",\"variable\":\"TypeVariable (RigidVariable 0)\",\"body\":\"FunctionType (TypeVariable (RigidVariable 0)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5))))\",\"node_matches_source\":true,\"child_matches_body\":true},{\"node\":\"TermNodeId 155\",\"occurrence\":\"OccurrenceId 155\",\"child\":\"TermNodeId 174\",\"source\":\"ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))\",\"variable\":\"TypeVariable (RigidVariable 2)\",\"body\":\"FunctionType (TypeVariable (RigidVariable 2)) (TypeVariable (RigidVariable 2))\",\"node_matches_source\":true,\"child_matches_body\":true}],\"implicit_type_applications\":[],\"context_introductions\":[],\"context_applications\":[]}}}\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)",
+        "observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "status": "candidate",
+        "candidate": "fun _ => fun x => x",
+        "accepted_variant": {
+          "observation": {
+            "schema": 1,
+            "label": "it1",
+            "term": "fun _ => fun x => x",
+            "route": "RouteTypedCandidate",
+            "variant_ordinal": 0,
+            "origin": {
+              "engine": "exference",
+              "renderer_ordinal": 0,
+              "rendering": {
+                "term": "fun _ => fun x => x",
+                "matches_verified_text": true
+              },
+              "graph": {
+                "root": "TermNodeId 120",
+                "root_type": "ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))",
+                "root_closed": true,
+                "node_count": 5,
+                "erasure_matches_compatibility": true,
+                "globals": [],
+                "forall_introductions": [
+                  {
+                    "node": "TermNodeId 120",
+                    "occurrence": "OccurrenceId 120",
+                    "child": "TermNodeId 137",
+                    "source": "ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))",
+                    "variable": "TypeVariable (RigidVariable 0)",
+                    "body": "FunctionType (TypeVariable (RigidVariable 0)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5))))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  },
+                  {
+                    "node": "TermNodeId 155",
+                    "occurrence": "OccurrenceId 155",
+                    "child": "TermNodeId 174",
+                    "source": "ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))",
+                    "variable": "TypeVariable (RigidVariable 2)",
+                    "body": "FunctionType (TypeVariable (RigidVariable 2)) (TypeVariable (RigidVariable 2))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  }
+                ],
+                "implicit_type_applications": [],
+                "context_introductions": [],
+                "context_applications": []
+              }
+            }
+          },
+          "observation_sha256": "6dffae2b10d5d7a884face4107759ca93eda68a278a9c99224500e42e4810fe6"
+        },
+        "finite_observation_count": 4
+      },
+      "replay": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_where-replay.lean",
+        "sha256": "7794e3dec48317e1b1ff2dd2792fa4a192f975f1cd79c6033715bb44dc61fb15",
+        "declarations": [
+          "NestedReplay.accepted",
+          "NestedReplay.passes"
+        ],
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "NestedReplay.accepted": [],
+          "NestedReplay.passes": []
+        }
+      }
+    },
+    {
+      "name": "nested_exference_false",
+      "engine": "exference",
+      "mode": "where",
+      "status": "passed",
+      "live": {
+        "name": "nested_exference_false",
+        "type": "{α : Type} → α → {β : Type} → β → β",
+        "mode": "where",
+        "output": "nested_exference_false : {α : Type} → α → {β : Type} → β → β where False\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FArr (FVar \"s0\") (FAll False \"s1\" (FArr (FVar \"s1\") (FVar \"s1\"))))\ndebug 1: fun _ => fun x => x\ndebug 2: fun _ => fun x => let a := ⟨⟩; match a with | _ => x\ndebug 3: fun _ => let a := ⟨⟩; match a with | _ => (fun x => x)\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-verification-failure.error-diagnostic=1\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-verification-failure.error-diagnostic=1\nthe engine proposed 3 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search reported more batches to come\nnote: search truncated: candidate limit reached (60)\nsupplied behavioral assertion: 0 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)",
+        "observations": {
+          "passed": 0,
+          "falsified": 1,
+          "inconclusive": 0
+        },
+        "status": "no_candidate"
+      }
+    },
+    {
+      "name": "nested_both_ordinary",
+      "engine": "both",
+      "mode": "ordinary",
+      "status": "passed",
+      "live": {
+        "name": "nested_both_ordinary",
+        "type": "{α : Type} → α → {β : Type} → β → β",
+        "mode": "ordinary",
+        "output": "{α : Type} → α → {β : Type} → β → β\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FArr (FVar \"s0\") (FAll False \"s1\" (FArr (FVar \"s1\") (FVar \"s1\"))))\ndebug 1: fun _ => fun x => x\ndebug 2: fun _ => fun x => let a := ⟨⟩; match a with | _ => x\ndebug 3: fun _ => let a := ⟨⟩; match a with | _ => (fun x => x)\ndebug metric: typed-candidate-rendered=3\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\n  it1  fun _ => fun x => x\ndebug accepted-candidate: {\"schema\":1,\"label\":\"it1\",\"term\":\"fun _ => fun x => x\",\"route\":\"RouteTypedCandidate\",\"variant_ordinal\":0,\"origin\":{\"engine\":\"exference\",\"renderer_ordinal\":0,\"rendering\":{\"term\":\"fun _ => fun x => x\",\"matches_verified_text\":true},\"graph\":{\"root\":\"TermNodeId 120\",\"root_type\":\"ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))\",\"root_closed\":true,\"node_count\":5,\"erasure_matches_compatibility\":true,\"globals\":[],\"forall_introductions\":[{\"node\":\"TermNodeId 120\",\"occurrence\":\"OccurrenceId 120\",\"child\":\"TermNodeId 137\",\"source\":\"ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))\",\"variable\":\"TypeVariable (RigidVariable 0)\",\"body\":\"FunctionType (TypeVariable (RigidVariable 0)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5))))\",\"node_matches_source\":true,\"child_matches_body\":true},{\"node\":\"TermNodeId 155\",\"occurrence\":\"OccurrenceId 155\",\"child\":\"TermNodeId 174\",\"source\":\"ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))\",\"variable\":\"TypeVariable (RigidVariable 2)\",\"body\":\"FunctionType (TypeVariable (RigidVariable 2)) (TypeVariable (RigidVariable 2))\",\"node_matches_source\":true,\"child_matches_body\":true}],\"implicit_type_applications\":[],\"context_introductions\":[],\"context_applications\":[]}}}\nnote: exference: search truncated: candidate limit reached (60)",
+        "status": "candidate",
+        "candidate": "fun _ => fun x => x",
+        "accepted_variant": {
+          "observation": {
+            "schema": 1,
+            "label": "it1",
+            "term": "fun _ => fun x => x",
+            "route": "RouteTypedCandidate",
+            "variant_ordinal": 0,
+            "origin": {
+              "engine": "exference",
+              "renderer_ordinal": 0,
+              "rendering": {
+                "term": "fun _ => fun x => x",
+                "matches_verified_text": true
+              },
+              "graph": {
+                "root": "TermNodeId 120",
+                "root_type": "ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))",
+                "root_closed": true,
+                "node_count": 5,
+                "erasure_matches_compatibility": true,
+                "globals": [],
+                "forall_introductions": [
+                  {
+                    "node": "TermNodeId 120",
+                    "occurrence": "OccurrenceId 120",
+                    "child": "TermNodeId 137",
+                    "source": "ForallType [FlexibleVariable 4] [] (FunctionType (TypeVariable (FlexibleVariable 4)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))))",
+                    "variable": "TypeVariable (RigidVariable 0)",
+                    "body": "FunctionType (TypeVariable (RigidVariable 0)) (ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5))))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  },
+                  {
+                    "node": "TermNodeId 155",
+                    "occurrence": "OccurrenceId 155",
+                    "child": "TermNodeId 174",
+                    "source": "ForallType [FlexibleVariable 5] [] (FunctionType (TypeVariable (FlexibleVariable 5)) (TypeVariable (FlexibleVariable 5)))",
+                    "variable": "TypeVariable (RigidVariable 2)",
+                    "body": "FunctionType (TypeVariable (RigidVariable 2)) (TypeVariable (RigidVariable 2))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  }
+                ],
+                "implicit_type_applications": [],
+                "context_introductions": [],
+                "context_applications": []
+              }
+            }
+          },
+          "observation_sha256": "6dffae2b10d5d7a884face4107759ca93eda68a278a9c99224500e42e4810fe6"
+        },
+        "finite_observation_count": 4
+      },
+      "replay": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_ordinary-replay.lean",
+        "sha256": "7794e3dec48317e1b1ff2dd2792fa4a192f975f1cd79c6033715bb44dc61fb15",
+        "declarations": [
+          "NestedReplay.accepted",
+          "NestedReplay.passes"
+        ],
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "NestedReplay.accepted": [],
+          "NestedReplay.passes": []
+        }
+      }
+    },
+    {
+      "name": "nested_both_where",
+      "engine": "both",
+      "mode": "where",
+      "status": "passed",
+      "live": {
+        "name": "nested_both_where",
+        "type": "{α : Type} → α → {β : Type} → β → β",
+        "mode": "where",
+        "output": "nested_both_where : {α : Type} → α → {β : Type} → β → β where (@nested_both_where Nat 17 Bool true = true) ∧ (@nested_both_where Bool false Nat 23 = 23) ∧ (@nested_both_where Nat 99 Nat 7 = 7) ∧ (@nested_both_where Unit () (List Nat) [2, 5] = [2, 5])\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FArr (FVar \"s0\") (FAll False \"s1\" (FArr (FVar \"s1\") (FVar \"s1\"))))\ndebug 1: fun _ => fun x => x\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\n  it1  fun _ => fun x => x\ndebug accepted-candidate: {\"schema\":1,\"label\":\"it1\",\"term\":\"fun _ => fun x => x\",\"route\":\"RouteTypedCandidate\",\"variant_ordinal\":0,\"origin\":{\"engine\":\"djinn\",\"renderer_ordinal\":0,\"rendering\":{\"term\":\"fun _ => fun x => x\",\"matches_verified_text\":true},\"graph\":{\"root\":\"TermNodeId 77\",\"root_type\":\"ForallType [FlexibleVariable \\\"v0\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v0\\\")) (ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\")))))\",\"root_closed\":true,\"node_count\":5,\"erasure_matches_compatibility\":true,\"globals\":[],\"forall_introductions\":[{\"node\":\"TermNodeId 44\",\"occurrence\":\"OccurrenceId 35\",\"child\":\"TermNodeId 27\",\"source\":\"ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\")))\",\"variable\":\"TypeVariable (RigidVariable \\\"$djinn$source$5\\\")\",\"body\":\"FunctionType (TypeVariable (RigidVariable \\\"$djinn$source$5\\\")) (TypeVariable (RigidVariable \\\"$djinn$source$5\\\"))\",\"node_matches_source\":true,\"child_matches_body\":true},{\"node\":\"TermNodeId 77\",\"occurrence\":\"OccurrenceId 65\",\"child\":\"TermNodeId 54\",\"source\":\"ForallType [FlexibleVariable \\\"v0\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v0\\\")) (ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\")))))\",\"variable\":\"TypeVariable (RigidVariable \\\"$djinn$source$0\\\")\",\"body\":\"FunctionType (TypeVariable (RigidVariable \\\"$djinn$source$0\\\")) (ForallType [FlexibleVariable \\\"v1\\\"] [] (FunctionType (TypeVariable (FlexibleVariable \\\"v1\\\")) (TypeVariable (FlexibleVariable \\\"v1\\\"))))\",\"node_matches_source\":true,\"child_matches_body\":true}],\"implicit_type_applications\":[],\"context_introductions\":[],\"context_applications\":[]}}}\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)",
+        "observations": {
+          "passed": 1,
+          "falsified": 0,
+          "inconclusive": 0
+        },
+        "status": "candidate",
+        "candidate": "fun _ => fun x => x",
+        "accepted_variant": {
+          "observation": {
+            "schema": 1,
+            "label": "it1",
+            "term": "fun _ => fun x => x",
+            "route": "RouteTypedCandidate",
+            "variant_ordinal": 0,
+            "origin": {
+              "engine": "djinn",
+              "renderer_ordinal": 0,
+              "rendering": {
+                "term": "fun _ => fun x => x",
+                "matches_verified_text": true
+              },
+              "graph": {
+                "root": "TermNodeId 77",
+                "root_type": "ForallType [FlexibleVariable \"v0\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v0\")) (ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\")))))",
+                "root_closed": true,
+                "node_count": 5,
+                "erasure_matches_compatibility": true,
+                "globals": [],
+                "forall_introductions": [
+                  {
+                    "node": "TermNodeId 44",
+                    "occurrence": "OccurrenceId 35",
+                    "child": "TermNodeId 27",
+                    "source": "ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\")))",
+                    "variable": "TypeVariable (RigidVariable \"$djinn$source$5\")",
+                    "body": "FunctionType (TypeVariable (RigidVariable \"$djinn$source$5\")) (TypeVariable (RigidVariable \"$djinn$source$5\"))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  },
+                  {
+                    "node": "TermNodeId 77",
+                    "occurrence": "OccurrenceId 65",
+                    "child": "TermNodeId 54",
+                    "source": "ForallType [FlexibleVariable \"v0\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v0\")) (ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\")))))",
+                    "variable": "TypeVariable (RigidVariable \"$djinn$source$0\")",
+                    "body": "FunctionType (TypeVariable (RigidVariable \"$djinn$source$0\")) (ForallType [FlexibleVariable \"v1\"] [] (FunctionType (TypeVariable (FlexibleVariable \"v1\")) (TypeVariable (FlexibleVariable \"v1\"))))",
+                    "node_matches_source": true,
+                    "child_matches_body": true
+                  }
+                ],
+                "implicit_type_applications": [],
+                "context_introductions": [],
+                "context_applications": []
+              }
+            }
+          },
+          "observation_sha256": "0811cce6070e5bc5849ab67d5753d82261a9b919dc6a2d5efc636e282b8ddbb0"
+        },
+        "finite_observation_count": 4
+      },
+      "replay": {
+        "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_where-replay.lean",
+        "sha256": "7794e3dec48317e1b1ff2dd2792fa4a192f975f1cd79c6033715bb44dc61fb15",
+        "declarations": [
+          "NestedReplay.accepted",
+          "NestedReplay.passes"
+        ],
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "NestedReplay.accepted": [],
+          "NestedReplay.passes": []
+        }
+      }
+    },
+    {
+      "name": "nested_both_false",
+      "engine": "both",
+      "mode": "where",
+      "status": "passed",
+      "live": {
+        "name": "nested_both_false",
+        "type": "{α : Type} → α → {β : Type} → β → β",
+        "mode": "where",
+        "output": "nested_both_false : {α : Type} → α → {β : Type} → β → β where False\npreparing synthesis environment (session imports + Lean)...\ndebug fragment: FAll False \"s0\" (FArr (FVar \"s0\") (FAll False \"s1\" (FArr (FVar \"s1\") (FVar \"s1\"))))\ndebug 1: fun _ => fun x => x\ndebug 2: fun _ => fun x => let a := ⟨⟩; match a with | _ => x\ndebug 3: fun _ => let a := ⟨⟩; match a with | _ => (fun x => x)\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-candidate-verified=1\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-verification-failure.error-diagnostic=1\ndebug metric: typed-candidate-rendered=1\ndebug metric: lean-variant-attempted=1\ndebug metric: lean-verification-failure.error-diagnostic=1\nthe engine proposed 3 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: exference: search reported more batches to come\nnote: exference: search truncated: candidate limit reached (60)\nsupplied behavioral assertion: 0 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)",
+        "observations": {
+          "passed": 0,
+          "falsified": 1,
+          "inconclusive": 0
+        },
+        "status": "no_candidate"
+      }
+    }
+  ],
+  "executable_hashes": {
+    "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe": "d913f666274c587953ad3bc8a95cd13390f7b068702d481f58e89f1bcc341e73",
+    "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe": "937918675ff15139816bbe2a4f6168fb8b36ea0e0990664311f4902cbce0f6f2",
+    "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+    "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe": "cf11cebeea855a47477a2648e2b8c10b11b7364e040e499d9cc5e015bfbaa0a2",
+    "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe": "7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a"
+  },
+  "processes": [
+    {
+      "label": "oracle",
+      "command": [
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\Oracle.lean"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:22:07Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\oracle.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\oracle.stderr.txt",
+      "owned_root_pid": 42216,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 19.457517899980303,
+      "finished_utc": "2026-09-08T14:22:27Z",
+      "stdout_sha256": "d1edf7c4e331bc3243ca713b25bcb0651694a7c9d692d1a82fa0cb1ff846321e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_djinn_ordinary-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain",
+        "--lake",
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:22:27Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_ordinary-live.input.txt",
+      "input_sha256": "36e6f3d5e9cf5447452ce6ac54588f57cc4d2768f51347ddefc0242c9a2c96c8",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_ordinary-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_ordinary-live.stderr.txt",
+      "owned_root_pid": 6524,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 65.25892059999751,
+      "finished_utc": "2026-09-08T14:23:32Z",
+      "stdout_sha256": "72c8468004b2169376e6ee4ce08a0438c692e69b2266107af2fe5134a29adc59",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_djinn_ordinary-kernel",
+      "command": [
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_ordinary-replay.lean"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:23:32Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_ordinary-kernel.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_ordinary-kernel.stderr.txt",
+      "owned_root_pid": 45016,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.014154399977997,
+      "finished_utc": "2026-09-08T14:23:33Z",
+      "stdout_sha256": "9a228de5d9aa378c46c3a45cea63fad60e88e0f4d012d34757aad9f6c26253ba",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_djinn_where-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain",
+        "--lake",
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:23:33Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_where-live.input.txt",
+      "input_sha256": "47245467b3a4bdfc26af5d35d0869e2c97365513e1b5c68c0bc96a2a80a10132",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_where-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_where-live.stderr.txt",
+      "owned_root_pid": 5932,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 44.28669340000488,
+      "finished_utc": "2026-09-08T14:24:18Z",
+      "stdout_sha256": "433a1ff899ce8546a5ca1770deef129c4564d136e645175670a37fdbdcf95f63",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_djinn_where-kernel",
+      "command": [
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_where-replay.lean"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:24:18Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_where-kernel.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_where-kernel.stderr.txt",
+      "owned_root_pid": 30248,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 3.415239499998279,
+      "finished_utc": "2026-09-08T14:24:21Z",
+      "stdout_sha256": "9a228de5d9aa378c46c3a45cea63fad60e88e0f4d012d34757aad9f6c26253ba",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_djinn_false-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain",
+        "--lake",
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:24:21Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_false-live.input.txt",
+      "input_sha256": "cdf7fb425c8f100814b92027ebcc9c8a25fec32a0594263ac104fcdaf0bfaeef",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_false-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_djinn_false-live.stderr.txt",
+      "owned_root_pid": 44080,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 39.857087600044906,
+      "finished_utc": "2026-09-08T14:25:01Z",
+      "stdout_sha256": "a5e8c4d285394c8883fd327c582aaa8966dacc1899fbe15f28cdba655258d7f1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_exference_ordinary-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain",
+        "--lake",
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:25:01Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_ordinary-live.input.txt",
+      "input_sha256": "9b67d1f6481301588d7a2f74975aa326bebdd20b3fc582eafbcfeaa9554cb50e",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_ordinary-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_ordinary-live.stderr.txt",
+      "owned_root_pid": 39460,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 66.93046820000745,
+      "finished_utc": "2026-09-08T14:26:08Z",
+      "stdout_sha256": "e82d54a7bb235250a7472534972fe49ec58d9bc71b79bba4537d895699a63aa3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_exference_ordinary-kernel",
+      "command": [
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_ordinary-replay.lean"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:26:08Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_ordinary-kernel.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_ordinary-kernel.stderr.txt",
+      "owned_root_pid": 25916,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 1.997571500018239,
+      "finished_utc": "2026-09-08T14:26:10Z",
+      "stdout_sha256": "9a228de5d9aa378c46c3a45cea63fad60e88e0f4d012d34757aad9f6c26253ba",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_exference_where-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain",
+        "--lake",
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:26:10Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_where-live.input.txt",
+      "input_sha256": "a6e3a25ee6b346f5beed21cf1ac10014375dde4936471edb7a6c40f3c7421b93",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_where-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_where-live.stderr.txt",
+      "owned_root_pid": 24836,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 24.039399200002663,
+      "finished_utc": "2026-09-08T14:26:34Z",
+      "stdout_sha256": "67f1342ab9e9211a08f8b37379cd403b3a968afb464a313308a824316d590e6e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_exference_where-kernel",
+      "command": [
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_where-replay.lean"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:26:34Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_where-kernel.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_where-kernel.stderr.txt",
+      "owned_root_pid": 14068,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.7112726999912411,
+      "finished_utc": "2026-09-08T14:26:35Z",
+      "stdout_sha256": "9a228de5d9aa378c46c3a45cea63fad60e88e0f4d012d34757aad9f6c26253ba",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_exference_false-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain",
+        "--lake",
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:26:35Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_false-live.input.txt",
+      "input_sha256": "664e603f6c6a7eb529dec2638ea74c77470716a695177991c5096d8582566aa8",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_false-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_exference_false-live.stderr.txt",
+      "owned_root_pid": 26152,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 9.807797499990556,
+      "finished_utc": "2026-09-08T14:26:45Z",
+      "stdout_sha256": "46185918f47e87fb80dcfa7b92a89c42d3e68b3a363436fd1df6b8859fdafc52",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_both_ordinary-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain",
+        "--lake",
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:26:45Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_ordinary-live.input.txt",
+      "input_sha256": "5d7a774799f5dd62895e583b52f2a4e117cde6660c1b1e0cd019ced0649566ed",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_ordinary-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_ordinary-live.stderr.txt",
+      "owned_root_pid": 31740,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 14.326124800019898,
+      "finished_utc": "2026-09-08T14:26:59Z",
+      "stdout_sha256": "7747bfa5d81aa4762b6b7d5a84e21c8ff6b4c65d9e2307fbfbd13f4c4044ffed",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_both_ordinary-kernel",
+      "command": [
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_ordinary-replay.lean"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:26:59Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_ordinary-kernel.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_ordinary-kernel.stderr.txt",
+      "owned_root_pid": 44084,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.6925780000165105,
+      "finished_utc": "2026-09-08T14:27:00Z",
+      "stdout_sha256": "9a228de5d9aa378c46c3a45cea63fad60e88e0f4d012d34757aad9f6c26253ba",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_both_where-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain",
+        "--lake",
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:27:00Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_where-live.input.txt",
+      "input_sha256": "ba9e8fb377b66427156a0e03e391f6ed37396e23751603e8fd016c733b31990c",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_where-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_where-live.stderr.txt",
+      "owned_root_pid": 31964,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 13.065587499993853,
+      "finished_utc": "2026-09-08T14:27:13Z",
+      "stdout_sha256": "e0b8e80faa28b8c99afc491b3aa002f97db91e8de2b608292eddae2ad482a47f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_both_where-kernel",
+      "command": [
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_where-replay.lean"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:27:13Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_where-kernel.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_where-kernel.stderr.txt",
+      "owned_root_pid": 16056,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.7251103000016883,
+      "finished_utc": "2026-09-08T14:27:14Z",
+      "stdout_sha256": "9a228de5d9aa378c46c3a45cea63fad60e88e0f4d012d34757aad9f6c26253ba",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "nested_both_false-live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain",
+        "--lake",
+        "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe"
+      ],
+      "process_timeout_seconds": 120,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-08T14:27:14Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_false-live.input.txt",
+      "input_sha256": "f40ed3463e3fa58837eaa2b629e41ba61c6438869bceea8e785b97aaef011d0c",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_false-live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\nested_both_false-live.stderr.txt",
+      "owned_root_pid": 39896,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 9.770900700008497,
+      "finished_utc": "2026-09-08T14:27:24Z",
+      "stdout_sha256": "616d3dc4bcd5221fea3fc03afde50a45085cf9c00a5a80515b60da07ba994d2e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "oracle": {
+    "path": "C:\\Leant\\dist-newstyle\\nested-forall-native-v2\\Oracle.lean",
+    "sha256": "1f0c09ecd665ad41a22e4d7d3ba0d140921ecb23405f8d257a7da87125363b9d",
+    "declarations": [
+      "NestedOracle.reference",
+      "NestedOracle.passes",
+      "NestedOracle.rejects_wrong_result",
+      "NestedOracle.rejects_false"
+    ],
+    "status": "passed",
+    "source_unchanged": true,
+    "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+    "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+    "kernel_unchanged": true,
+    "axiom_inventories": {
+      "NestedOracle.reference": [],
+      "NestedOracle.passes": [],
+      "NestedOracle.rejects_wrong_result": [],
+      "NestedOracle.rejects_false": []
+    }
+  },
+  "runtime_identity": {
+    "leant": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+    "kernel_launcher": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+    "kernel_runtime": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+    "requested_kernel_toolchain": "",
+    "backend": "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe",
+    "backend_project": "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0",
+    "backend_toolchain": "leanprover/lean4:v4.32.0",
+    "backend_lean_runtime": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+    "backend_lake_runtime": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe",
+    "python": "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+    "discovery_policy": "filesystem-only resolution; direct kernel binary; explicit backend and direct Lake binary for every live query"
+  },
+  "kernel": {
+    "path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+    "sha256_before": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+    "invocation": "direct absolute kernel executable; no PATH lookup or elan proxy"
+  },
+  "sources_unchanged": true,
+  "executables_unchanged": true,
+  "commands_unchanged": true,
+  "kernel_sources_unchanged": true,
+  "captures_unchanged": true,
+  "accepted_outputs": 6,
+  "actual_false_controls": 3
+}

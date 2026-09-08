@@ -1,5 +1,18 @@
 # Church synthesis acceptance in Lean
 
+The [nested-result graph check](../docs/reports/2026-09-08-nested-forall-graphs.md)
+passes nine native cells independently of the broader Church behavior matrix.
+To rerun it against a built executable, use
+`python test-church/nested_forall_probe.py --leant path/to/leant --output dist-newstyle/nested-forall-native`.
+The output directory must be new. `--prepare-only` emits the exact commands
+and oracle without starting any runtime process. Ordinary and named-`where`
+queries retain the full type `{α : Type} → α → {β : Type} → β → β`; every
+accepted text is kernel-replayed with four cross-instantiation observations.
+Each engine also must reject an actual False assertion. The harness records
+the exact source graph's two forall introductions, runtime hashes and all
+owned process results; its standard command timeout and search limits remain
+unchanged.
+
 The [expanded behavioral coverage report](../docs/reports/2026-09-07-priority4-behavioral-coverage.md)
 records the selected six-operation Exference subset, including the independently
 replayed native `Int` length implementation. `behavior_extended_probe.py` and

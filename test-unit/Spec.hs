@@ -3015,26 +3015,22 @@ behavioralStreamingTests = testGroup "named behavioral candidate streaming"
                 Just node -> pure node
               let actual = Djex.termNodeType root
                   sourceVariables = Set.toList $ Djex.freeVariables expected
-                  openedVariables = Set.toList $ Djex.freeVariables actual
+                  actualVariables = Djex.freeVariables actual
               -- This fixture has one context-free rank-1 source parameter.
-              -- Exference universally closes the request, then opens it to a
-              -- fresh rigid before checking the candidate. Compare the entire
-              -- types under that opening, never by arbitrary instantiation.
+              -- The checker retains the exact closure of this prepared request
+              -- and its opening witness; do not reconstruct the actual root.
               length sourceVariables @?= 1
-              length openedVariables @?= 1
               assertBool ("request parameter lost its flexible source role: " ++ show expected)
                 $ all (\variable -> case variable of
                     FlexibleVariable{} -> True
                     _ -> False) sourceVariables
-              assertBool ("graph parameter was not opened rigidly: " ++ show actual)
-                $ all (\variable -> case variable of
-                    Djex.RigidVariable{} -> True
-                    _ -> False) openedVariables
-              assertBool ("opened Exference graph belongs to a different retained request; expected "
+              assertBool ("closed Exference graph retained a free root variable: " ++ show actual)
+                $ Set.null actualVariables
+              assertBool ("closed Exference graph belongs to a different retained request; expected "
                   ++ show expected ++ ", actual " ++ show actual)
                 $ Djex.alphaEquivalentClosedTypes
                     (Djex.quantifyFreeVariables (const True) expected)
-                    (Djex.quantifyFreeVariables (const True) actual)
+                    actual
               assertBool "Exference variant lost its own retained sidecar"
                 $ detailedVerificationVariantSemanticSidecar variant == Just semantic
             _ -> assertFailure "streamed candidate has ambiguous source ownership"
@@ -24813,7 +24809,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                   ++ show groups
           other -> assertFailure $
             "expected provider-backed candidates, got: " ++ show other
-  , testCase "use compatibility only for explicit typed graph absence" $ do
+  , testCase "retain typed graphs for nested polymorphic results" $ do
       let outer = FAtom False "Demo.Outer"
           goal = FArr outer
             (FAll True "a" (FArr (FVar "a") (FVar "a")))
@@ -24824,28 +24820,37 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
       fmap projectDetailedSynthOutcome detailed @?= compatibility
       case detailed of
         Right (DetailedSynthCandidates groups _) -> do
-          assertBool
-            ("expected an explicit nested-forall fallback, got: "
-              ++ show groups)
-            (any
-              ((== RouteLegacyCandidateFallback)
-                . detailedCandidateGroupRoute)
-              groups)
-          assertBool
-            "a compatibility-only rendering retained typed graph semantics"
-            (all
-              (isNothing . detailedCandidateGroupSemanticSidecar)
-              (filter
-                ((== RouteLegacyCandidateFallback)
-                  . detailedCandidateGroupRoute)
-                groups))
+          assertBool "nested-result search returned no candidates" $ not $ null groups
+          forM_ groups $ \group -> do
+            detailedCandidateGroupRoute group @?= RouteTypedCandidate
+            semantic <- case detailedCandidateGroupSemanticSidecar group of
+              Just owned -> pure owned
+              Nothing -> assertFailure "nested result lost its own typed sidecar"
+                >> error "unreachable"
+            let candidate = typedCandidateSemanticCandidate semantic
+                request = inspectedAuthorityRequest $
+                  typedCandidateSemanticAuthorityInspection semantic
+            graph <- expectRight $ typedCandidateTermGraph candidate
+            root <- case Djex.lookupTermNode (Djex.termGraphRoot graph) graph of
+              Just node -> pure node
+              Nothing -> assertFailure "nested-result graph has no root" >> error "unreachable"
+            assertBool "nested-result root has a free source variable" $
+              Set.null $ Djex.freeVariables $ Djex.termNodeType root
+            assertBool "nested-result graph changed its complete request" $
+              Djex.alphaEquivalentClosedTypes
+                (Djex.quantifyFreeVariables (const True) $ requestGoal request)
+                (Djex.termNodeType root)
+            length [() | (_, Djex.TermNode _ Djex.TypedForallIntroduction{})
+                           <- Djex.termGraphNodes graph] @?= 2
+            let clause = Djex.candidateOutput $ Djex.typedCandidateCompatibility candidate
+            Djex.eraseTermGraphToFunctionClause (Djex.clauseName clause) graph @?= clause
           let observed = leantObservationCodeEntries $ detailedCandidateGroupObservations groups
-          assertBool "the actual fallback lost its source graph absence reason"
-            $ any (("source-graph-absent.exference." `isPrefixOf`) . fst) observed
-          assertBool "the additional graph observation replaced the historical fallback counter"
-            $ any ((== "legacy-candidate-fallback") . fst) observed
+          assertBool "retained nested graphs were reported as absent"
+            $ not $ any (("source-graph-absent.exference." `isPrefixOf`) . fst) observed
+          assertBool "typed nested results were reported as compatibility fallbacks"
+            $ not $ any ((== "legacy-candidate-fallback") . fst) observed
         Right other -> assertFailure $
-          "expected a fallback Exference candidate, got: " ++ show other
+          "expected typed nested-result Exference candidates, got: " ++ show other
         Left err -> assertFailure err
   , testCase "retain exact typed authority for relaxed unused-binder candidates" $ do
       let left = FAtom False "Demo.RelaxedLeft"
@@ -24884,14 +24889,11 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
               Nothing -> assertFailure "relaxed graph has no root" >> error "unreachable"
             let actual = Djex.termNodeType root
                 variables = Djex.freeVariablesInFirstOccurrenceOrder actual
-                close source = ForallType (Djex.freeVariablesInFirstOccurrenceOrder source) [] source
-            length variables @?= 2
-            assertBool "relaxed graph parameters were not opened rigidly" $
-              all (\variable -> case variable of
-                Djex.RigidVariable{} -> True
-                _ -> False) variables
+            variables @?= []
+            length (Djex.freeVariablesInFirstOccurrenceOrder $ requestGoal request) @?= 2
             assertBool "relaxed graph belongs to a different complete request" $
-              Djex.alphaEquivalentClosedTypes (close $ requestGoal request) (close actual)
+              Djex.alphaEquivalentClosedTypes
+                (Djex.quantifyFreeVariables (const True) $ requestGoal request) actual
             let clause = Djex.candidateOutput $ Djex.typedCandidateCompatibility candidate
             -- Clause conversion groups the leading lambda spine; every
             -- binder and the remaining body must still agree exactly.
@@ -25446,14 +25448,11 @@ providerEngineTests = testGroup "foreign providers"
         Nothing -> assertFailure "Nat eliminator graph has no root" >> error "unreachable"
       let actual = Djex.termNodeType root
           variables = Djex.freeVariablesInFirstOccurrenceOrder actual
-          close source = ForallType (Djex.freeVariablesInFirstOccurrenceOrder source) [] source
-      length variables @?= 1
-      assertBool "Nat result parameter was not opened rigidly" $
-        all (\variable -> case variable of
-          Djex.RigidVariable{} -> True
-          _ -> False) variables
+      variables @?= []
+      length (Djex.freeVariablesInFirstOccurrenceOrder $ requestGoal request) @?= 1
       assertBool "Nat eliminator graph changed its complete request" $
-        Djex.alphaEquivalentClosedTypes (close $ requestGoal request) (close actual)
+        Djex.alphaEquivalentClosedTypes
+          (Djex.quantifyFreeVariables (const True) $ requestGoal request) actual
       let clause = Djex.candidateOutput $ Djex.typedCandidateCompatibility candidate
       Djex.functionClauseFromExpression (Djex.clauseName clause)
         (eraseTermGraph graph) @?= clause

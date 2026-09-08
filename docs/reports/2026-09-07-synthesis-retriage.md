@@ -5,7 +5,7 @@ from the [original roadmap](../../lib/Djex/docs/reports/2026-09-06-synthesis-nex
 The [completion register](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/docs/reports/2026-09-07-synthesis-priorities-1-4.md)
 retains the full scope. The current canonical
 [Djex re-triage](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-07-synthesis-retriage.md)
-also covers working changes newer than this repository's pinned dependency.
+also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
@@ -18,7 +18,7 @@ is complete. Priorities 2–4 retain their original requirements.
 
 | Order | Delivery | Required acceptance |
 | --- | --- | --- |
-| 1 | Complete expanded Church behavior and its concrete failures | Both Haskell engines accept 12/13 extended operations from separate batches; maybeEither remains missing. Close the observed graph/elaboration and fixture gates, then all 19 explicit-default counterparts and remaining Lean cells. Preserve exact providers, actual False controls, full-signature replay and per-cell limits. |
+| 1 | Complete expanded Church behavior and its concrete failures | Both Haskell engines accept 12/13 extended operations from separate batches; maybeEither remains missing. The supplied witness's graph/elaboration gate and Leant's nine-cell nested-result integration pass. Inspect the unchanged all-false search prefix and the foldl1 construction path, then finish all 19 explicit-default counterparts and remaining Lean cells. Preserve exact providers, actual False controls, full-signature replay and per-cell limits. |
 | 2 | Broaden supplied-fold acceptance after the native verification repair | Exact empty-user-root reuse now passes native Djinn append/length, lifecycle isolation/reset/recovery and the complete 686-test suite. Continue the remaining engine and supplied tree-fold/accumulator cases with exact provider inventories, full-signature behavior and termination-checked replay. Keep existing bounds and failure classifications. |
 | 3 | Admit one described global contextual provider | Extend the existing `Type 0` route with one fully described global provider while retaining the current non-overlap guard. Preserve complete source metadata, exact owned graph/renderer evidence and payload-sensitive replay; do not broaden instances or universes as part of this increment. |
 | 4 | Preserve selected dictionary identity before relaxing overlap guards | Carry the selected introduction occurrence and ordered slot through lowering and reconstruction. Require a forced equal-predicate outer/inner fixture whose faithful scoped capture preserves distinct payload behavior in Haskell and Lean replay. Graph IDs or successful compilation alone are insufficient. Methods, superclass evidence and further provider schemes remain separate extensions. |
@@ -28,6 +28,18 @@ priority 4, step 2 advances priority 2, and steps 3–4 advance priority 3.
 Independent cells may proceed while heavy runtime work remains serialized.
 Tree folds and accumulator programs depend on reliable native verification,
 not on completing dictionary selection.
+
+The [nested-result integration](2026-09-08-nested-forall-graphs.md) now vendors
+Djex `a44f70570c9287d3fc377e9df18978e1c6a692fa`. All nine native cells pass:
+six exact full-type outputs, 24 finite observations, three actual False
+controls and 16 empty axiom inventories. The closed graph roots retain both
+actual forall introductions and their own renderer/engine association.
+The final strict build and all 686 unfiltered unit tests pass in 358.12 seconds.
+This closes a frontend evidence gate. It does not add Church behavioral
+coverage: the unchanged public Exference `maybeEither` query still checks
+256 false candidates, with zero errors or timeouts after five same-candidate
+elaboration repairs. Search admission and construction now take precedence
+over further changes to that successfully checked witness's representation.
 
 ## Current evidence and its limits
 

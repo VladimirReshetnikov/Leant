@@ -63,6 +63,26 @@ observeCandidate candidate = case D.typedCandidateTermGraph candidate of
     , ("erasure_matches_compatibility", JBool $
         D.eraseTermGraphToFunctionClause (D.clauseName clause) graph == clause)
     , ("globals", JArr [maybe JNull JStr $ D.nameSpelling name | (_, D.TypedGlobal _ name) <- forms])
+    , ("forall_introductions", JArr
+        [ JObj [("node", JStr $ show node), ("occurrence", JStr $ show occurrence)
+               , ("child", JStr $ show child)
+               , ("source", JStr $ show $ D.forallIntroductionSource witness)
+               , ("variable", JStr $ show $ D.forallIntroductionVariable witness)
+               , ("body", JStr $ show $ D.forallIntroductionBody witness)
+               , ("node_matches_source", JBool $ maybe False
+                   ((== D.forallIntroductionSource witness) . D.termNodeType)
+                   (D.lookupTermNode node graph))
+               , ("child_matches_body", JBool $ maybe False
+                   ((== D.forallIntroductionBody witness) . D.termNodeType)
+                   (D.lookupTermNode child graph))]
+        | (node, D.TypedForallIntroduction occurrence child witness) <- forms])
+    , ("implicit_type_applications", JArr
+        [ JObj [("node", JStr $ show node), ("occurrence", JStr $ show occurrence)
+               , ("child", JStr $ show child)
+               , ("source", JStr $ show $ D.implicitTypeApplicationSource witness)
+               , ("selected", JStr $ show $ D.implicitTypeApplicationSelected witness)
+               , ("result", JStr $ show $ D.implicitTypeApplicationResult witness)]
+        | (node, D.TypedImplicitTypeApplication occurrence child witness) <- forms])
     , ("context_introductions", JArr
         [ JObj [("node", JStr $ show node), ("occurrence", JStr $ show occurrence)
                , ("binders", JArr

@@ -135,6 +135,13 @@ Companion documents:
   Rendering and Length consume the candidate's own graph and source inventory;
   `both` preserves each retained candidate's engine ownership. See the
   [implementation and validated coverage](docs/synth-internals.md#djinn-source-graphs-and-current-validation).
+  The [nested-result integration](docs/reports/2026-09-08-nested-forall-graphs.md)
+  retains Exference's original root quantifiers and nested forall introductions.
+  Its nine native cells pass across all three modes: six exact full-type replays,
+  24 finite observations, three actual False controls and 16 empty axiom inventories.
+  The strict build and complete 686-test integration suite also pass.
+  Exact constructor schemes and lambda projection are retained by the pinned
+  Djex dependency; the remaining Church search failures stay open.
 - **Current synthesis progress.** The bounded local `Type 0` contextual route
   is accepted across Djinn, Exference and Both, through ordinary and named-`where`
   commands. The fresh [39-cell matrix and complete 680-test suite](test-context/receipts/ordinary-context-streaming.json)

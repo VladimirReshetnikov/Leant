@@ -113,6 +113,10 @@ who wants the *what* can stop at the paragraph.
 
 ## Design and report index
 
+The [nested-result graph integration](reports/2026-09-08-nested-forall-graphs.md)
+records the closed Exference root contract, same-candidate forall diagnostics,
+and native ordinary/behavioral/False acceptance in all three engine modes.
+
 The implementation invariants are recorded in the dated reports for
 [finite families](reports/2026-08-01-query-wide-parametric-inductive-families.md)
 and
