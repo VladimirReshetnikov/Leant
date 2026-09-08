@@ -9,14 +9,23 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-**September 8 acceptance follow-up: close frontend gaps, then missing Church
-constructions.** The [global-method integration report](2026-09-08-global-contextual-providers.md) records the completed
+**September 8 re-triage after loaded-provider acceptance: prioritize missing
+Church programs, then bounded frontend usability and tree folds.** Broader
+contextual support remains required, but is no longer a prerequisite for those
+deliveries. This changes execution order without narrowing priorities 1–4.
+
+The [loaded-provider report](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-loaded-contextual-providers.md)
+records accepted ordinary Haskell source-scheme transport and explicit-`forall`
+behavioral queries in both engines, including independent replay, False
+controls, a strict build and all 2,306 tests in 15 complete suites at Djex
+`85bd472f`. The [global-method integration report](2026-09-08-global-contextual-providers.md) records the completed
 bounded Leant delivery against Djex `4a4ed0fc`: six native ordinary/where method
 cases with full-type kernel replay and 24 observations; nine cache/False
 sessions with 21 independent replay files; a fresh 39/39 local-context matrix;
-a strict build; and the complete 701/701 unit suite. Canonical Djex's existing
-strict build and 2,304-test acceptance remain attached to their recorded
-revision; no new canonical engine changes are claimed here.
+a strict build; and the complete 701/701 unit suite. Leant still pins Djex
+`4a4ed0fc`; the newer canonical Haskell acceptance does not establish native
+Lean integration of that revision. These are existing acceptance receipts,
+not new runtime runs performed for this re-triage.
 
 Ordinary verification now carries exact candidate ownership in optional
 request traces. All cache captures are complete at the explicitly selected
@@ -27,16 +36,26 @@ reopening the now-completed trace/correlation work.
 
 | Order | Delivery | Why now and required acceptance |
 | --- | --- | --- |
-| 1 | Close Haskell frontend gaps (priority 3) | [Loaded ordinary value schemes](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/reports/2026-09-08-loaded-contextual-providers.md) and explicit-forall behavioral method use now pass both engines, exact displayed-source replay, False controls and the complete 2,306-test regression. Finish implicit-root scoping, ordinary contextual presentation and complete derived class-method schemes at original full signatures. |
-| 2 | Support mixed Lean contextual provider inventories (priority 3) | Cap-one method discovery passes, but the existing mixed inventory still refuses `ContextProduction.Dictionary.mk`, whose dictionary-valued scheme is unsupported. Extend source representation/admission while retaining explicit unsupported cases and ownership checks. Exercise an ordinary inventory containing constructors and methods; do not discard rejected packets merely to obtain a pass. |
-| 3 | Make missing Church constructions reachable (priority 4) | Inspect actual rule admission, substitutions and queue decisions for `maybeEither` and `foldl1`, then validate a generic fix with the original live queries and bounds. Checked references stay outside provider inventories. Two failed heuristic experiments are evidence against more blind tuning. |
-| 4 | Accept supplied tree folds with accumulators (priority 2; independent bounded delivery) | Run the prepared polymorphic tree fixture in both Haskell engines and all three Lean modes, with exact provider inventories, order-sensitive observations, full-type behavior, termination checking and False controls. The fixture is prepared, not accepted. |
-| 5 | Preserve dictionary occurrence, then extend evidence (priority 3) | Keep overlap guards until equal-predicate outer/inner uses retain the selected dictionary and distinguish payloads. Add conditional providers, superclass projections and richer universe metadata as separate increments. |
+| 1 | Synthesize missing Church programs and close coverage (priority 4) | Diagnose `maybeEither` rule admission, substitutions and queue decisions at the original bounds, then `foldl1` and the remaining cells. Establish whether a needed construction is unavailable or merely delayed before changing search. Accept a generic fix only through the original public queries, exact full-signature replay and False controls. Reference implementations stay outside search inventories. |
+| 2 | Finish bounded Haskell frontend usability (priority 3) | Preserve implicit root binder order and lexical scope, and make ordinary contextual output independently usable. Test explicit and implicit signatures, expression and definition output, and ordinary and named-`where` routes. The worker must check the exact displayed implementation at the original signature. Derived class-method extraction is a separate increment in delivery 4. |
+| 3 | Accept supplied tree folds with accumulators (priority 2) | Execute the prepared polymorphic tree fixture in both Haskell engines and all three Lean modes. Require exact provider inventories, order-sensitive observations, full-type replay, termination checking and False controls. Preparation alone is not acceptance; do not add a new general-recursion mechanism before this fixture identifies a need. |
+| 4 | Extend contextual source coverage (priority 3) | Complete Haskell derived class-method schemes and Lean mixed inventories containing constructors and methods. The existing `ContextProduction.Dictionary.mk` refusal requires source representation/admission, not a larger provider cap. Retain rejected packets and precise unsupported outcomes; integrate a newer Djex pin only with its own native validation. |
+| 5 | Preserve selected dictionaries and derive further evidence (priority 3) | Keep overlap guards until distinct outer/inner dictionaries with equal predicates retain their selected payloads through search and replay. Then extend conditional providers, superclass projections and richer universe metadata through separate fixtures. Existing bounded conditional-provider support does not establish the general case. |
 
-The first two deliveries close concrete frontend gaps exposed by the current
-implementation. They should not grow into a general frontend rewrite or defer
-the Church work behind unrelated infrastructure. Diagnostics belong inside the
-delivery they unblock; a successful trace is not a synthesized implementation.
+The Church misses are the most direct remaining gap in the requested practical
+coverage. Their current fixtures do not establish a dependency on mixed Lean
+dictionary inventories or broader instance derivation. Loading more providers
+cannot repair a provider-free construction gap. The frontend increment remains
+small because compiling inside a worker does not by itself make displayed code
+usable in a caller's scope. Compiler syntax probes are design evidence only;
+they do not accept implicit-root synthesis or its expression-output contract.
+
+Use one failing public query and its exact candidate/search evidence to drive
+each repair. Instrument only the missing decision, stop speculative tuning
+after an unchanged failure, and preserve existing budgets. A completed delivery
+must add an accepted program or close a demonstrated correctness gap; another
+trace framework or larger evidence archive is not a substitute. Keep runtime
+validation serialized and run affected acceptance cells with each increment.
 
 The full priority-4 obligation remains **all 13 extended operations and all
 19 explicit-default counterparts**, across Haskell Djinn/Exference and Lean
@@ -213,11 +232,11 @@ error is repairable.
 | Idea | Promotion criterion |
 | --- | --- |
 | Exact accepted-candidate provenance and reproducible replay | Retain the accepted 39-cell/680-test boundaries, non-forcing diagnostics and direct kernel pinning. Retain bounded request capture and its whole-record omission accounting. Keep the accepted empty-environment repair and lifecycle controls as regressions; defer a general tracing framework. |
-| Verification trace and runner consistency | Promote narrowly: ordinary verification lacks the behavioral annotation required by the supplemental runner. Preserve exact candidate ownership while aligning the contract; share exercised UTF-8, runtime-pinning and query-format helpers. |
+| Verification trace and runner consistency | Completed for the global-method increment. Retain exact ordinary/where ownership, portable runners, explicit capture caps and negative controls. Defer broader tracing until another concrete acceptance gap requires it. |
 | Routing-test maintenance | When touching a routing boundary, replace brittle source-text counts with executable routing or boundary controls where practical. Preserve coverage; this is incremental maintenance, not a separate cleanup milestone. |
-| Constraint-only provider instantiation | Six real method cases and three False controls now pass in the working prototype. Finish trace/cache and aggregate regression closure; Haskell frontend admission and implicit-root scoping remain separate tasks. |
+| Constraint-only provider instantiation | Engine/API, bounded native integration and loaded Haskell explicit-forall behavioral use are accepted. Retain the 701-test native and 2,306-test canonical receipts at their distinct revisions. Implicit-root scoping and ordinary presentation are delivery 2; derived method schemes and mixed Lean inventories are delivery 4. |
 | Tree folds and accumulator programs | Independent next recursion delivery; the polymorphic tree-accumulator fixture is prepared but unexecuted. Require exact supplied-provider inventory, order-sensitive full-signature behavior and termination checking. Native verification repair is already accepted. |
-| Flexible-goal construction and branch diagnostics | Next Church-search investigation: trace actual rule admission, substitutions and queue decisions for a missing derivation. Preserve budgets and distinguish an unavailable construction from an admitted but delayed branch. Public graph histograms alone do not locate the cause. |
+| Flexible-goal construction and branch diagnostics | Promoted to the first delivery: trace actual rule admission, substitutions and queue decisions for a missing derivation. Preserve budgets and distinguish an unavailable construction from an admitted but delayed branch. Public graph histograms alone do not locate the cause. |
 | Further heuristic tuning | Demoted: the two tested Exference changes both leave `maybeEither` at 256 false candidates. Require a measured branch/queue diagnosis and successful original query before adoption. |
 | Counterexample-guided search | Conditional follow-up when repeated expensive rejection remains material after construction gaps close. Reuse only exact-candidate observations under the same environment/predicate; finite agreement cannot justify general equivalence or unsound pruning. |
 | Native Windows Length acquisition | Promote for a concrete Windows workflow. Require bounded acquisition, actual solver execution and independent replay; existing refusal behavior and Length tests do not implement the missing acquisition route. |

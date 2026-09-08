@@ -76,8 +76,8 @@ Companion documents:
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
 - **[Current synthesis re-triage](docs/reports/2026-09-07-synthesis-retriage.md)**
-  — accepted case analysis across all engines, Lean fold acceptance, production
-  contextual evidence, and the remaining behavioral corpus;
+  — missing Church constructions first, then bounded Haskell frontend usability,
+  supplied tree folds, and broader contextual source/evidence support;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -179,7 +179,10 @@ Companion documents:
   build and 2,306-test regression pass; Leant retains the separately accepted
   `4a4ed0fc` pin above. Implicit-root scoping, ordinary contextual presentation,
   derived method schemes, mixed Lean dictionary inventories and missing Church
-  constructions remain open. Supplied tree folds remain an independent delivery.
+  constructions remain open. The revised order puts Church construction and
+  coverage first, then bounded Haskell frontend usability and supplied tree
+  folds. Broader contextual source/evidence support follows; it is not a
+  prerequisite for the provider-free Church fixtures.
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
   now includes separate-run acceptance of 12/13 extended operations in each
   Haskell engine and 2/4 Exference explicit-default cases. Lean Exference's
