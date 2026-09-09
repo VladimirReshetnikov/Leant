@@ -1,0 +1,86 @@
+{
+  "status": "transfer_checks_failed_with_reached_native_construction",
+  "native_dependency": "bfc3692e891ed2d81846fb2bd6b54ecd51aa7442",
+  "native_source_and_runtime_unchanged": true,
+  "native_results": [
+    {
+      "name": "lean-tree_accumulator_djinn",
+      "status": "failed",
+      "failure": "expected one behaviorally accepted output for tree_accumulator_djinn: []"
+    },
+    {
+      "name": "lean-tree_accumulator_djinn_reject_all",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "name": "lean-tree_accumulator_exference",
+      "status": "failed",
+      "failure": "synthesis command exceeded its prepared deadline"
+    },
+    {
+      "name": "lean-tree_accumulator_exference_reject_all",
+      "status": "failed",
+      "failure": "synthesis command exceeded its prepared deadline"
+    },
+    {
+      "name": "lean-tree_accumulator_both",
+      "status": "failed",
+      "failure": "synthesis command exceeded its prepared deadline"
+    },
+    {
+      "name": "lean-tree_accumulator_both_reject_all",
+      "status": "failed",
+      "failure": "synthesis command exceeded its prepared deadline"
+    }
+  ],
+  "reached_debug_candidate": {
+    "index": 115,
+    "independent_full_type_replay": true,
+    "original_observations": 16,
+    "axiom_inventories": {
+      "TreeAccumulatorFixture.foldTree": [],
+      "TreeAccumulatorReplay.candidate": [],
+      "TreeAccumulatorReplay.candidate_passes": []
+    },
+    "boundary": "Compatibility debug expression only; no accepted typed-candidate association, live verification success or verification order is established."
+  },
+  "haskell_foldl1": {
+    "status": "bounded_miss",
+    "window": 256,
+    "steps": 100000,
+    "queue": 8192,
+    "positive_oracle_controls": 1,
+    "wrong_oracle_controls": 3,
+    "actual_false_control": true,
+    "source_and_executable_unchanged_during_run": true,
+    "executable_hashes": {
+      "C:\\Djex\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\djex-2026.7.17\\x\\djex\\build\\djex\\djex.exe": "8f8e33f6013bd8807abdf7973f1207d653a4fb9feded0776a23d839ef4271b0a",
+      "C:\\ghcup\\bin\\ghc.exe": "7c55e201f71860c5babea886007c8fa44b861abf50d1c07e5677eb0bda387a70"
+    }
+  },
+  "fixture_refresh": {
+    "first_attempt": "stopped before synthesis because run_acceptance.py differed from its manifest",
+    "changed_files": [
+      "case.json",
+      "manifest.json"
+    ],
+    "case_changes": [
+      "preparation_bases"
+    ],
+    "semantic_types_observations_providers_commands_and_limits_unchanged": true
+  },
+  "archive": {
+    "path": "tree-transfer-after-integration.zip",
+    "sha256": "d36b8c23b03e29454520c51c26ddcc6f01109cb0b059c988cc758438524c6a80",
+    "bytes": 5021987,
+    "artifacts": 623,
+    "all_members_rehashed": true
+  },
+  "boundaries": [
+    "Native tree acceptance remains open in all three modes.",
+    "The Haskell foldl1 check retains its prior bounded miss; the oracle is not a synthesized witness.",
+    "Native inputs are copied from verified matching files. Haskell source provenance follows the runner's declared 20-file scope and exact executable identity, not a complete production-source census.",
+    "The canonical Haskell executable was rebuilt later for independent frontend work; its current bytes are not represented as the earlier foldl1 executable."
+  ]
+}

@@ -1,5 +1,10 @@
 # Synthesis re-triage: bounded contexts, reliable checking, and behavior
 
+> Execution order superseded by the [tree/frontend re-triage](2026-09-08-synthesis-frontier-retriage.md).
+> The transfer checks have run and still miss; the implicit-signature
+> implementation passes 360/361 tests and remains unaccepted. The
+> native integration results below retain their recorded acceptance.
+
 This report, updated on 2026-09-08, preserves the active goal to implement priorities 1–4
 from the [original roadmap](../../lib/Djex/docs/reports/2026-09-06-synthesis-next-priorities.md).
 The [completion register](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/docs/reports/2026-09-07-synthesis-priorities-1-4.md)

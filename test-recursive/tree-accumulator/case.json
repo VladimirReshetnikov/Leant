@@ -244,11 +244,11 @@
   "preparation_bases": [
     {
       "path": "test-recursive/run_recursors.py",
-      "sha256": "385ce828107e81f5c687e94ad0396e1221b3919858ff5e67bd922a4d067188f0"
+      "sha256": "4ff83ca825acb3de074cc72d0c57db2c0906f1b25945e6d6773d666f4984b13c"
     },
     {
       "path": "lib/Djex/test-integration/RecursorSpec.hs",
-      "sha256": "13b80337e48fbffe6491ac6c1df8f2af92d5a42d4dccfa1f9d88fed3eb6bf6cd"
+      "sha256": "3fbc25af8edf42b86024d066caa50a76f89515f8c80bbc4628eb79f881ef82d8"
     }
   ]
 }

@@ -208,6 +208,15 @@ Companion documents:
   All ten integration gates and the final input-integrity check pass; Leant now
   pins the tested dependency. Earlier deadline failures remain recorded in the
   [historical report](docs/reports/2026-09-08-native-carrier-integration.md).
+  The [new tree/frontend re-triage](docs/reports/2026-09-08-synthesis-frontier-retriage.md)
+  records the subsequent native tree and Haskell `foldl1` transfer misses at
+  their original limits. A native tree debug expression independently passes
+  the full type and all 16 observations, but its live typed-candidate acceptance
+  remains open. Candidate tracing now precedes broader search changes. The
+  in-progress Haskell implicit-signature frontend passes **360/361 tests**,
+  including all **115 CLI tests**; a synonym source-hint regression still
+  prevents acceptance and dependency promotion. The full Church behavior
+  target and broader contextual evidence remain in the delivery queue.
   The [semantic provider filter](docs/reports/2026-09-08-semantic-auxiliary-providers.md)
   now excludes generated auxiliary eliminators while retaining ordinary user
   `elim` functions. Four real-kernel discovery checks and the public tree

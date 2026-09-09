@@ -1,5 +1,10 @@
 # Further improvements after the native recursor gates pass
 
+> Execution order superseded by the [tree/frontend re-triage](2026-09-08-synthesis-frontier-retriage.md).
+> The transfer checks have run and still miss; the implicit-signature
+> implementation passes 360/361 tests and remains unaccepted. The
+> native integration results below retain their recorded acceptance.
+
 This September 8, 2026 re-triage, updated after terminal integration, reorders the remaining work under priorities
 1–4. The full goal remains open. The useful next work is a bounded transfer
 check for tree folds, completion of public Haskell frontend behavior, and the

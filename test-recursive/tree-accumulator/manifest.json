@@ -10,7 +10,7 @@
     {
       "path": "case.json",
       "bytes": 19559,
-      "sha256": "512a9168c2e0337b77dc04acd2914aaddcca171983f8f457d3c4ca5dd671d717"
+      "sha256": "b90aa5994fbb0ca84d2e0de8bede9898dbff6bb628752556f69ce685118cdd90"
     },
     {
       "path": "CheckControls.hs",
@@ -74,8 +74,8 @@
     },
     {
       "path": "run_acceptance.py",
-      "bytes": 26858,
-      "sha256": "85557a165d88b522a2c72d8db6e6e542813c89a93cafae21a0beba7b63b3a487"
+      "bytes": 26638,
+      "sha256": "d5afa7c8da635d2a36a92714150a8da51c1bb43b9fc6675176b2265f9ac33108"
     },
     {
       "path": "test_deadlines.py",
