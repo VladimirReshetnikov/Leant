@@ -1,5 +1,7 @@
 # Further improvements after request-deadline and native-tree diagnostics
 
+> Superseded delivery order: [contextual frontend and validation re-triage](2026-09-09-synthesis-after-contextual-frontier.md). This report retains the earlier diagnostic evidence.
+
 This September 9, 2026 assessment supersedes the execution order in the
 [previous frontier report](2026-09-08-synthesis-frontier-retriage.md), while
 preserving priorities 1–4 and their completion requirements. **Close the current

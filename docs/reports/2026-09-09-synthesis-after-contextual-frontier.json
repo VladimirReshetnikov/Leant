@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "purpose": "Interim triage evidence summary; not a synthesis acceptance or release receipt.",
+  "date": "2026-09-09",
+  "deadline_integration": {
+    "parent_receipt": {
+      "local_path": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\results.json",
+      "sha256": "2ed640e1010e52e021600047608a6f99ff754fc95a4ef2e5de4b77d73b427166"
+    },
+    "parent_status": "running",
+    "completed_gates": [
+      {
+        "gate": "unit",
+        "status": "passed",
+        "retained": true,
+        "receipt": "C:\\Leant\\dist-newstyle\\request-deadline-unit-v1\\results.json",
+        "receipt_sha256": "ede3a0b0fabb309be973c32fd7064822d6513ee31a326505d8617c2f140c6d17",
+        "tests": 705
+      },
+      {
+        "gate": "methods",
+        "status": "passed",
+        "exit_code": 0,
+        "receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\methods\\results.json"
+      },
+      {
+        "gate": "method-controls",
+        "status": "passed",
+        "exit_code": 0,
+        "receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\method-controls\\results.json"
+      },
+      {
+        "gate": "local-context",
+        "status": "passed",
+        "exit_code": 0,
+        "receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\local-context\\results.json"
+      },
+      {
+        "gate": "simplification",
+        "status": "passed",
+        "exit_code": 0,
+        "receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\simplification\\results.json"
+      },
+      {
+        "gate": "native-recursor",
+        "status": "passed",
+        "exit_code": 0,
+        "receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\native-recursor\\results.json"
+      },
+      {
+        "gate": "extended-exference",
+        "status": "passed",
+        "exit_code": 0,
+        "receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\extended-exference\\results.json"
+      },
+      {
+        "gate": "nested-forall",
+        "status": "passed",
+        "exit_code": 0,
+        "receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\nested-forall\\results.json"
+      },
+      {
+        "gate": "signatures-djinn",
+        "status": "passed",
+        "exit_code": 0,
+        "receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\signatures-djinn\\results.json"
+      }
+    ],
+    "interruptions": [
+      {
+        "local_path": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\terminal-interruption.json",
+        "sha256": "a0865ce37c9ed9339d5084fb1ea72c53f26886018b71fd14c5c17a0c853a677b",
+        "status": "interrupted_before_final_gate_receipt",
+        "parent_receipt_sha256": "2ed640e1010e52e021600047608a6f99ff754fc95a4ef2e5de4b77d73b427166",
+        "completed_gates": [
+          "unit",
+          "methods",
+          "method-controls",
+          "local-context",
+          "simplification",
+          "native-recursor",
+          "extended-exference",
+          "nested-forall",
+          "signatures-djinn"
+        ],
+        "incomplete_gate": "signatures-exference",
+        "exit_code": null,
+        "termination_reason": "Unknown; owning tool session is absent and no Python/Leant/Lean/backend processes remain.",
+        "all_original_inputs_still_match": true
+      },
+      {
+        "local_path": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v3\\terminal-interruption.json",
+        "sha256": "08c0b69c01e5ebeb5ab268db9489890b29f9c61194ce825c235c941495934f9d",
+        "status": "interrupted_before_final_gate_receipt",
+        "parent_receipt_sha256": "2716190576ea0a03c69f6dd830edf4444f00966257c7d7a2e04d831ca93637e5",
+        "completed_gates": [
+          "unit",
+          "methods",
+          "method-controls",
+          "local-context",
+          "simplification",
+          "native-recursor",
+          "extended-exference",
+          "nested-forall",
+          "signatures-djinn"
+        ],
+        "incomplete_gate": "signatures-exference",
+        "exit_code": null,
+        "termination_reason": "Unknown; owner session absent and no native or Python process remains. Transcript stops at backend startup.",
+        "all_original_inputs_still_match": true
+      }
+    ],
+    "interpretation": "Nine completed gates, including retained 705-test unit receipt. Final Exference corpus lacks terminal acceptance; running in parent is stale."
+  },
+  "one_shot_frontend": {
+    "receipt": {
+      "local_path": "C:\\Djex\\dist-newstyle\\one-shot-context-focused-v3\\results.json",
+      "sha256": "82d7a95efa383771960698cab41ec16b94d035dc995ace74938b620fe9784310"
+    },
+    "status": "failed",
+    "passed_cases": 6,
+    "total_cases": 8,
+    "frozen_inputs_unchanged_during_run": true,
+    "transcript_sha256": "51fd4fc1be36b424a514a3a8c1c4bb2d902970a9ceccb7c49bda1fe23709ab89",
+    "transcript": "Djex CLI integration\n  one-shot commands retain contextual source scope\n    djinn first balanced:     OK (8.75s)\n    djinn best balanced:      OK (9.30s)\n    djinn all balanced:       OK (8.67s)\n    djinn all legacy:         OK (9.20s)\n    exference first balanced: OK (8.10s)\n    exference best balanced:  OK (10.22s)\n    exference all balanced:   FAIL (0.05s)\n      test-cli\\Spec.hs:4132:\n      one-shot contextual command failed: warning: unknown type constructor 'Bool' used in class instances\n      warning: unknown type constructor 'Int' used in class instances\n      warning: unknown type constructor 'Int' used in the binding Methods.Token\n      warning: unknown type constructor 'Int' used in the binding Methods.payload\n      warning: unknown type constructor 'Int' used in the binding Methods.observe\n      error [DJEX_EXF_RENDER]: cannot present the checked search result\n        context: \"no source graph for this candidate\"\n      \n      expected: ExitSuccess\n       but got: ExitFailure 1\n      Use -p '/one-shot commands retain contextual source scope/&&/exference all balanced/' to rerun this test only.\n    exference all legacy:     FAIL (0.05s)\n      test-cli\\Spec.hs:4132:\n      one-shot contextual command failed: warning: unknown type constructor 'Bool' used in class instances\n      warning: unknown type constructor 'Int' used in class instances\n      warning: unknown type constructor 'Int' used in the binding Methods.Token\n      warning: unknown type constructor 'Int' used in the binding Methods.payload\n      warning: unknown type constructor 'Int' used in the binding Methods.observe\n      error [DJEX_EXF_RENDER]: cannot present the checked search result\n        context: \"no source graph for this candidate\"\n      \n      expected: ExitSuccess\n       but got: ExitFailure 1\n      Use -p '/one-shot commands retain contextual source scope/&&/exference all legacy/' to rerun this test only.\n\n2 out of 8 tests failed (54.35s)\n",
+    "later_diagnostic_sha256": "c54c44e7982908b1449f8ad182ed2f9d83b83a29dfccd7cc44d61f721f51cada",
+    "later_diagnostic": "warning: unknown type constructor 'Bool' used in class instances\nwarning: unknown type constructor 'Int' used in class instances\nwarning: unknown type constructor 'Int' used in the binding Methods.Token\nwarning: unknown type constructor 'Int' used in the binding Methods.payload\nwarning: unknown type constructor 'Int' used in the binding Methods.observe\nerror [DJEX_EXF_RENDER]: cannot present the checked search result\n  context: \"no source graph for this candidate: UnsupportedContextualCertificateGraph; compatibility expression: Methods.method @Int\"\n",
+    "interpretation": "Focused evidence predates the unbuilt lexical-context certificate patch; does not certify current source."
+  },
+  "unvalidated_certificate_patch_inputs": {
+    "synthesis\\internal\\Language\\Haskell\\Synthesis\\Internal\\TypedGenerated\\Certificate\\Association.hs": "971bfbfa6b5181f1a983349ea53f26426ab6ec2d833b6b40407829b5657fab19",
+    "exference\\src-core\\Language\\Haskell\\Exference\\Core\\Internal\\ExpressionCheck.hs": "74353779114d42c33efc5adca87d40e466089d1d1b9caed06a635be22326da0c"
+  }
+}
