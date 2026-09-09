@@ -1,5 +1,7 @@
 # Further improvements after native contextual integration
 
+> Subsequent canonical acceptance: [contextual list construction and output](2026-09-09-contextual-list-output.md) passes its documented REPL/one-shot matrices and complete regressions. Native integration of this new revision remains pending; the remaining Church behavior, query forms and broader provider obligations stay open.
+
 This assessment replaces the delivery order in the [previous re-triage](2026-09-09-synthesis-after-one-shot-acceptance.md). The deadline repair and canonical contextual integration are accepted milestones and leave the active implementation queue. The next work should close contextual data construction, deliver missing Church behaviors, and then expand public syntax and provider evidence in bounded increments.
 
 The original priorities 1–4 remain in force. This report changes the order of work, not the meaning of practical rank-N and impredicative support or the agreed treatment of partial functions.

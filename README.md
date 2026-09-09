@@ -255,8 +255,16 @@ Companion documents:
   The [ordinary Haskell contextual REPL delivery](docs/reports/2026-09-08-ordinary-contextual-output.md):
   36 explicit-forall public queries and 330 tests across four complete affected
   suites pass at the documented fixture bounds. The later implicit-root and
-  one-shot increments above extend that output coverage; typed list rendering
-  remains open. Broader search estimates were rejected after losing Church composition.
+  one-shot increments above extend that output coverage.
+  The [contextual list milestone](docs/reports/2026-09-09-contextual-list-output.md) passes **2,385 tests in 16 suites**,
+  **80 one-shot list queries** with **2,526 exact displayed replays**, and the existing
+  64-query contextual matrix. Named REPL tests check nonempty lists, preserved
+  tails, polymorphic elements, wrappers, hidden constructors and construction
+  from arguments under unused outer/nested contexts. Root binder names remain
+  source-scoped when nested binders are alpha-renamed. Both Haskell signature
+  corpora pass 350/350 and extended Exference retains 13/13 behaviors.
+  Native integration of this new canonical revision remains pending.
+  Broader search estimates were rejected after losing Church composition.
   The committed dependency is `3adfac5c`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-09-synthesis-after-native-contextual-integration.md).

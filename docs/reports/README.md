@@ -293,3 +293,4 @@ a forward-looking proposal rather than a dated record:
 - 2026-09-09 — [Canonical contextual synthesis passes native integration](2026-09-09-one-shot-native-integration.md)
 
 - 2026-09-09 — [Further improvements after native contextual integration](2026-09-09-synthesis-after-native-contextual-integration.md) — completed native milestones, contextual list construction and replay failures, behavior-first delivery and conditional optimization work.
+- 2026-09-09 — [Contextual constructors and polymorphic list output](2026-09-09-contextual-list-output.md) — checked constructor plans, method-free outer/nested contexts, retained binder scope and exact public-output acceptance.
