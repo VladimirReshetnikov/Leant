@@ -1,0 +1,120 @@
+{
+  "status": "integration_passed",
+  "parent_status_at_snapshot": "passed",
+  "parent_snapshot_sha256": "06b7feeb78047c3da23bf7a5c395280da2aebebf06270c04f9bd9bd7e512bac3",
+  "dependency": "bfc3692e891ed2d81846fb2bd6b54ecd51aa7442",
+  "completed_gates": [
+    {
+      "gate": "unit",
+      "receipt_sha256": "ede3a0b0fabb309be973c32fd7064822d6513ee31a326505d8617c2f140c6d17",
+      "retained": true,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-unit-v1\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "methods",
+      "receipt_sha256": "550dce30fbfe4b0e8e897778f8363b67ceffc77eb3577a99500981b2d519f0c1",
+      "retained": true,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\methods\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "method-controls",
+      "receipt_sha256": "3f1f99b11e172fa88b14dab1b3fc76d08cedb9e5fed37a1f2e02cf8ddcd7024c",
+      "retained": true,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\method-controls\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "local-context",
+      "receipt_sha256": "d8f2b3383c03bb62eba4b90be03474b8e5feed60b3a89215f9ca9372939a7857",
+      "retained": true,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\local-context\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "simplification",
+      "receipt_sha256": "bf63b20e8f510e767fcaab538606ce131b5552d2dfdc349f7c5b8e20b0db1a26",
+      "retained": true,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\simplification\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "native-recursor",
+      "receipt_sha256": "41b583ec58019d62680f45536249a6c4323513ca7643c2900daccf4ab3f85916",
+      "retained": true,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\native-recursor\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "extended-exference",
+      "receipt_sha256": "35d720fa2d28743434480aa6bafa3562e2278b7532bebc001b2920e785f70c24",
+      "retained": true,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\extended-exference\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "nested-forall",
+      "receipt_sha256": "512fa750c5a78fcc2ee33897db342929cf8907476886fba097412e0116e53a98",
+      "retained": true,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\nested-forall\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "signatures-djinn",
+      "receipt_sha256": "ccdf8ccbab31b786e95eeeab251e6929f5795f60ceec0fb82230f7fc9dd685be",
+      "retained": true,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v2\\signatures-djinn\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "signatures-exference",
+      "receipt_sha256": "4c647929564ee25f7783ecb753538e0cc749325ad81b8ef4fc5700fad1eb631e",
+      "retained": false,
+      "source_receipt": "C:\\Leant\\dist-newstyle\\request-deadline-integration-v4\\signatures-exference\\results.json",
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    }
+  ],
+  "pending_gates": [],
+  "aggregate_accepted": true,
+  "frozen_inputs_match_at_packaging": true,
+  "counts": {
+    "unit_tests": 705,
+    "method_cells": 6,
+    "method_control_sessions": 9,
+    "local_context_cells": 39,
+    "simplification_queries": 15,
+    "recursor_cells": 12,
+    "recursor_exact_replays": 9,
+    "recursor_completed_false_controls": 3,
+    "extended_exference_operations": 13,
+    "extended_exference_false_controls": 1,
+    "nested_forall_cells": 9,
+    "native_signatures_per_completed_engine": 350
+  },
+  "boundaries": [
+    "The 705-test unit receipt and eight completed v2 native gates are retained with exact input checks; the final Exference signature corpus is a fresh terminal v4 run.",
+    "The method-control backend source pin was reviewed and refreshed before v2. The hash guard, query limits, capture format and independent replay checks remain enforced.",
+    "All ten gates are terminal passes and the final parent input-integrity check passed; there are no running child artifacts.",
+    "Source hashes were checked again while packaging; this is not another live synthesis run.",
+    "Native List recursors and type-signature coverage do not establish native tree or complete Church behavioral coverage.",
+    "The three original deadline failures and v1 stale-pin preflight failure are preserved in the separately published deadline-tree-retriage archive."
+  ],
+  "archive": {
+    "path": "request-deadline-integration.zip",
+    "sha256": "5edf4ae899c7783047cb8fc2bfc5aac833542a82e6d2f506f3238f3e8aade778",
+    "bytes": 12508475,
+    "artifact_count": 3749,
+    "all_members_rehashed": true
+  }
+}

@@ -45,6 +45,7 @@ import Control.Concurrent.MVar
   , readMVar
   , takeMVar
   )
+import Control.Concurrent.Async (wait, withAsync)
 import Control.Exception
   ( IOException
   , SomeException
@@ -174,7 +175,7 @@ data RequestError
 -- source text or payloads. Request capture requires a separate explicit opt-in.
 -- Neither mode adds file IO or threads to the request path. Event capacity is
 -- clamped to 0..16384; older events are dropped with an explicit count. Clocks
--- and bookkeeping do not move the existing response-read timeout boundary.
+-- and bookkeeping share the request's deadline with sending and response reading.
 data BackendTrace = BackendTrace
   !(IORef BackendTraceState) !(Maybe (IORef TraceRequestCapture))
 
@@ -944,45 +945,68 @@ requestWithTraceAnnotation
   :: Backend -> Maybe Int -> JValue -> Maybe JValue -> IO (Either RequestError JValue)
 requestWithTraceAnnotation backend timeoutSecs payload annotation = do
   identifier <- newTraceRequest $ beTrace backend
+  started <- getMonotonicTimeNSec
   let observe = recordTrace (beTrace backend) identifier
       encoded = encodeJson payload
+      deadline = fmap (\seconds -> toInteger started
+        + max 0 (toInteger seconds) * 1000000000) timeoutSecs
+      beforeDeadline action = case deadline of
+        Nothing -> Just <$> action
+        Just absolute -> do
+          now <- getMonotonicTimeNSec
+          let remaining = absolute - toInteger now
+              micros = min (toInteger (maxBound :: Int)) $ (remaining + 999) `div` 1000
+          if remaining <= 0 then pure Nothing
+            else timeout (fromInteger micros) action
+      send = try $ do
+        captureTraceRequest (beTrace backend) identifier annotation encoded
+        observe TraceWriteStarted
+        hPutStr (beIn backend) (encoded ++ "\n\n")
+        observe TraceWriteCompleted
+        hFlush (beIn backend)
+        observe TraceFlushCompleted
+      -- Windows pipe writes can defer asynchronous exceptions until the reader
+      -- closes. Wait on an owned sender instead; on a send deadline, terminate
+      -- the backend before joining that sender. No writer or partial protocol
+      -- message may survive a returned timeout. Ordinary response timeouts keep
+      -- the existing caller-owned retirement path.
+      sendBeforeDeadline = withAsync send $ \sender ->
+        (do sent <- beforeDeadline $ wait sender
+            case sent of
+              Nothing -> killBackend backend >> pure Nothing
+              Just result -> pure $ Just result)
+          `onException` killBackend backend
       perform = do
         observe $ TraceRequestStarted timeoutSecs
-        sendResult <- try $ do
-          captureTraceRequest (beTrace backend) identifier annotation encoded
-          observe TraceWriteStarted
-          hPutStr (beIn backend) (encoded ++ "\n\n")
-          observe TraceWriteCompleted
-          hFlush (beIn backend)
-          observe TraceFlushCompleted
-        case (sendResult :: Either IOException ()) of
-          Left _ -> do
-            observe TraceSendFailed
-            Left . ServerClosed <$> drainStderr backend
-          Right () -> do
-            observe TraceResponseReadStarted
-            response <- withTimeout (readResponse backend identifier)
-            case response of
-              Nothing -> do
-                observe TraceRequestTimedOut
-                pure (Left RequestTimeout)
-              Just (Left err) -> do
-                observe TraceResponseTransportFailed
-                pure (Left err)
-              Just (Right text) -> do
-                observe TraceResponseReadCompleted
-                case parseJson text of
-                  Left err -> do
-                    observe TraceResponseInvalidJson
-                    pure (Left (BadResponse (err ++ "\nin: " ++ text)))
-                  Right v -> do
-                    observe TraceResponseParsed
-                    pure (Right v)
+        sendResult <- sendBeforeDeadline
+        completed <- case (sendResult :: Maybe (Either IOException ())) of
+          Nothing -> pure Nothing
+          Just sent -> beforeDeadline $ case sent of
+            Left _ -> do
+              observe TraceSendFailed
+              Left . ServerClosed <$> drainStderr backend
+            Right () -> do
+              observe TraceResponseReadStarted
+              response <- readResponse backend identifier
+              case response of
+                Left err -> do
+                  observe TraceResponseTransportFailed
+                  pure (Left err)
+                Right text -> do
+                  observe TraceResponseReadCompleted
+                  case parseJson text of
+                    Left err -> do
+                      observe TraceResponseInvalidJson
+                      pure (Left (BadResponse (err ++ "\nin: " ++ text)))
+                    Right v -> do
+                      observe TraceResponseParsed
+                      pure (Right v)
+        case completed of
+          Nothing -> do
+            observe TraceRequestTimedOut
+            pure (Left RequestTimeout)
+          Just response -> pure response
   perform `onException` observe TraceRequestInterrupted
- where
-  withTimeout action = case timeoutSecs of
-    Nothing -> Just <$> action
-    Just secs -> timeout (secs * 1000000) action
 
 readResponse :: Backend -> Maybe Integer -> IO (Either RequestError String)
 readResponse backend identifier = go []

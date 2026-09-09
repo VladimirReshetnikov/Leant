@@ -21,7 +21,13 @@ BASE = HERE
 METHOD_SHA = 'c0ff4bbf5c40588e6f52615bd55fabcb07d24c36a8e07f3f8539692f5d4d5a64'
 CAPTURE = HERE / 'capture.py'
 CAPTURE_SHA = '131d4d1bf6980d834ac659d5421992f52088d16843d36ef5dc7c94ddb5508f4d'
-BACKEND_SHA = '650e7c02c1dcd3ebe32df35c10813ba24872005efeb8caa4c23e095b338ea1c9'
+# Reviewed request-deadline revision: capture schemas, request/backend identity,
+# canonical payloads and successful-request stage ordering are unchanged. Sending
+# now runs in an owned task within the same absolute deadline as response reading;
+# a send timeout retires the backend before that task is joined. The 705-test run
+# includes the three reproduced deadline failures and existing capture/lifecycle
+# controls. Keep the exact source guard; older acceptance retains its original pin.
+BACKEND_SHA = '175a93f83363f34bc24a76bd9b7a07eee84cec17f4bd2e996bb511278d97116a'
 
 def sha(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -323,6 +329,7 @@ def main():
     if args.prepare_only: return 0
     if sha(ROOT / 'src/Leant/Backend.hs') != BACKEND_SHA:
         raise ValueError('request-capture backend differs from the frozen authority')
+    report['reviewed_backend_source_sha256'] = BACKEND_SHA
     args.lean, args.toolchain = str(args.lean_runtime), ''
     selected_executable, backend, lake, runtime_hashes = method.runtime_pins.runtime_identity(args, runtime, report)
     executable = Path(selected_executable)

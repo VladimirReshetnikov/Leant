@@ -3,7 +3,7 @@
 -- before Tasty parses its arguments. No Lean executable is used by these tests.
 module BackendTraceSpec (main, backendTraceTests, runBackendTraceHelper) where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (MVar, newEmptyMVar, takeMVar, threadDelay)
 import Control.Exception (SomeException, bracket, try)
 import Control.Monad (replicateM_, unless)
 import Data.List (isInfixOf)
@@ -13,6 +13,7 @@ import System.IO
   (BufferMode (..), hFlush, hGetLine, hIsEOF, hPutStr, hSetBuffering,
    hSetEncoding, stdin, stdout, utf8)
 import System.Timeout (timeout)
+import System.IO.Unsafe (unsafeInterleaveIO)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertFailure, testCase, (@?=))
 
@@ -106,6 +107,52 @@ backendTraceTests = testGroup "opt-in backend transport trace"
       assertBool "missing read timeout outcome" $ TraceRequestTimedOut `elem` stages
       assertBool "timed-out request acquired a reply" $
         TraceResponseParsed `notElem` stages && TraceResponseReadCompleted `notElem` stages
+  , testCase "request deadline bounds annotation evaluation before writing" $ do
+      trace <- newBackendTraceWithRequests 256
+      blocked <- newEmptyMVar :: IO (MVar ())
+      annotation <- unsafeInterleaveIO $ takeMVar blocked >> pure JNull
+      withBackend (Just trace) "echo" $ \backend -> do
+        completed <- timeout 3000000 $
+          requestWithTraceAnnotation backend (Just 1) payload (Just annotation)
+        case completed of
+          Just response -> expectTimeout response
+          Nothing -> assertFailure "annotation evaluation escaped the request deadline"
+      snapshot <- readBackendTrace trace
+      let stages = [backendTraceStage event | event <- backendTraceEvents snapshot,
+                    backendTraceRequestId event == Just 1]
+      assertBool "blocked annotation reached the protocol" $
+        TraceWriteStarted `notElem` stages && TraceResponseParsed `notElem` stages
+      assertBool "annotation timeout did not retain its owned request" $
+        TraceRequestTimedOut `elem` stages && TraceRequestInterrupted `notElem` stages
+  , testCase "request deadline bounds payload encoding without capture" $ do
+      trace <- newBackendTrace 256
+      blocked <- newEmptyMVar :: IO (MVar ())
+      delayedPayload <- unsafeInterleaveIO $ takeMVar blocked >> pure payload
+      withBackend (Just trace) "echo" $ \backend -> do
+        completed <- timeout 3000000 $ request backend (Just 1) delayedPayload
+        case completed of
+          Just response -> expectTimeout response
+          Nothing -> assertFailure "payload encoding escaped the request deadline"
+      snapshot <- readBackendTrace trace
+      let stages = [backendTraceStage event | event <- backendTraceEvents snapshot,
+                    backendTraceRequestId event == Just 1]
+      assertBool "blocked encoding reached response reading" $
+        TraceResponseReadStarted `notElem` stages && TraceResponseParsed `notElem` stages
+      assertBool "encoding timeout lost its request outcome" $ TraceRequestTimedOut `elem` stages
+  , testCase "request deadline bounds a blocked pipe write" $ do
+      trace <- newBackendTrace 256
+      withBackend (Just trace) "no-read" $ \backend -> do
+        completed <- timeout 3000000 $
+          request backend (Just 1) (JStr $ replicate (1024 * 1024) 'x')
+        case completed of
+          Just response -> expectTimeout response
+          Nothing -> assertFailure "pipe writing escaped the request deadline"
+      snapshot <- readBackendTrace trace
+      let stages = [backendTraceStage event | event <- backendTraceEvents snapshot,
+                    backendTraceRequestId event == Just 1]
+      assertBool "fixture failed to block before response reading" $
+        TraceWriteStarted `elem` stages && TraceResponseReadStarted `notElem` stages
+      assertBool "blocked write lost its timeout outcome" $ TraceRequestTimedOut `elem` stages
   , testCase "malformed JSON remains a parse failure after a complete response" $ do
       trace <- newBackendTrace 256
       withBackend (Just trace) "invalid" $ \backend -> do
@@ -359,7 +406,7 @@ runBackendTraceHelper ["env", argument]
       hSetEncoding stdin utf8
       hSetEncoding stdout utf8
       hSetBuffering stdout NoBuffering
-      loop mode
+      if mode == "no-read" then threadDelay 10000000 else loop mode
       pure True
  where
   loop mode = do

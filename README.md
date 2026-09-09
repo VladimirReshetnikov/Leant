@@ -214,16 +214,18 @@ Companion documents:
   the full type and all 16 observations, but its live typed-candidate acceptance
   remains open. The completed trace now points toward candidate generation or
   traversal; no new Lean request occurs for about 79 seconds before timeout.
-  The local deadline repair has nine completed integration gates, including
-  705 unit tests and fresh method controls. The final Exference corpus remains
-  interrupted without terminal acceptance. The canonical
+  The [request-deadline repair](docs/reports/2026-09-09-request-deadline-integration.md) now passes
+  **705 unit tests and all ten native integration gates**, including both
+  **350-signature** corpora with independent axiom-free kernel replay. Eight
+  native gates were retained only after exact input checks; the final Exference
+  corpus completed in a fresh run. Earlier interruptions remain historical. The canonical
   [one-shot contextual increment](docs/reports/2026-09-09-one-shot-contextual-output.md) now passes
   **2,371 tests in 16 suites**, **64 public queries** with exact output replay,
   **350 signatures per Haskell engine**, and **13/13 Exference extended behaviors**.
   It is separate from native acceptance; the tested Djex dependency remains pinned.
-  The current order closes deadline validation, integrates the accepted Djex
-  revision, completes remaining public frontend forms and advances Church behavior,
-  with a bounded tree investigation. The
+  The current order integrates the accepted canonical Djex revision, completes
+  remaining public frontend forms and advances Church behavior, with a bounded
+  tree investigation. The
   [Haskell implicit-signature REPL increment](docs/reports/2026-09-08-implicit-root-scope.md)
   now passes **361/361 tests**, including all **115 CLI tests**, and **350 Church
   signatures per Haskell engine**. It scopes contextual definitions with GHC
