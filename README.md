@@ -76,8 +76,8 @@ Companion documents:
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
 - **[Current synthesis re-triage](docs/reports/2026-09-07-synthesis-retriage.md)**
-  — complete native integration, check the Lean tree, finish exact Haskell
-  output, and continue the full Church/default matrix and contextual evidence;
+  — finish the last native signature gate, check the Lean tree, complete
+  Haskell frontend behavior, and continue the full Church/default matrix;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -197,14 +197,17 @@ Companion documents:
   extended corpus now passes **13/13 in one native run** at Djex `3529c465`,
   with exact full-type kernel replay and an actual False control. The
   [refinement and updated priorities](docs/reports/2026-09-08-post-integration-priorities.md)
-  preserve the older `63a23f58` integration failure. At working Djex
-  `bfc3692e`, the fresh complete native suite now passes **701/701**,
-  including the layered-provider case at its unchanged deadline, and all
-  six method cells, nine method-control sessions and all 39 local-context cells
-  pass. The [terminal native report](docs/reports/2026-09-08-native-carrier-integration.md)
-  records 9/12 recursor cells after auditing deadlines: Exference append and
-  Exference/Both False controls time out. Later integration gates were not run.
-  The corrected fixture rejects False observations from timed-out commands.
+  preserve the older `63a23f58` integration failure. The
+  [latest validation and re-triage](docs/reports/2026-09-08-synthesis-next-deliveries.md)
+  at working Djex `bfc3692e` records **702/702 unit tests**, six method cells,
+  nine method-control sessions, 39 local-context cells and 15 simplification
+  queries passing. The native recursor matrix now passes **12/12 at its original
+  limits**, including nine exact full-type replays and three completed False
+  controls. Extended Lean Exference behavior passes **13/13**, nested foralls
+  pass nine cells, and native Djinn signatures pass **350/350**. The native
+  Exference signature gate was still running at the checkpoint; aggregate
+  integration and dependency promotion remain pending. Earlier deadline failures
+  remain recorded in the [historical report](docs/reports/2026-09-08-native-carrier-integration.md).
   The [semantic provider filter](docs/reports/2026-09-08-semantic-auxiliary-providers.md)
   now excludes generated auxiliary eliminators while retaining ordinary user
   `elim` functions. Four real-kernel discovery checks and the public tree
@@ -215,14 +218,13 @@ Companion documents:
   original bounds, with 1,024 contradictory controls rejecting. It retains
   13/13 extended Church behavior and 350 signatures per Haskell engine; all
   2,309 tests in 15 complete suites pass across the documented runs, including
-  a complete Length rerun after its test-only lifecycle repair. Native Lean
-  integration is incomplete at the recursor gate; native tree acceptance remains
-  open. The [current delivery order](docs/reports/2026-09-07-synthesis-retriage.md)
-  continues native integration after the
-  [combined verification delivery](docs/reports/2026-09-08-combined-behavioral-verification.md):
-  Exference append and its False control now complete at their original limits,
-  with exact append replay, 702 unit tests and method/cache regressions passing.
-  Independent frontend fixes, native tree checks and Church batches remain. The [ordinary Haskell contextual REPL delivery](docs/reports/2026-09-08-ordinary-contextual-output.md):
+  a complete Length rerun after its test-only lifecycle repair. Native tree
+  acceptance remains open. The [current delivery order](docs/reports/2026-09-07-synthesis-retriage.md)
+  finishes the remaining signature gate, then checks the native tree transfer,
+  completes Haskell frontend gaps and continues the full Church behavioral
+  matrix. The [combined verifier](docs/reports/2026-09-08-combined-behavioral-verification.md)
+  remains covered by the now-passing recursor, fallback and method/cache gates.
+  The [ordinary Haskell contextual REPL delivery](docs/reports/2026-09-08-ordinary-contextual-output.md):
   36 explicit-forall public queries and 330 tests across four complete affected
   suites pass at the documented fixture bounds. Implicit-root scope, one-shot
   contextual commands and typed list rendering remain open. Broader search

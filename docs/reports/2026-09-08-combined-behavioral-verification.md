@@ -106,6 +106,12 @@ fixture passes without increasing its limit.
 
 ## Remaining integration
 
+**Later checkpoint:** the [next-delivery re-triage](2026-09-08-synthesis-next-deliveries.md)
+records the fresh 12/12 native recursor matrix, 13/13 extended Exference behavior,
+nested-result checks and 350/350 native Djinn signatures. The Exference signature
+gate was still running; aggregate integration and dependency promotion remain
+pending. The paragraph below records this component's earlier publication boundary.
+
 Leant still commits Djex `4a4ed0fc`; this verification increment is tested with
 working Djex `bfc3692e`. Local contexts, the full simplification/recursor matrices,
 extended behavior, nested foralls and both native signature corpora continue as

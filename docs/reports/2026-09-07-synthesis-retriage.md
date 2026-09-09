@@ -9,78 +9,60 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-The accepted [function-carrier repair](2026-09-08-function-carrier-search.md)
-changes the order below. Canonical Haskell Exference now synthesizes the supplied
-tree accumulator at its original bounds, retaining all 13 extended operations,
-350 signatures per Haskell engine and 2,309 tests across the documented complete
-suite runs. The semantic auxiliary-provider filter and replay factoring are
-also delivered. These leave the implementation queue and remain regressions.
+The [latest re-triage](2026-09-08-synthesis-next-deliveries.md) records nine
+completed native integration gates at Leant `43f1bc11` with working Djex
+`bfc3692e`. Native List recursors now pass **12/12 at the original limits**,
+including nine exact full-type replays and three completed False controls.
+Extended Lean Exference behavior passes **13/13**, nested-result foralls pass
+nine cells, and native Djinn signatures pass **350/350** with kernel replay.
+The accepted 702-test unit run, six method cells, nine method-control sessions,
+39 local-context cells and 15 simplification queries are retained with their
+fixture-version boundaries in the
+[receipt](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/combined-integration-retriage.json).
 
-The [terminal native integration report](2026-09-08-native-carrier-integration.md)
-records **701/701 unit tests, 6/6 method cells, 9/9 method-control sessions and
-39/39 local-context cells passing** at working Djex `bfc3692e`. The recurring
-layered-provider case passes at its unchanged deadline. Native List recursors
-pass **9/12 cells after a deadline audit**: Exference append and the Exference/Both
-False controls time out. The fixture now rejects timed-out False prefixes, as
-the tree fixture already did; original results are preserved alongside the
-correction. Both mode accepts append. The run stopped at this gate, so extended
-behavior, nested foralls and the two native signature corpora were not run.
-Leant still commits `4a4ed0fc`; integration remains incomplete.
+The native Exference signature gate was still running at this checkpoint.
+Aggregate integration and promotion of Leant's committed `4a4ed0fc` dependency
+remain pending that terminal result and the final unchanged-input check.
+The historical 9/12 recursor failure is superseded by the new matrix; native
+tree and the complete Church behavioral target remain open.
 
-The [verification diagnostic receipt](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/verification-retriage.json)
-and [archive](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/verification-retriage.zip)
-now justify one focused attempt to reduce verification requests. The events-only
-append rerun still reaches the original 90-second deadline: zero passes, 385
-falsifications and zero inconclusive observations. Its retained tail contains
-780 completed requests totaling 61.47 seconds, including 61.18 seconds waiting
-for responses. The ring dropped 8,047 events. These unlabelled retained-tail
-sums are neither whole-query attribution nor kernel CPU measurements, and do
-not establish a speedup. The payload-capture attempt instead hit its 180-second
-outer guard and retained only a startup snapshot; it supplies no complete phase
-breakdown.
-
-The [combined behavioral certificate delivery](2026-09-08-combined-behavioral-verification.md)
-now closes that bounded experiment: original-bound Exference append and its
-False control both complete, with independent full-type append replay. The
-strict build, 702/702 unit tests, ten kernel controls, six global-method cells,
-nine method-control sessions and twelve trace-validator tests pass. The earlier
-metaprogramming prototype failed its environment boundary; the accepted version
-uses an ordinary core checked pair and preserves the original fallback pipeline.
-The first full unit run's missing fake-solver event file and the obsolete trace
-validator's role rejection remain recorded. This is a verification increment,
-not complete native integration or dependency promotion.
-
-This is the current execution order. Original priorities 1–4 and their full
-completion requirements are unchanged. Native integration gates dependency
-promotion; independent frontend and Church work need not wait for its completion.
-
-| Order | Delivery | Acceptance and decision boundary |
+| Order | Next delivery | Required evidence |
 | --- | --- | --- |
-| **1 — verification increment delivered; integration continues, P2** | **Complete the remaining native gates before advancing the dependency.** Combined checked certificates now resolve the two focused Exference timeouts. | Retain the accepted exact-input comparison, proof/error/sorry controls and original fallback. Finish local contexts, full simplification/recursors, extended behavior, nested foralls and both native signature corpora at the final dependency. Native tree and the complete Church matrix remain separate requirements. |
-| **2 — independent frontend deliveries, P3** | **Finish implicit-root scope, one-shot contextual output and typed list rendering in separate increments.** | Ordinary and named-function `where` queries must preserve root binder order, nested quantifiers and selected contextual payloads in both Haskell engines. Compile the exact displayed implementation at the original signature. Compatibility erasure cannot validate a failed typed rendering. After these increments, investigate repeated best-output results under the separate identity gate below. |
-| **3 — transfer the accepted construction, P2/P4** | **Run the native tree fixture and recheck Haskell Exference `foldl1` once at their original bounds.** The accepted Haskell Exference function-carrier repair is the concrete reason for these checks. | Native tree requires the supplied fold/constructor inventory, all 16 observations, full-type kernel replay, axiom/termination checks and completed False controls in Djinn, Exference and Both. `foldl1` needs actual search and all original observations, not just its checked witness. Haskell Djinn tree remains a separate known miss. Diagnose one failed derivation, then continue the next independent batch. |
-| **4 — finish the entire behavioral matrix, P4** | **Work through explicit batches: remaining extended operations, selectors, nonempty reductions, extrema and native-Int indexing.** Trace Djinn `maybeEither` and native-Int `at` as concrete failed cells. | Retain all **13 extended plus all 19 supplied-default operations** across Haskell Djinn/Exference and Lean Djinn/Exference/Both. Each accepted cell requires live synthesis, exact full-type replay and its controls. Distinguish historical acceptance, current acceptance, bounded miss, timeout, replay failure and not run. No successful batch replaces the full matrix. |
-| **5 — broader contextual evidence, P3** | **Extend source admission before selected-dictionary transport.** Derived Haskell method schemes and mixed Lean constructor/method inventories precede distinct dictionaries for equal predicates, superclass/conditional evidence and richer universes. | Preserve source identity, lexical scope and selected payload throughout search, rendering and replay. Keep overlap guards until distinct outer/inner dictionary behavior passes. Increasing provider caps cannot repair a missing source scheme. |
+| **0 — finish the running release gate** | Complete native Exference signature validation, then promote the tested dependency. | All ten terminal gates pass and final input hashes match. |
+| **1 — bounded transfer checks, P2/P4** | Run the native tree fixture and recheck Haskell Exference `foldl1` once at original bounds. | Actual synthesis, exact original-type replay, all observations, completed False controls; tree provider/axiom/termination checks. A miss gets one concrete diagnosis before the next independent batch. |
+| **2 — Haskell frontend correctness, P3** | Implicit-root scope, one-shot contextual commands and typed list output, as separate increments. | Both engines through public ordinary and named-`where` queries; compile the exact displayed implementation without rewriting the original signature. Preserve binder order, nested scope and selected payloads. |
+| **3 — full behavioral matrix, P4** | Remaining extended operations, selectors, nonempty reductions, extrema and native-`Int` indexing. | All 13 extended plus all 19 supplied-default operations across Haskell Djinn/Exference and Lean Djinn/Exference/Both. Separate current/historical passes, misses, timeouts, replay failures and unrun cells. |
+| **4 — contextual evidence, P3** | Derived Haskell method schemes and mixed Lean inventories, then selected equal-predicate dictionaries, superclass/conditional evidence and richer universes. | Preserve source ownership and lexical dictionary payloads through search, rendering and replay. Retain existing guards until each extension passes. |
 
-After a relevant native repair, rerun the corrected recursor gate and the affected
-complete regressions, then finish extended behavior, nested foralls and both
-350-signature native corpora at the final dependency before promoting the gitlink.
-The successful Djinn/Both append cases and all previously accepted context/method
-behavior remain regressions. No new native acceptance is recorded by this re-triage.
+These are execution priorities, not a reduction of the original priorities 1–4.
+The transfer checks need not block independent frontend or Church work. Heavy
+validation stays serialized with frozen inputs. Re-run relevant complete suites
+when production inputs change; repeated unchanged runs are not an implementation
+strategy.
 
-The [ordinary contextual REPL delivery](2026-09-08-ordinary-contextual-output.md)
-now passes all 36 public queries and 330 tests across four complete affected
-suites, with the documented test-only assertion correction and 256-step fixture.
-It leaves the implementation queue. The earlier 20,000-step best timeouts remain
-recorded; this delivery does not repair their performance. Implicit-root scope,
-one-shot contextual commands and typed list rendering remain open.
+### Other ideas
 
-Native integration remains a release gate for the dependency. Execute heavy
-checks serially with frozen inputs, and rerun accepted aggregate suites when
-relevant production inputs change.
+The combined verifier, semantic provider filter, ordinary explicit-forall
+contextual REPL output and canonical Exference tree carrier are delivered and
+remain regressions. Further verification-request reduction leaves the immediate
+queue now that all native recursor cells pass.
 
-The full supplied-default worklist is explicit so that successful small batches
-cannot silently replace it:
+Exact duplicate suppression in best output is the next performance candidate
+after frontend correctness. First establish identity using typed evidence,
+source ownership and selected dictionaries; repeated printed text alone is
+insufficient. Compare at the preserved original failing settings.
+
+Keep diagnostics narrow and tied to a concrete failed derivation. Defer broad
+ranking, memoization, semantic pruning, worker tuning and provider retrieval
+until a current workload identifies their need. General recursion, indexed
+synthesis, an engine rewrite, editor integration and Windows Length acquisition
+remain separate expansions; the
+[detailed decisions](2026-09-08-synthesis-next-deliveries.md#disposition-of-other-ideas)
+state what would promote each.
+
+The full behavioral worklist is **160 operation/mode cells**, with controls and
+replay in addition. It is not a count of missing or accepted cells. The 19
+supplied-default identities remain:
 
 - Selectors: `head`, `last`, `fromJust`, `fromLeft`, `fromRight`, `atKey`.
 - Nonempty reductions: `foldl1`, `foldr1`, `reduce`.
@@ -88,29 +70,12 @@ cannot silently replace it:
   `minmaxElement`, `maximum`, `minimum`, `minMax`.
 - Native-`Int` indexing: `at`, including negative indices.
 
-Those are all 19 prepared operation identities. These groups are an execution
-plan, not new behavioral acceptance. Use the agreed supplied default or
-inhabitance assumption for partial Lean counterparts. Keep original partial
-signatures classified separately from their total defaulted targets.
+Use explicit defaults or inhabitance assumptions for the agreed total Lean
+counterparts, retaining separate classification of the original partial types.
+The 350-signature inhabitation results do not establish this behavioral matrix.
 
-### Disposition of other ideas
-
-| Idea | Re-triaged decision | Evidence that would promote it |
-| --- | --- | --- |
-| Fewer verification requests | **Delivered as a bounded verification increment.** The original Exference append and False queries now complete, with exact replay and complete unit coverage. | Retain the checked-pair protocol, original fallback, request ownership and failure controls as regressions. Complete the remaining native integration gates before dependency promotion; this is not an invitation to broaden caching or prune by finite observations. |
-| Exact duplicate suppression in contextual best output | **Promote to a bounded follow-up after frontend correctness.** The preserved 20,000-step baseline includes 7,475 copies of the same compatibility expression and best-mode timeouts; the accepted 256-step presentation fixture does not close this performance gap. | First establish duplicate identity using typed evidence, selected dictionaries and source ownership. Equal printed expressions alone are insufficient. Preserve distinct derivations where observable, documented tie behavior and engine selection. Compare exact displayed outputs and independent compiler replay at the original failing settings. |
-| Broader search estimates and heuristic tuning | **Defer.** Retain the scoped accepted change and its rejected broader variants. | A traced original-bound failure identifies a lost or delayed useful branch, and a general repair retains the accepted regressions. |
-| General memoization and shared subgoal graphs | **Defer the refactor.** Repeated displayed text is not evidence of equivalent internal subproblems. The old allocation figure did not identify reusable work. | Repeated scope-equivalent work explains a material current cost; keys preserve source identity, dictionary selection and budget accounting. |
-| Combined-engine streaming and cancellation | **Conditional.** Both already accepts append; do not change its established selection order to mask Exference's failure. | A trace identifies avoidable waiting or cancellation work, with ordering, ownership and deadlines preserved. |
-| Counterexample-guided search and observation caching | **Defer behind request reduction.** Hundreds of falsifications do not establish reusable candidate evaluations or a sound pruning rule. | Repeated exact candidate/environment/predicate checks dominate after the smaller repair. Broader pruning needs a sound condition; finite agreement is not semantic equivalence. |
-| Provider retrieval and relevance ranking | **Defer scaling; finish supported admission first.** | A realistic inventory demonstrably omits a useful supported provider, with recall and latency measured together. |
-| More diagnostics and validation infrastructure | **Keep narrow.** Reuse existing traces and preserve their omissions. Payload capture failed to retain the command trace; do not count it as complete attribution. | Add a bounded observation only when it decides the current experiment. Keep deadline completion distinct from rejection counts and retain failed evidence. |
-| Worker counts and RTS tuning | **Defer.** Response waits do not identify kernel CPU, transport overhead, GC or memory as their cause. | Controlled current measurements identify a specific bottleneck and demonstrate improvement with environment and cleanup parity. |
-| General recursion, induction, dependent/indexed synthesis and invariant discovery | **Defer broad expansion.** Supplied folds already express the current tree witness. | A concrete required program needs additional termination or equality machinery. |
-| A Lean-native engine rewrite, editor/tactic integration, native Windows Length acquisition | **Separate architecture, product and platform deliveries.** | A concrete requested workflow supplies its own runtime, replay and budget acceptance criteria. |
-
-The remaining sections preserve historical diagnoses, counts and proposals at
-their recorded revisions. They do not override the current decision above.
+The remaining sections preserve historical results and diagnoses at their
+recorded revisions. They do not override this execution order.
 
 ## What changed in this re-triage
 

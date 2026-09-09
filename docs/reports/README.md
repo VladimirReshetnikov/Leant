@@ -283,3 +283,5 @@ a forward-looking proposal rather than a dated record:
 - 2026-09-08 — [Exference composes supplied folds with function carriers](2026-09-08-function-carrier-search.md) — accepted canonical Haskell tree synthesis, preserved 13/13 Church behavior, complete regression coverage and explicit native integration boundary.
 
 - 2026-09-08 — [Combined behavioral certificates](2026-09-08-combined-behavioral-verification.md) — original-bound native Exference append and False completion, 702 unit tests, exact method/cache replay, and the remaining integration boundary.
+
+- 2026-09-08 — [Further improvements after the native recursor gates pass](2026-09-08-synthesis-next-deliveries.md) — nine terminal integration gates, the original-bound 12/12 recursor matrix, bounded transfer checks, frontend gaps and the full Church behavioral target.
