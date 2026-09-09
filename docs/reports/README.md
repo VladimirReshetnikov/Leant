@@ -291,3 +291,5 @@ a forward-looking proposal rather than a dated record:
 - 2026-09-09 — [Further improvements after one-shot contextual acceptance](2026-09-09-synthesis-after-one-shot-acceptance.md)
 - 2026-09-09 — [Complete request deadlines pass native integration](2026-09-09-request-deadline-integration.md)
 - 2026-09-09 — [Canonical contextual synthesis passes native integration](2026-09-09-one-shot-native-integration.md)
+
+- 2026-09-09 — [Further improvements after native contextual integration](2026-09-09-synthesis-after-native-contextual-integration.md) — completed native milestones, contextual list construction and replay failures, behavior-first delivery and conditional optimization work.

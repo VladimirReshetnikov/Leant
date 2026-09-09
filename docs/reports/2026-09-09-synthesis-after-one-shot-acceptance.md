@@ -1,5 +1,7 @@
 # Further improvements after one-shot contextual acceptance
 
+> Delivery order superseded by [the re-triage after native contextual integration](2026-09-09-synthesis-after-native-contextual-integration.md). Deadline and dependency integration are closed; this report retains historical evidence.
+
 > Subsequent acceptance: [native contextual integration](2026-09-09-one-shot-native-integration.md) passes all ten fresh gates and promotes Djex `3adfac5c`. Deliveries 0 and 1 are closed; remaining public forms and Church behaviors are next, with a bounded native tree investigation. The assessment below retains its dated evidence.
 
 
