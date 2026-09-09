@@ -218,9 +218,12 @@ Companion documents:
   a complete Length rerun after its test-only lifecycle repair. Native Lean
   integration is incomplete at the recursor gate; native tree acceptance remains
   open. The [current delivery order](docs/reports/2026-09-07-synthesis-retriage.md)
-  puts exact ordinary Haskell contextual output first (prototype builds; replay
-  acceptance pending), then a focused native timeout diagnosis and the native
-  tree check. Broader search estimates were rejected after losing Church composition.
+  returns to native timeout diagnosis and the native tree check after the
+  [ordinary Haskell contextual REPL delivery](docs/reports/2026-09-08-ordinary-contextual-output.md):
+  36 explicit-forall public queries and 330 tests across four complete affected
+  suites pass at the documented fixture bounds. Implicit-root scope, one-shot
+  contextual commands and typed list rendering remain open. Broader search
+  estimates were rejected after losing Church composition.
   The committed dependency remains `4a4ed0fc`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).

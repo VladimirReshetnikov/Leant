@@ -32,19 +32,22 @@ completion requirements are unchanged.
 
 | Order | Delivery | Acceptance and decision boundary |
 | --- | --- | --- |
-| **First implementation delivery — P3** | **Finish exact ordinary Haskell contextual output.** A strict-build-passing prototype retains the selected candidate's own typed graph; its public before/after replay tests are still incomplete. | Require exact expression and definition replay under the original explicit-forall signatures for Djinn, Exference and Both, with first/best/all selection and distinct class payloads. A successful build is not output acceptance. Finish affected presentation/parallel regressions before publishing the implementation. |
 | **Next integration diagnosis — P2** | **Resolve native Exference append and the Exference/Both False timeouts.** Publish the completed gates and corrected deadline classifications now; keep the dependency unchanged. | At the original bounds, separate search/selection, rendering and kernel-checking time before changing scheduling or caching. Preserve successful Djinn/Both append. A completed False control requires actual rejection and query completion. Then finish extended behavior, nested foralls and both 350-signature corpora before promoting the gitlink. |
 | **Next bounded construction check — P2** | **Transfer the accepted function-carrier construction to native Lean.** Run the prepared tree fixture once at its original bounds in Djinn, Exference and Both. | Require exact supplied-fold/constructor inventories, all 16 observations, full-type kernel replay, axiom/termination checks and completed False queries. Haskell Djinn remains a separate known miss. After one focused diagnosis of a failed construction, continue an independent delivery rather than repeat an unchanged run. |
-| **Continue exact-output work — P3** | **Handle implicit-root binder scope and typed list rendering as separate increments.** Ordinary explicit-forall output does not close either gap. | Cover ordinary and named-function `where` queries in both Haskell engines. GHC must accept the exact displayed implementation at the original full signature, retaining nested quantifiers and contextual payloads. An erased compatibility expression does not validate a failing typed rendering. |
+| **Continue exact-output work — P3** | **Handle implicit-root binder scope, one-shot contextual commands and typed list rendering as separate increments.** Ordinary explicit-forall output does not close either gap. | Cover ordinary and named-function `where` queries in both Haskell engines. GHC must accept the exact displayed implementation at the original full signature, retaining nested quantifiers and contextual payloads. An erased compatibility expression does not validate a failing typed rendering. |
 | **Continue construction coverage — P4** | **Complete the remaining Church matrix in explicit batches.** Start with Exference `foldl1`, where the accepted carrier construction justifies one original-bound recheck; trace Djinn `maybeEither` and native-Int `at`. | Retain all **13 extended plus all 19 supplied-default operations in five language/engine combinations**: Haskell Djinn/Exference and Lean Djinn/Exference/Both. Each accepted cell needs live synthesis, exact full-type replay and its controls. Distinguish historical acceptance, current acceptance, bounded miss, timeout, replay failure and not run. |
 | **After the frontend increments — P3** | **Extend source admission, then selected evidence.** Derived Haskell method schemes and mixed Lean constructor/method inventories come first. Distinct selected dictionaries for equal predicates, superclass/conditional evidence and richer universes follow separately. | Preserve source identity, root scope and selected payload through search, rendering and replay. Retain overlap guards until distinct outer/inner dictionary behavior passes; increasing the provider cap cannot repair a missing source scheme. |
 
-The changed order favors a demonstrated output defect with an existing bounded
-repair over another general search experiment. Native integration remains a
-release gate for the dependency; independent canonical frontend work can finish
-while that gate is unresolved. Execute resource-heavy checks serially and retain
-their frozen inputs. Re-run an accepted aggregate suite when relevant production
-inputs change, rather than merely because the roadmap was updated.
+The [ordinary contextual REPL delivery](2026-09-08-ordinary-contextual-output.md)
+now passes all 36 public queries and 330 tests across four complete affected
+suites, with the documented test-only assertion correction and 256-step fixture.
+It leaves the implementation queue. The earlier 20,000-step best timeouts remain
+recorded; this delivery does not repair their performance. Implicit-root scope,
+one-shot contextual commands and typed list rendering remain open.
+
+Native integration remains a release gate for the dependency. Execute heavy
+checks serially with frozen inputs, and rerun accepted aggregate suites when
+relevant production inputs change.
 
 The full supplied-default worklist is explicit so that successful small batches
 cannot silently replace it:
