@@ -213,9 +213,13 @@ Companion documents:
   their original limits. A native tree debug expression independently passes
   the full type and all 16 observations, but its live typed-candidate acceptance
   remains open. Candidate tracing now precedes broader search changes. The
-  in-progress Haskell implicit-signature frontend passes **360/361 tests**,
-  including all **115 CLI tests**; a synonym source-hint regression still
-  prevents acceptance and dependency promotion. The full Church behavior
+  [Haskell implicit-signature REPL increment](docs/reports/2026-09-08-implicit-root-scope.md)
+  now passes **361/361 tests**, including all **115 CLI tests**, and **350 Church
+  signatures per Haskell engine**. It scopes contextual definitions with GHC
+  visible type patterns and preserves dictionary payloads in 40 exact positive
+  replays. The strengthened synonym test distinguishes retained outer binders
+  from genuinely erased binders. Leant keeps its tested `bfc3692e` dependency
+  pending native integration of this frontend revision. The full Church behavior
   target and broader contextual evidence remain in the delivery queue.
   The [semantic provider filter](docs/reports/2026-09-08-semantic-auxiliary-providers.md)
   now excludes generated auxiliary eliminators while retaining ordinary user

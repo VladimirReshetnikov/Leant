@@ -1,9 +1,10 @@
 # Synthesis re-triage: bounded contexts, reliable checking, and behavior
 
 > Execution order superseded by the [tree/frontend re-triage](2026-09-08-synthesis-frontier-retriage.md).
-> The transfer checks have run and still miss; the implicit-signature
-> implementation passes 360/361 tests and remains unaccepted. The
-> native integration results below retain their recorded acceptance.
+> The transfer checks have run and still miss. The subsequent
+> [implicit-signature REPL increment](2026-09-08-implicit-root-scope.md) passes
+> 361/361 tests and 350 signatures per Haskell engine. Native tree tracing is
+> next; one-shot/list frontend and full Church behavior requirements remain.
 
 This report, updated on 2026-09-08, preserves the active goal to implement priorities 1–4
 from the [original roadmap](../../lib/Djex/docs/reports/2026-09-06-synthesis-next-priorities.md).
