@@ -1,0 +1,33 @@
+{
+  "format": "function-carrier-native-checkpoint-v1",
+  "captured_at_utc": "2026-09-09T01:19:59.199507+00:00",
+  "status": "completed_subset_native_integration_pending",
+  "leant_base_revision": "21d7f36d481bb2ecf75ce252e779d0eb1d06e5e4",
+  "djex_working_revision": "bfc3692e891ed2d81846fb2bd6b54ecd51aa7442",
+  "djex_committed_revision": "4a4ed0fc23f76d7b82b06496e03adfadbf374f84",
+  "completed_gates": {
+    "unit": {
+      "tests": 701,
+      "suite_seconds": 495.62,
+      "archive_member": "run/unit/results.json"
+    },
+    "methods": {
+      "cells": 6,
+      "archive_member": "run/methods/results.json"
+    }
+  },
+  "boundaries": [
+    "Only the unit and methods gates contribute accepted coverage here.",
+    "The serial integration is still running; this is not its terminal receipt.",
+    "No dependency promotion or native tree acceptance is claimed.",
+    "The earlier 700/701 failure remains tied to its recorded older revision.",
+    "No controlled speedup, worst-case guarantee or full Church behavioral matrix is claimed."
+  ],
+  "archive": {
+    "path": "function-carrier-native-checkpoint.zip",
+    "sha256": "64124df05e06687238721ad1b3c9dd5fd27a1917322e576b096b7c98f75dee5a",
+    "bytes": 204905,
+    "members": 68,
+    "all_member_hashes_verified": true
+  }
+}

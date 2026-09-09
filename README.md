@@ -76,8 +76,8 @@ Companion documents:
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
 - **[Current synthesis re-triage](docs/reports/2026-09-07-synthesis-retriage.md)**
-  — missing Church constructions first, then bounded Haskell frontend usability,
-  supplied tree folds, and broader contextual source/evidence support;
+  — complete native integration, check the Lean tree, finish exact Haskell
+  output, and continue the full Church/default matrix and contextual evidence;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -197,8 +197,11 @@ Companion documents:
   extended corpus now passes **13/13 in one native run** at Djex `3529c465`,
   with exact full-type kernel replay and an actual False control. The
   [refinement and updated priorities](docs/reports/2026-09-08-post-integration-priorities.md)
-  retain a clean aggregate integration gate for `63a23f58`: the latest full
-  native unit run passes **700/701**, with one recurring layered-provider deadline.
+  preserve the older `63a23f58` integration failure. At working Djex
+  `bfc3692e`, the fresh complete native suite now passes **701/701**,
+  including the layered-provider case at its unchanged deadline, and all
+  six real-kernel method cells pass. Remaining integration gates are running;
+  see the [current decision and preserved evidence](docs/reports/2026-09-07-synthesis-retriage.md).
   The [semantic provider filter](docs/reports/2026-09-08-semantic-auxiliary-providers.md)
   now excludes generated auxiliary eliminators while retaining ordinary user
   `elim` functions. Four real-kernel discovery checks and the public tree
@@ -210,8 +213,8 @@ Companion documents:
   13/13 extended Church behavior and 350 signatures per Haskell engine; all
   2,309 tests in 15 complete suites pass across the documented runs, including
   a complete Length rerun after its test-only lifecycle repair. Native Lean
-  integration of this change is next, with the recurring layered-provider
-  deadline still the release gate. Exact Haskell output remains an independent
+  integration is in progress; the next construction check is the original-bound
+  Lean tree matrix. Exact Haskell output is the next independent implementation
   delivery; broader search estimates were rejected after losing Church composition.
   The committed dependency remains `4a4ed0fc`. The full 13-operation/19-default coverage
   across engines is still open.

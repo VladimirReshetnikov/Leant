@@ -9,24 +9,63 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-The [current re-triage](2026-09-08-post-integration-priorities.md)
-supersedes the historical order and counts below. The latest full native unit
-run passes 700/701, with a recurring layered-provider deadline; clean integration
-remains a release gate. A broader scheduling experiment failed and was reverted.
-The tree accumulator remains an executed Haskell miss. The later
-[semantic provider filter](2026-09-08-semantic-auxiliary-providers.md) repairs
-Lean's generated-eliminator admission and corrects the tree False-control
-timeout claims; it adds no accepted positive accumulator cell.
+The accepted [function-carrier repair](2026-09-08-function-carrier-search.md)
+changes the order below. Canonical Haskell Exference now synthesizes the supplied
+tree accumulator at its original bounds, retaining all 13 extended operations,
+350 signatures per Haskell engine and 2,309 tests across the documented complete
+suite runs. The semantic auxiliary-provider filter and replay factoring are
+also delivered. These leave the implementation queue and remain regressions.
 
-Prioritize the specific integration failure, semantic provider filtering and
-function-carrier fold composition. Keep bounded Haskell frontend usability
-independent, and interleave remaining Church repairs. All 13 extended operations,
-all 19 explicit defaults and all five language/engine combinations remain in
-scope, along with broader contextual admission and selected dictionary evidence.
-The linked report gives exact acceptance gates and dispositions for other ideas.
+The [new native checkpoint](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/function-carrier-native-checkpoint.json) records a fresh **701/701 unit pass** and
+**6/6 real-kernel method cells** at working Djex `bfc3692e`. The complete unit
+suite takes 495.62 seconds, including the previously failing layered-provider
+case at its unchanged deadline. This supersedes the older 700/701 result for
+these gates at this revision. It establishes neither a controlled speedup nor
+complete integration. The archive contains 68 verified artifacts from the
+completed gates and supporting checks; the serial integration remains in
+progress. Leant still commits `4a4ed0fc` until its remaining gates pass.
+
+This is the current execution order. Original priorities 1–4 and their full
+completion requirements are unchanged.
+
+| Order | Delivery | Acceptance and decision boundary |
+| --- | --- | --- |
+| **Finish the running gate** | **Complete native integration and then promote the dependency.** The recurring unit failure is no longer a confirmed current defect. | Finish method controls/cache separation, local context, native recursors, nested foralls, both 350-signature corpora and extended Exference behavior at the same frozen source/runtime. Preserve the 701-test and method results. Advance the gitlink only after complete acceptance; diagnose an actual failed gate before rerunning it. |
+| **Next bounded construction check — P2** | **Transfer the accepted function-carrier construction to native Lean.** Run the prepared tree fixture once at its original bounds in Djinn, Exference and Both. | Require exact supplied-fold/constructor inventories, all 16 observations, full-type kernel replay, axiom/termination checks and completed False queries. A timeout after rejection observations fails. Haskell Djinn remains a separate known miss; trace its lost derivation before another unchanged run. If native search fails, retain the failure and move to the independent frontend delivery after one focused diagnosis. |
+| **Next implementation — P3** | **Make exact Haskell output usable.** Complete implicit-root binder order/scope, ordinary contextual expression/definition output, and the exposed list typed-renderer cases as separately checked increments. | Public ordinary and named-function `where` queries in both engines must emit exact implementations that GHC accepts at the original full signature. Retain nested quantifiers and payload-sensitive contextual controls. An erased compatibility expression does not validate a failing typed rendering. |
+| **Continue construction coverage — P4** | **Complete the remaining Church matrix in explicit batches.** Start with Exference `foldl1`, where the newly accepted carrier construction gives a concrete reason for one original-bound recheck; trace Djinn `maybeEither` and native-Int `at` rather than increasing limits. | Retain all **13 extended plus all 19 supplied-default operations in five language/engine combinations**: Haskell Djinn/Exference and Lean Djinn/Exference/Both. Each accepted cell needs live synthesis, exact full-type replay and its controls. Distinguish historical acceptance, current acceptance, bounded miss, timeout, replay failure and not run. |
+| **After the frontend increments — P3** | **Extend source admission, then selected evidence.** Derived Haskell method schemes and mixed Lean constructor/method inventories come first. Distinct selected dictionaries for equal predicates, superclass/conditional evidence and richer universes follow separately. | Preserve source identity, root scope and selected payload through search, rendering and replay. Retain overlap guards until distinct outer/inner dictionary behavior passes; increasing the provider cap cannot repair a missing source scheme. |
+
+The full supplied-default worklist is explicit so that successful small batches
+cannot silently replace it:
+
+- Selectors: `head`, `last`, `fromJust`, `fromLeft`, `fromRight`, `atKey`.
+- Nonempty reductions: `foldl1`, `foldr1`, `reduce`.
+- Extrema: `maximumBy`, `maximumOn`, `minimumBy`, `minimumOn`, `minMaxBy`,
+  `minmaxElement`, `maximum`, `minimum`, `minMax`.
+- Native-`Int` indexing: `at`, including negative indices.
+
+Those are all 19 prepared operation identities. These groups are an execution
+plan, not new behavioral acceptance. Use the agreed supplied default or
+inhabitance assumption for partial Lean counterparts. Keep original partial
+signatures classified separately from their total defaulted targets.
+
+### Disposition of other ideas
+
+| Idea | Re-triaged decision | Evidence that would promote it |
+| --- | --- | --- |
+| Broader search estimates and heuristic tuning | **Defer.** Retain the scoped accepted change and its rejected broader variants. | A traced original-bound failure identifies a lost or delayed useful branch, and a general repair retains the accepted regressions. |
+| Memoization, duplicate suppression and shared subgoal graphs | **Demote from the immediate queue to conditional profiling.** The old allocation figure did not identify repeated equivalent work, and the current complete unit gate passes. | Repeated scope-equivalent work explains a material current cost; keys preserve source identity, dictionary selection and budget accounting. |
+| Combined-engine streaming and cancellation | **Conditional performance work.** Do not return an early Djinn result by changing Both's established selection order. | A phase trace identifies avoidable work or waiting, with ordering, ownership and deadlines preserved. |
+| Counterexample-guided search and observation caching | **After a representative current cost measurement.** Reachability and replay cost are separate problems. | Repeated behavioral rejection dominates runtime. Reuse checks only for the same candidate, environment and predicate; finite agreement is not semantic equivalence. |
+| Provider retrieval and relevance ranking | **Defer scaling; finish supported admission first.** | A realistic inventory demonstrably omits a useful supported provider, with recall and latency measured together. |
+| More diagnostics and validation infrastructure | **Keep narrow.** Maintain one current decision section and link immutable receipts; preserve historical failures without letting them lead the roadmap. | A missing observation prevents a concrete diagnosis. Add that observation rather than another tracing framework. |
+| Worker counts and RTS tuning | **Defer.** Cumulative allocation alone does not establish high residency or a GC bottleneck. | Controlled current measurements identify startup, GC or memory as the limiting factor. |
+| General recursion, induction, dependent/indexed synthesis and invariant discovery | **Defer broad expansion.** Supplied folds already express the current tree witness. | A concrete required program needs additional termination or equality machinery. |
+| A Lean-native engine rewrite, editor/tactic integration, native Windows Length acquisition | **Separate architecture, product and platform deliveries.** | A concrete requested workflow supplies its own runtime, replay and budget acceptance criteria. |
 
 The remaining sections preserve historical diagnoses, counts and proposals at
-their recorded revisions. They do not override the current linked decision.
+their recorded revisions. They do not override the current decision above.
 
 ## What changed in this re-triage
 

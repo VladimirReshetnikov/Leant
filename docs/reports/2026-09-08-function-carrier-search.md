@@ -1,5 +1,10 @@
 # Exference composes supplied folds with function carriers
 
+> Native follow-up: the [current re-triage](2026-09-07-synthesis-retriage.md)
+> records 701 passing native unit tests and six passing method cells at
+> Djex `bfc3692e`. The remaining integration gates are running. The native
+> "not run" status below describes this report's earlier publication.
+
 Canonical Haskell Exference now synthesizes the supplied tree accumulator at
 its original limits, while retaining the complete 13-operation extended Church
 behavioral corpus. The [receipt](https://github.com/VladimirReshetnikov/Djex/blob/main/test-church/receipts/function-carrier-search.json)
