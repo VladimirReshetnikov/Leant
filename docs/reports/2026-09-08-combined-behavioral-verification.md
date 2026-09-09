@@ -3,8 +3,9 @@
 Leant now checks a candidate and attempts both decision polarities in one
 kernel-checked command. The two previously failing native Exference recursor
 queries pass at their original bounds. This is an accepted verification
-increment within priority 2; full native integration and the broader priorities
-1–4 remain incomplete.
+increment within priority 2. The later [complete native integration](2026-09-08-combined-native-integration.md)
+now passes; the broader priorities 1–4 remain incomplete. Component evidence
+below retains its original publication boundary.
 
 The [receipt](https://github.com/VladimirReshetnikov/Leant/blob/main/test-behavioral/receipts/combined-verification.json)
 and [archive](https://github.com/VladimirReshetnikov/Leant/blob/main/test-behavioral/receipts/combined-verification.zip)
@@ -104,23 +105,17 @@ of an observed missing-sorry diagnostic. The initial four-variant Nat identity
 smoke fixture selected zero/successor candidates; the corrected polymorphic
 fixture passes without increasing its limit.
 
-## Remaining integration
+## Completed integration and remaining scope
 
-**Later checkpoint:** the [next-delivery re-triage](2026-09-08-synthesis-next-deliveries.md)
-records the fresh 12/12 native recursor matrix, 13/13 extended Exference behavior,
-nested-result checks and 350/350 native Djinn signatures. The Exference signature
-gate was still running; aggregate integration and dependency promotion remain
-pending. The paragraph below records this component's earlier publication boundary.
-
-Leant still commits Djex `4a4ed0fc`; this verification increment is tested with
-working Djex `bfc3692e`. Local contexts, the full simplification/recursor matrices,
-extended behavior, nested foralls and both native signature corpora continue as
-separate integration gates. No unexecuted or running gate contributes accepted
-coverage here. Advance the dependency only after the complete required gates
-pass at the final dependency.
+The [terminal native integration](2026-09-08-combined-native-integration.md)
+now passes all ten gates, including the full 12/12 recursor matrix, 13/13
+extended Exference behavior, nested-result checks and 350/350 signatures in
+each native engine. Final source/runtime/executable identities match. Leant
+now pins the tested Djex `bfc3692e` dependency. This supersedes the integration
+boundary at the original component publication while retaining that archive.
 
 The [current roadmap](2026-09-07-synthesis-retriage.md) retains implicit-root and
 one-shot Haskell output, typed lists, native tree construction, contextual
 evidence, and all 13 extended plus 19 supplied-default operations across Haskell
-Djinn/Exference and Lean Djinn/Exference/Both. This increment closes none of those
-broader requirements by itself.
+Djinn/Exference and Lean Djinn/Exference/Both. Complete native integration does
+not close those broader requirements.

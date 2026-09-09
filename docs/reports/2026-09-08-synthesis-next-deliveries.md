@@ -1,6 +1,6 @@
 # Further improvements after the native recursor gates pass
 
-This September 8, 2026 checkpoint reorders the remaining work under priorities
+This September 8, 2026 re-triage, updated after terminal integration, reorders the remaining work under priorities
 1–4. The full goal remains open. The useful next work is a bounded transfer
 check for tree folds, completion of public Haskell frontend behavior, and the
 remaining Church behavioral cells. Broader search and architecture changes
@@ -8,12 +8,15 @@ need a specific failing workload before they enter that queue.
 
 ## Evidence behind the change
 
-The [completed-gate receipt](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/combined-integration-retriage.json)
-and [archive](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/combined-integration-retriage.zip)
-retain nine terminal passing integration gates at Leant `43f1bc11` with working
-Djex `bfc3692e`. The archive contains 3,727 hashed artifacts plus its manifest;
-every member was rehashed. Its SHA-256 is
-`3235cc1ad17e8be44084d8ed772d12cb731f723c904995e17da135038360523d`.
+The [completed native integration](2026-09-08-combined-native-integration.md)
+now records all ten terminal gates passing at Leant production revision
+`43f1bc11` with Djex `bfc3692e`. Leant pins that exact tested dependency.
+The [terminal receipt](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/combined-native-integration.json)
+and [archive](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/combined-native-integration.zip)
+retain 3,736 hashed artifacts plus the manifest. Every member was rehashed;
+the archive SHA-256 is
+`ac464ba0f8d35a1095bf5bed2c59e2e8961660502e345be703022700ad2d87c9`.
+The earlier nine-gate checkpoint remains preserved separately.
 
 | Gate | Recorded result |
 | --- | --- |
@@ -25,7 +28,7 @@ every member was rehashed. Its SHA-256 is
 | Extended Lean Exference behavior | **13/13**, exact full-type replays and one actual False control |
 | Nested-result foralls | Nine cells: six exact outputs and three actual False controls |
 | Native Djinn signatures | **350/350**, independently replayed with empty candidate axiom inventories |
-| Native Exference signatures | Still running when this checkpoint was captured; excluded from accepted counts and archived child artifacts |
+| Native Exference signatures | **350/350**, independently replayed with empty candidate axiom inventories |
 
 The native recursor timeout repair now has a complete matrix behind it. All
 nine replayed recursor implementations, their observation proofs and `List.foldr`
@@ -37,17 +40,16 @@ inventories to every proof in the project.
 Unit and positive-method results come from the preceding v2 run. Only three
 trace-control fixture files changed after the positive-method run; that driver
 imports or executes none of them. The new control sessions exercise those
-changes. This checkpoint includes a snapshot of the running parent, and is
-**not aggregate integration acceptance**. Leant's committed Djex dependency
-remains `4a4ed0fc` pending the final signature gate and final input-integrity check.
-Historical failures remain in the earlier
+changes. The final Exference signature gate and final input-integrity check
+both pass, completing aggregate integration and allowing promotion from
+`4a4ed0fc` to the tested `bfc3692e` dependency. The earlier checkpoint's
+running-parent snapshot remains historical evidence. Failures remain in the earlier
 [combined-verification report](2026-09-08-combined-behavioral-verification.md).
 
 ## Execution order
 
 | Order | Delivery | Concrete acceptance |
 | --- | --- | --- |
-| 0 | Finish the already running native integration | Obtain the terminal Exference 350-signature result and unchanged-input result; then promote precisely the tested dependency. A running query or its previous revision's pass is insufficient. |
 | 1 | Transfer the accepted function-carrier construction | Run the prepared native tree matrix once at its original bounds, and recheck Haskell Exference `foldl1` once. Require actual synthesis, exact full-signature replay, all original observations, and completed False controls. The tree also needs its provider, axiom and termination checks. Haskell Djinn tree remains a separate known miss. |
 | 2 | Close the Haskell frontend gaps in separate increments | First implicit-root scoping, then one-shot contextual commands, then typed list output. Exercise ordinary and named-`where` public entrances in both engines; compile exactly what is displayed at the user's original signature. Preserve binder order, nested forall scope and dictionary payloads. |
 | 3 | Finish the full Church behavioral matrix | Execute remaining extended cells and explicit-default groups. Start with concrete misses such as Djinn `maybeEither`, nonempty reductions and native-`Int` indexing. Keep all 13 extended and all 19 defaulted operations across five engine/language modes in the register. |

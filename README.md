@@ -76,8 +76,8 @@ Companion documents:
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
 - **[Current synthesis re-triage](docs/reports/2026-09-07-synthesis-retriage.md)**
-  — finish the last native signature gate, check the Lean tree, complete
-  Haskell frontend behavior, and continue the full Church/default matrix;
+  — check the Lean tree, complete Haskell frontend behavior, and continue
+  the full Church/default matrix after completed native integration;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -189,8 +189,8 @@ Companion documents:
   including `maybeEither`, at unchanged search limits. Exact full-signature GHC
   replay, 28 oracle controls and a live False query pass. Strict builds, all
   **2,308 tests in 15 suites**, and **350 signatures per Haskell engine** pass.
-  Leant still pins Djex `4a4ed0fc`; integrating the newer search change requires
-  its own native kernel replay and regression acceptance.
+  The [completed native integration](docs/reports/2026-09-08-combined-native-integration.md)
+  now promotes Leant's Djex dependency to the tested `bfc3692e`.
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
   now includes fresh 13/13 Haskell Exference acceptance and historical
   separate-run 12/13 Haskell Djinn and 2/4 Exference explicit-default acceptance. Lean Exference's
@@ -204,10 +204,10 @@ Companion documents:
   queries passing. The native recursor matrix now passes **12/12 at its original
   limits**, including nine exact full-type replays and three completed False
   controls. Extended Lean Exference behavior passes **13/13**, nested foralls
-  pass nine cells, and native Djinn signatures pass **350/350**. The native
-  Exference signature gate was still running at the checkpoint; aggregate
-  integration and dependency promotion remain pending. Earlier deadline failures
-  remain recorded in the [historical report](docs/reports/2026-09-08-native-carrier-integration.md).
+  pass nine cells, and **both native signature corpora pass 350/350 each**.
+  All ten integration gates and the final input-integrity check pass; Leant now
+  pins the tested dependency. Earlier deadline failures remain recorded in the
+  [historical report](docs/reports/2026-09-08-native-carrier-integration.md).
   The [semantic provider filter](docs/reports/2026-09-08-semantic-auxiliary-providers.md)
   now excludes generated auxiliary eliminators while retaining ordinary user
   `elim` functions. Four real-kernel discovery checks and the public tree
@@ -220,8 +220,8 @@ Companion documents:
   2,309 tests in 15 complete suites pass across the documented runs, including
   a complete Length rerun after its test-only lifecycle repair. Native tree
   acceptance remains open. The [current delivery order](docs/reports/2026-09-07-synthesis-retriage.md)
-  finishes the remaining signature gate, then checks the native tree transfer,
-  completes Haskell frontend gaps and continues the full Church behavioral
+  checks the native tree transfer, completes Haskell frontend gaps and continues
+  the full Church behavioral
   matrix. The [combined verifier](docs/reports/2026-09-08-combined-behavioral-verification.md)
   remains covered by the now-passing recursor, fallback and method/cache gates.
   The [ordinary Haskell contextual REPL delivery](docs/reports/2026-09-08-ordinary-contextual-output.md):
@@ -229,7 +229,7 @@ Companion documents:
   suites pass at the documented fixture bounds. Implicit-root scope, one-shot
   contextual commands and typed list rendering remain open. Broader search
   estimates were rejected after losing Church composition.
-  The committed dependency remains `4a4ed0fc`. The full 13-operation/19-default coverage
+  The committed dependency is `bfc3692e`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
 - **Checked conditional providers in canonical Djex.** The

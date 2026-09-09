@@ -9,26 +9,25 @@ also records the canonical evidence and remaining implementation gates.
 
 ## Current decision and next delivery gates
 
-The [latest re-triage](2026-09-08-synthesis-next-deliveries.md) records nine
-completed native integration gates at Leant `43f1bc11` with working Djex
-`bfc3692e`. Native List recursors now pass **12/12 at the original limits**,
+The [latest re-triage](2026-09-08-synthesis-next-deliveries.md) records all ten
+completed native integration gates at Leant production revision `43f1bc11` with
+Djex `bfc3692e`, now pinned by Leant. Native List recursors now pass **12/12 at the original limits**,
 including nine exact full-type replays and three completed False controls.
 Extended Lean Exference behavior passes **13/13**, nested-result foralls pass
-nine cells, and native Djinn signatures pass **350/350** with kernel replay.
+nine cells, and both native engine signature corpora pass **350/350** each
+with kernel replay.
 The accepted 702-test unit run, six method cells, nine method-control sessions,
 39 local-context cells and 15 simplification queries are retained with their
 fixture-version boundaries in the
-[receipt](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/combined-integration-retriage.json).
+[receipt](https://github.com/VladimirReshetnikov/Leant/blob/main/test-recursive/receipts/combined-native-integration.json).
 
-The native Exference signature gate was still running at this checkpoint.
-Aggregate integration and promotion of Leant's committed `4a4ed0fc` dependency
-remain pending that terminal result and the final unchanged-input check.
-The historical 9/12 recursor failure is superseded by the new matrix; native
-tree and the complete Church behavioral target remain open.
+The [terminal integration](2026-09-08-combined-native-integration.md) passes its
+final unchanged-input check and closes the dependency release gate. The
+historical 9/12 recursor failure is superseded by the new matrix. Native tree
+and the complete Church behavioral target remain open.
 
 | Order | Next delivery | Required evidence |
 | --- | --- | --- |
-| **0 — finish the running release gate** | Complete native Exference signature validation, then promote the tested dependency. | All ten terminal gates pass and final input hashes match. |
 | **1 — bounded transfer checks, P2/P4** | Run the native tree fixture and recheck Haskell Exference `foldl1` once at original bounds. | Actual synthesis, exact original-type replay, all observations, completed False controls; tree provider/axiom/termination checks. A miss gets one concrete diagnosis before the next independent batch. |
 | **2 — Haskell frontend correctness, P3** | Implicit-root scope, one-shot contextual commands and typed list output, as separate increments. | Both engines through public ordinary and named-`where` queries; compile the exact displayed implementation without rewriting the original signature. Preserve binder order, nested scope and selected payloads. |
 | **3 — full behavioral matrix, P4** | Remaining extended operations, selectors, nonempty reductions, extrema and native-`Int` indexing. | All 13 extended plus all 19 supplied-default operations across Haskell Djinn/Exference and Lean Djinn/Exference/Both. Separate current/historical passes, misses, timeouts, replay failures and unrun cells. |

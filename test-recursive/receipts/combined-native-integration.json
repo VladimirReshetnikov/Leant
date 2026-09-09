@@ -1,0 +1,104 @@
+{
+  "status": "integration_passed",
+  "parent_status_at_snapshot": "passed",
+  "parent_snapshot_sha256": "42db0b9e0ff70c066e5fff69392478f70da0126317e8576cfaa4a8454f0e8c51",
+  "dependency": "bfc3692e891ed2d81846fb2bd6b54ecd51aa7442",
+  "completed_gates": [
+    {
+      "gate": "unit",
+      "receipt_sha256": "c7d555903da3f877c3b988f8e49c230abfaa42b4aed1511a172c0bef313567bd",
+      "retained": true,
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "methods",
+      "receipt_sha256": "cf8722e2348104d5700973b8d3ea179e14eb2f4ec5889800d6d2a96b99815978",
+      "retained": true,
+      "changed_trace_fixture_inputs": [
+        "C:\\Leant\\test-context\\global-methods\\capture.py",
+        "C:\\Leant\\test-context\\global-methods\\run_controls.py",
+        "C:\\Leant\\test-context\\global-methods\\test_capture.py"
+      ]
+    },
+    {
+      "gate": "method-controls",
+      "receipt_sha256": "45d1a582020ccba3f6afc516267874311a6dea7bc95ebc1136a32c8324c72737",
+      "retained": false,
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "local-context",
+      "receipt_sha256": "292079794a8be63afb3b1c8c40c48d9aeecf6e31a4fb8869a70ddaea5cff0ad4",
+      "retained": false,
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "simplification",
+      "receipt_sha256": "4a6dffaf4bfc1522dd468a89c5213ed2621a1c59e5d89e6d44e69217ccd84fff",
+      "retained": false,
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "native-recursor",
+      "receipt_sha256": "8498860f5b7b54de0b0fa594835f4a05eb3a7b139f3d5b16b4ff49908104c0e5",
+      "retained": false,
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "extended-exference",
+      "receipt_sha256": "3574dc746a194f3c3e381012bd8f4823fb13d4a466fa1ab2643642ab52541e77",
+      "retained": false,
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "nested-forall",
+      "receipt_sha256": "f8efb2e5b318bc553a28d509d223e97b1d27704e048f203ef9fb7591ed65d997",
+      "retained": false,
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "signatures-djinn",
+      "receipt_sha256": "b223822633fed469f79fdb4875822388743f228f492ec0822d36bfebdca90145",
+      "retained": false,
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "signatures-exference",
+      "receipt_sha256": "17c9cc758db5d737617339afd06ee2bed3d8f3c575b9ef2dff049bbd9eb34829",
+      "retained": false,
+      "changed_trace_fixture_inputs": []
+    }
+  ],
+  "pending_gates": [],
+  "aggregate_accepted": true,
+  "frozen_inputs_match_at_packaging": true,
+  "counts": {
+    "unit_tests": 702,
+    "method_cells": 6,
+    "method_control_sessions": 9,
+    "local_context_cells": 39,
+    "simplification_queries": 15,
+    "recursor_cells": 12,
+    "recursor_exact_replays": 9,
+    "recursor_completed_false_controls": 3,
+    "extended_exference_operations": 13,
+    "extended_exference_false_controls": 1,
+    "nested_forall_cells": 9,
+    "native_signatures_per_completed_engine": 350
+  },
+  "boundaries": [
+    "Unit and positive-method receipts are retained from v2; all other archived gates are terminal v3 runs.",
+    "Only three trace-control fixture files changed after the positive-method run; that driver imports or executes none of them. Production, executable, queries and replays match.",
+    "All ten gates are terminal passes and the final parent input-integrity check passed; there are no running child artifacts.",
+    "Source hashes were checked again while packaging; this is not another live synthesis run.",
+    "Native List recursors and type-signature coverage do not establish native tree or complete Church behavioral coverage.",
+    "Historical failures and component controls remain in the separately published combined-verification archive."
+  ],
+  "archive": {
+    "path": "combined-native-integration.zip",
+    "sha256": "ac464ba0f8d35a1095bf5bed2c59e2e8961660502e345be703022700ad2d87c9",
+    "bytes": 11352790,
+    "artifact_count": 3736,
+    "all_members_rehashed": true
+  }
+}
