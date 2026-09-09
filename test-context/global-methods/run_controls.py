@@ -20,7 +20,7 @@ ROOT = HERE.parents[1]
 BASE = HERE
 METHOD_SHA = 'c0ff4bbf5c40588e6f52615bd55fabcb07d24c36a8e07f3f8539692f5d4d5a64'
 CAPTURE = HERE / 'capture.py'
-CAPTURE_SHA = '6841638bfe459c70b1a5cfa9683276cb3517766ca956407b313184f923ef0990'
+CAPTURE_SHA = '131d4d1bf6980d834ac659d5421992f52088d16843d36ef5dc7c94ddb5508f4d'
 BACKEND_SHA = '650e7c02c1dcd3ebe32df35c10813ba24872005efeb8caa4c23e095b338ea1c9'
 
 def sha(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
@@ -186,22 +186,27 @@ def trace_semantics(prepared, session, observed):
             if (annotation['route'] != 'RouteTypedCandidate' or annotation['owner_engine'] not in ('djinn', 'exference')
                     or (case['engine'] != 'both' and annotation['owner_engine'] != case['engine'])):
                 raise ValueError('actual callback lost its own typed route/engine origin')
+            if annotation['role'] == 'combined-decision':
+                if capture.combined_decision_subject(row['code'], annotation) != (case['name'], case['predicate']):
+                    raise ValueError('combined decision changed the original query binder/predicate')
         if case['expected'] == 'no_candidate':
-            if not any(row['annotation']['role'] == 'negative-decide' for row in calls):
+            if not any(row['annotation']['role'] in {'negative-decide', 'combined-decision'} for row in calls):
                 raise ValueError('literal False did not reach an actual negative proof request')
             # A positive decision request occurs only after real Lean type
-            # verification succeeds. Replay every distinct such exact term.
+            # verification succeeds. A combined request attempts both checks;
+            # it is not itself an acceptance receipt. Independently type-check
+            # every distinct attempted term in this strict fixture below.
             evaluated = {}
             for row in calls:
                 annotation = row['annotation']
-                if annotation['role'] == 'positive-decide':
+                if annotation['role'] in {'positive-decide', 'combined-decision'}:
                     term = annotation['candidate']
                     if re.search(r'\bsorry\b|\bunsafe\b|Classical|MethodOracle|MethodReplay|it!', term):
                         raise ValueError('a rejected candidate borrowed hidden/oracle/earlier-result authority')
                     evaluated.setdefault(term, dict(term=term, requested_type=case['type'],
                         owner_engine=annotation['owner_engine'], renderer_ordinal=annotation['renderer_ordinal'],
                         request_id=row['request_id'], backend_id=row['backend_id']))
-            if not evaluated: raise ValueError('no independently type-verified literal-False candidate was evaluated')
+            if not evaluated: raise ValueError('no literal-False candidate reached a checked proof attempt')
             rejected.append(dict(name=case['name'], candidates=list(evaluated.values())))
         else:
             retained = result['accepted_variant']
@@ -213,7 +218,7 @@ def trace_semantics(prepared, session, observed):
             # display owner, rather than borrowing the other lane's request.
             after_discovery = discoveries[-1]['request_id'] if discoveries else boundaries[index]
             accepted_checks = [row for row in calls
-                if row['annotation']['role'] == 'type-verification'
+                if row['annotation']['role'] in {'type-verification', 'combined-decision'}
                 and row['annotation']['candidate'] == result['candidate']
                 and row['annotation']['owner_engine'] == retained['origin']['engine']
                 and row['annotation']['renderer_ordinal'] == retained['variant_ordinal']

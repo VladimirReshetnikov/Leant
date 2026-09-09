@@ -8,11 +8,15 @@ module Leant.Synth.Behavioral
   , behavioralPreflightProgram
   , behavioralDecisionProgram
   , behavioralProofProgram
+  , behavioralCombinedDecisionProgram
+  , decodeBehavioralDecisionTags
   , decideBehavioralBy
   , proveBehavioralBy
   ) where
 
 import Language.Haskell.Synthesis.Behavioral (BehavioralQuery (..))
+import Data.Char (isSpace)
+import Data.List (isPrefixOf)
 
 data BehavioralVerdict
   = BehavioralSatisfied
@@ -69,6 +73,46 @@ behavioralProofProgram method negatePredicate query term = options ++ unlines
   proof = case method of
     BehavioralDecide -> "by decide"
     BehavioralSimp -> "by\n  solve\n  | simp (config := { maxSteps := 10000 })"
+
+-- | Check the full candidate and attempt both decision polarities in one
+-- ephemeral example. A dependent pair retains the candidate as a value even
+-- when the predicate ignores it, so erasure cannot hide candidate sorries.
+-- Its second field contains a checked proof of p or its negation, or none
+-- when neither attempt closes. A trace follows only the
+-- successfully closed branch. The complete command must still pass the kernel:
+-- an error or sorry can coexist with a trace and invalidates the observation.
+-- This uses only core commands/tactics and introduces no user-visible name.
+behavioralCombinedDecisionProgram :: BehavioralQuery -> String -> String
+behavioralCombinedDecisionProgram query term = options ++ unlines
+  [ "example : _root_.PSigma (fun " ++ behavioralName query ++ " : ("
+  , behavioralType query
+  , ") => _root_.Option (_root_.Decidable ("
+  , behavioralPredicate query
+  , "))) := by"
+  , "  refine ⟨("
+  , term
+  , "  ), ?_⟩"
+  , "  first"
+  , "  | exact _root_.Option.some (_root_.Decidable.isTrue (by decide))"
+  , "    trace \"LEANT_BEHAVIOR_DECISION:1\""
+  , "  | exact _root_.Option.some (_root_.Decidable.isFalse (by decide))"
+  , "    trace \"LEANT_BEHAVIOR_DECISION:2\""
+  , "  | exact _root_.Option.none"
+  , "    trace \"LEANT_BEHAVIOR_DECISION:0\""
+  ]
+
+-- | Decode only the protocol, not proof authority. The caller must first
+-- validate the complete Lean response. Missing, malformed or duplicate tags
+-- cannot classify a candidate, even if one of them looks like a success.
+decodeBehavioralDecisionTags :: [String] -> Either String (Maybe Bool)
+decodeBehavioralDecisionTags messages = case tags of
+  ["LEANT_BEHAVIOR_DECISION:0"] -> Right Nothing
+  ["LEANT_BEHAVIOR_DECISION:1"] -> Right (Just True)
+  ["LEANT_BEHAVIOR_DECISION:2"] -> Right (Just False)
+  _ -> Left "Lean did not return exactly one valid behavioral decision tag"
+ where
+  tags = filter ("LEANT_BEHAVIOR_DECISION:" `isPrefixOf`) $
+    map (reverse . dropWhile isSpace . reverse . dropWhile isSpace) messages
 
 options :: String
 options = unlines

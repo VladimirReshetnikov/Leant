@@ -218,10 +218,11 @@ Companion documents:
   a complete Length rerun after its test-only lifecycle repair. Native Lean
   integration is incomplete at the recursor gate; native tree acceptance remains
   open. The [current delivery order](docs/reports/2026-09-07-synthesis-retriage.md)
-  prioritizes one bounded attempt to reduce native verification requests,
-  followed by independent frontend fixes, native tree checks and Church batches.
-  The first combined-check prototype fails its live environment gate; no speedup
-  is accepted. The [ordinary Haskell contextual REPL delivery](docs/reports/2026-09-08-ordinary-contextual-output.md):
+  continues native integration after the
+  [combined verification delivery](docs/reports/2026-09-08-combined-behavioral-verification.md):
+  Exference append and its False control now complete at their original limits,
+  with exact append replay, 702 unit tests and method/cache regressions passing.
+  Independent frontend fixes, native tree checks and Church batches remain. The [ordinary Haskell contextual REPL delivery](docs/reports/2026-09-08-ordinary-contextual-output.md):
   36 explicit-forall public queries and 330 tests across four complete affected
   suites pass at the documented fixture bounds. Implicit-root scope, one-shot
   contextual commands and typed list rendering remain open. Broader search

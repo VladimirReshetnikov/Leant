@@ -46,3 +46,22 @@ method controls, all fifteen queries across the three engines, and independent
 replay of all six displayed results. See the
 [acceptance report](../docs/reports/2026-09-07-bounded-behavioral-simplification.md)
 for the exact dependency and separate build/full-suite status.
+
+## Combined decision certificates
+
+The [combined verification report](../docs/reports/2026-09-08-combined-behavioral-verification.md)
+and [receipt](receipts/combined-verification.json) record the checked candidate/proof
+pair, original-budget fallback, exact-input recursor comparison and regressions.
+Generate the controls through the production Haskell builder, then run each
+isolated command with the exact Lean kernel executable:
+
+```powershell
+python -B test-behavioral/run_combined_controls.py --output dist-newstyle/combined-controls --lean C:/Users/vresh/.elan/toolchains/leanprover--lean4---v4.32.0/bin/lean.exe
+```
+
+Use a fresh output directory and substitute the actual toolchain path. This
+requires the existing Cabal build environment. The ten controls validate core
+command compatibility, positive/negative/undecided certificates, diagnostic and
+sorry handling, duplicate tags, trailing comments and lexical scope. They do not
+alone establish synthesis or full integration acceptance. Live public queries,
+complete unit tests and exact emitted-term replays remain separate evidence.

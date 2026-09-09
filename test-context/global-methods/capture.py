@@ -29,7 +29,36 @@ ROW_KEYS = {"backend_id", "request_id", "capture_started_ns", "capture_completed
 
 ANNOTATION_KEYS = {"role", "requested_type", "candidate", "renderer_ordinal", "route", "owner_engine"}
 
-CANDIDATE_ROLES = {"type-verification", "positive-decide", "negative-decide", "positive-simp", "negative-simp"}
+CANDIDATE_ROLES = {"type-verification", "positive-decide", "negative-decide", "positive-simp", "negative-simp", "combined-decision"}
+
+
+def combined_decision_subject(code, annotation):
+    """Bind the complete checked-pair program to its annotated type and term.
+
+    This validates request structure, not a successful response or proof. The
+    caller must match the returned binder/predicate to the original query and
+    independently replay the actual results.
+    """
+    prefix = ("set_option autoImplicit false in\n"
+              "set_option maxHeartbeats 200000 in\n"
+              "example : _root_.PSigma (fun ")
+    if not code.startswith(prefix):
+        raise ValueError("combined decision lost its checked pair or proof bounds")
+    binder = re.match(r"([^\s:]+) : \(\n", code[len(prefix):])
+    if binder is None:
+        raise ValueError("combined decision lost its lexical candidate binder")
+    prefix += binder[0] + annotation['requested_type'] + "\n) => _root_.Option (_root_.Decidable (\n"
+    suffix = ("\n))) := by\n  refine ⟨(\n" + annotation['candidate'] + "\n  ), ?_⟩\n"
+              "  first\n"
+              "  | exact _root_.Option.some (_root_.Decidable.isTrue (by decide))\n"
+              "    trace \"LEANT_BEHAVIOR_DECISION:1\"\n"
+              "  | exact _root_.Option.some (_root_.Decidable.isFalse (by decide))\n"
+              "    trace \"LEANT_BEHAVIOR_DECISION:2\"\n"
+              "  | exact _root_.Option.none\n"
+              "    trace \"LEANT_BEHAVIOR_DECISION:0\"\n")
+    if not code.startswith(prefix) or not code.endswith(suffix) or len(code) <= len(prefix) + len(suffix):
+        raise ValueError("combined decision changed its full type, candidate, or proof protocol")
+    return binder[1], code[len(prefix):-len(suffix)]
 
 TERMINAL_STAGES = {"TraceSendFailed", "TraceRequestTimedOut", "TraceResponseTransportFailed",
                    "TraceResponseParsed", "TraceResponseInvalidJson", "TraceRequestInterrupted"}
@@ -181,6 +210,8 @@ def annotation_value(text, size, payload):
         if (annotation["candidate"] not in payload["cmd"]
                 or annotation["requested_type"] not in payload["cmd"]):
             raise ValueError("candidate/type label does not occur verbatim in its actual command")
+        if role == "combined-decision":
+            combined_decision_subject(payload["cmd"], annotation)
     return raw, annotation
 
 def validate_capture(trace, expected_row_limit=128):

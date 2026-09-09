@@ -39,13 +39,16 @@ not establish a speedup. The payload-capture attempt instead hit its 180-second
 outer guard and retained only a startup snapshot; it supplies no complete phase
 breakdown.
 
-The combined type/positive/negative-decision prototype passes its strict build
-and focused tag-decoder test, but **fails all three live smoke queries** at the
-Lean command boundary. Its metaprogramming wrapper requires imports unavailable
-in the exact user environment; an independent no-import kernel probe reproduces
-the missing `Command` namespace and `Lean.Elab.Command` requirement. The prototype
-remains unaccepted and uncommitted as production code. A process exit of zero
-and a diagnostic status of `captured` do not establish behavioral acceptance.
+The [combined behavioral certificate delivery](2026-09-08-combined-behavioral-verification.md)
+now closes that bounded experiment: original-bound Exference append and its
+False control both complete, with independent full-type append replay. The
+strict build, 702/702 unit tests, ten kernel controls, six global-method cells,
+nine method-control sessions and twelve trace-validator tests pass. The earlier
+metaprogramming prototype failed its environment boundary; the accepted version
+uses an ordinary core checked pair and preserves the original fallback pipeline.
+The first full unit run's missing fake-solver event file and the obsolete trace
+validator's role rejection remain recorded. This is a verification increment,
+not complete native integration or dependency promotion.
 
 This is the current execution order. Original priorities 1–4 and their full
 completion requirements are unchanged. Native integration gates dependency
@@ -53,7 +56,7 @@ promotion; independent frontend and Church work need not wait for its completion
 
 | Order | Delivery | Acceptance and decision boundary |
 | --- | --- | --- |
-| **1 — one bounded verification experiment, P2** | **Reduce redundant native verification requests.** Try a kernel-checked combined certificate in the exact user environment, then compare at the original append/False bounds. | Preserve the complete requested type, candidate ownership, positive/negative/inconclusive distinction, bounded simplification, error/sorry rejection, effective proof budgets and absolute command deadline. First pass live positive, negative, undecidable, ill-typed and protocol-failure controls without changing user imports or scope. Then require actual original-bound recursor improvement and affected regressions. If the corrected experiment fails these gates, retain its evidence and move to order 2; do not start another open-ended tracing or scheduler campaign. |
+| **1 — verification increment delivered; integration continues, P2** | **Complete the remaining native gates before advancing the dependency.** Combined checked certificates now resolve the two focused Exference timeouts. | Retain the accepted exact-input comparison, proof/error/sorry controls and original fallback. Finish local contexts, full simplification/recursors, extended behavior, nested foralls and both native signature corpora at the final dependency. Native tree and the complete Church matrix remain separate requirements. |
 | **2 — independent frontend deliveries, P3** | **Finish implicit-root scope, one-shot contextual output and typed list rendering in separate increments.** | Ordinary and named-function `where` queries must preserve root binder order, nested quantifiers and selected contextual payloads in both Haskell engines. Compile the exact displayed implementation at the original signature. Compatibility erasure cannot validate a failed typed rendering. After these increments, investigate repeated best-output results under the separate identity gate below. |
 | **3 — transfer the accepted construction, P2/P4** | **Run the native tree fixture and recheck Haskell Exference `foldl1` once at their original bounds.** The accepted Haskell Exference function-carrier repair is the concrete reason for these checks. | Native tree requires the supplied fold/constructor inventory, all 16 observations, full-type kernel replay, axiom/termination checks and completed False controls in Djinn, Exference and Both. `foldl1` needs actual search and all original observations, not just its checked witness. Haskell Djinn tree remains a separate known miss. Diagnose one failed derivation, then continue the next independent batch. |
 | **4 — finish the entire behavioral matrix, P4** | **Work through explicit batches: remaining extended operations, selectors, nonempty reductions, extrema and native-Int indexing.** Trace Djinn `maybeEither` and native-Int `at` as concrete failed cells. | Retain all **13 extended plus all 19 supplied-default operations** across Haskell Djinn/Exference and Lean Djinn/Exference/Both. Each accepted cell requires live synthesis, exact full-type replay and its controls. Distinguish historical acceptance, current acceptance, bounded miss, timeout, replay failure and not run. No successful batch replaces the full matrix. |
@@ -94,7 +97,7 @@ signatures classified separately from their total defaulted targets.
 
 | Idea | Re-triaged decision | Evidence that would promote it |
 | --- | --- | --- |
-| Fewer verification requests | **Promote to the bounded experiment above.** The current request tail establishes substantial checking latency; the first prototype fails its environment gate. | A checked certificate works in the exact user environment, preserves proof and deadline semantics, reduces work at original bounds, and passes controls and regressions. No speedup is assumed from the request count. |
+| Fewer verification requests | **Delivered as a bounded verification increment.** The original Exference append and False queries now complete, with exact replay and complete unit coverage. | Retain the checked-pair protocol, original fallback, request ownership and failure controls as regressions. Complete the remaining native integration gates before dependency promotion; this is not an invitation to broaden caching or prune by finite observations. |
 | Exact duplicate suppression in contextual best output | **Promote to a bounded follow-up after frontend correctness.** The preserved 20,000-step baseline includes 7,475 copies of the same compatibility expression and best-mode timeouts; the accepted 256-step presentation fixture does not close this performance gap. | First establish duplicate identity using typed evidence, selected dictionaries and source ownership. Equal printed expressions alone are insufficient. Preserve distinct derivations where observable, documented tie behavior and engine selection. Compare exact displayed outputs and independent compiler replay at the original failing settings. |
 | Broader search estimates and heuristic tuning | **Defer.** Retain the scoped accepted change and its rejected broader variants. | A traced original-bound failure identifies a lost or delayed useful branch, and a general repair retains the accepted regressions. |
 | General memoization and shared subgoal graphs | **Defer the refactor.** Repeated displayed text is not evidence of equivalent internal subproblems. The old allocation figure did not identify reusable work. | Repeated scope-equivalent work explains a material current cost; keys preserve source identity, dictionary selection and budget accounting. |

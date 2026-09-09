@@ -152,6 +152,8 @@ import Leant.Synth.Behavioral
   , behavioralSyntaxProgram
   , behavioralPreflightProgram
   , behavioralProofProgram
+  , behavioralCombinedDecisionProgram
+  , decodeBehavioralDecisionTags
   , proveBehavioralBy
   )
 import Leant.Synth.Fragment
@@ -4313,7 +4315,7 @@ synthVerify successQuota st goal groups = do
 
 -- A rejected assertion does not consume the type-correct group's result slot:
 -- try its remaining renderings before advancing to the next admitted group.
--- The returned receipt always belongs to the exact twice-checked variant.
+-- The returned receipt always belongs to the exact checked variant.
 synthVerifyBehavioral
   :: BehavioralRun
   -> Int
@@ -4323,6 +4325,10 @@ synthVerifyBehavioral
   -> IO (VerificationBatch DetailedVerificationVariant, [DetailedVerificationVariant])
 synthVerifyBehavioral active successQuota st goal groups = do
   reverseAttempts <- newIORef []
+  -- This is a one-use handoff between the verifier's immediately adjacent
+  -- callbacks, scoped to this invocation. It is not a cross-candidate cache
+  -- and carries no graph authority or replacement candidate identity.
+  pendingDecision <- newIORef Nothing
   previous <- readIORef $ behavioralRunObservations active
   let acceptedSpellings = Set.fromList
         [text | (text, BehavioralSatisfied) <- previous]
@@ -4330,32 +4336,76 @@ synthVerifyBehavioral active successQuota st goal groups = do
         (filter ((`Set.notMember` acceptedSpellings) . detailedVerificationVariantText)) groups
   (verification, assessments) <- verifyBehavioralCandidateGroupsBy
     detailedVerificationVariantText successQuota
-    (verifyVariant reverseAttempts) assessVariant freshGroups
+    (verifyVariant reverseAttempts pendingDecision)
+    (assessVariant pendingDecision) freshGroups
   modifyIORef' (behavioralRunObservations active)
     (++ [(detailedVerificationVariantText candidate, verdict)
          | (candidate, verdict) <- assessments])
   attempts <- reverse <$> readIORef reverseAttempts
   pure (verification, attempts)
  where
-  verifyVariant reverseAttempts variant = do
+  verifyVariant reverseAttempts pendingDecision variant = do
+    writeIORef pendingDecision Nothing
     modifyIORef' reverseAttempts (variant :)
+    result <- runBehavioralCommand st active False
+      (behavioralCombinedDecisionProgram
+        ((behavioralRunQuery active) { behavioralType = goal })
+        (detailedVerificationVariantText variant))
+      (Just $ synthTraceAnnotation "combined-decision" goal $ Just variant)
+    case result of
+      Left failure -> debugRequestFailure "combined-decision" variant failure
+      Right _ -> pure ()
+    case result of
+      Left _ -> pure $ VariantRejected BackendRequestFailure
+      Right response
+        | isJust (respFatal response) -> pure $ VariantRejected BackendFatalResponse
+        | hasErrors response -> fallbackVerify pendingDecision variant
+        | not (null $ respSorries response) -> fallbackVerify pendingDecision variant
+        | isNothing (respEnv response) -> pure $ VariantRejected BackendFatalResponse
+        | otherwise -> case decodeBehavioralDecisionTags
+            [message | (severity, message) <- respMessages response, severity == "info"] of
+            Left failure -> do
+              debugRequestFailure "combined-decision" variant failure
+              fallbackVerify pendingDecision variant
+            Right decision -> do
+              writeIORef pendingDecision $ Just (detailedVerificationVariantText variant, decision)
+              pure VariantAccepted
+
+  -- A failed optimization is not a type verdict. Reuse the original isolated
+  -- type check before the original decision/simp pipeline. Transport/fatal
+  -- failures above do not retry a potentially retired backend.
+  fallbackVerify pendingDecision variant = do
     result <- runBehavioralCommand st active False
       (candidateVerificationProgram (goal ++ "\n")
         (detailedVerificationVariantText variant ++ "\n"))
       (Just $ synthTraceAnnotation "type-verification" goal $ Just variant)
     case result of
-      Left failure -> debugRequestFailure "type-verification" variant failure
-      Right _ -> pure ()
-    pure $ case result of
-      Left _ -> VariantRejected BackendRequestFailure
+      Left failure -> do
+        debugRequestFailure "type-verification" variant failure
+        pure $ VariantRejected BackendRequestFailure
       Right response
-        | isJust (respFatal response) -> VariantRejected BackendFatalResponse
-        | hasErrors response -> VariantRejected LeanErrorDiagnostic
-        | not (null $ respSorries response) -> VariantRejected LeanContainsSorry
-        | isNothing (respEnv response) -> VariantRejected BackendFatalResponse
-        | otherwise -> VariantAccepted
+        | isJust (respFatal response) -> pure $ VariantRejected BackendFatalResponse
+        | hasErrors response -> pure $ VariantRejected LeanErrorDiagnostic
+        | not (null $ respSorries response) -> pure $ VariantRejected LeanContainsSorry
+        | isNothing (respEnv response) -> pure $ VariantRejected BackendFatalResponse
+        | otherwise -> do
+            writeIORef pendingDecision $ Just (detailedVerificationVariantText variant, Nothing)
+            pure VariantAccepted
 
-  assessVariant variant = proveBehavioralBy $ \method negatePredicate -> do
+  assessVariant pendingDecision variant = do
+    checked <- atomicModifyIORef' pendingDecision (\value -> (Nothing, value))
+    case checked of
+      Just (text, decision) | text == detailedVerificationVariantText variant ->
+        case decision of
+          Just True -> pure BehavioralSatisfied
+          Just False -> pure BehavioralFalsified
+          Nothing -> proveBehavioralBy $ assessProof variant
+      _ -> pure $ BehavioralInconclusive "the combined decision receipt does not match this verification callback"
+
+  -- Combined attempts share a bounded command. When they cannot classify the
+  -- candidate, retain each original decision/simp attempt and its own proof
+  -- budget, all under the same absolute query deadline.
+  assessProof variant method negatePredicate = do
     let query = (behavioralRunQuery active) { behavioralType = goal }
         role = (if negatePredicate then "negative-" else "positive-")
           ++ case method of

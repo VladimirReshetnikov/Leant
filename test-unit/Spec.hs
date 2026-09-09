@@ -692,6 +692,7 @@ import Leant.Synth.Behavioral
   , behavioralPreflightProgram
   , behavioralDecisionProgram
   , behavioralProofProgram
+  , decodeBehavioralDecisionTags
   , decideBehavioralBy
   , proveBehavioralBy
   )
@@ -2769,6 +2770,19 @@ hostBehavioralTests = testGroup "host behavioral synthesis"
             else Right False
         verdict @?= BehavioralInconclusive "shared command deadline expired"
         readIORef attempts >>= (@?= take (failureIndex + 1) stages)
+  , testCase "combined decision tags reject missing malformed and ambiguous observations" $ do
+      decodeBehavioralDecisionTags ["LEANT_BEHAVIOR_DECISION:0"] @?= Right Nothing
+      decodeBehavioralDecisionTags ["LEANT_BEHAVIOR_DECISION:1"] @?= Right (Just True)
+      decodeBehavioralDecisionTags ["unrelated Lean message", " LEANT_BEHAVIOR_DECISION:2\n"]
+        @?= Right (Just False)
+      forM_ [[], ["LEANT_BEHAVIOR_DECISION:3"],
+          ["LEANT_BEHAVIOR_DECISION:1", "LEANT_BEHAVIOR_DECISION:2"],
+          ["LEANT_BEHAVIOR_DECISION:1", "LEANT_BEHAVIOR_DECISION:1"],
+          ["LEANT_BEHAVIOR_DECISION:1", "LEANT_BEHAVIOR_DECISION:malformed"]] $ \messages ->
+        assertBool "an absent or ambiguous certificate classified the candidate" $
+          case decodeBehavioralDecisionTags messages of
+            Left _ -> True
+            Right _ -> False
   , testCase "simplification preserves the exact candidate and requires a closed bounded proof" $ do
       let query = BehavioralQuery "f" "∀ A : Type, A → A -- exact type"
             "∀ n : Nat, f Nat n = n -- exact assertion"

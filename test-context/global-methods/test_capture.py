@@ -26,6 +26,42 @@ def fixture():
 
 
 class CaptureTests(unittest.TestCase):
+    def test_combined_certificate_subject_and_protocol(self):
+        annotation = dict(requested_type='Nat', candidate='Nat.succ 0')
+        # Independent protocol fixture: full candidate value, both proof
+        # constructors, and the inconclusive branch must all be retained.
+        code = '''set_option autoImplicit false in
+set_option maxHeartbeats 200000 in
+example : _root_.PSigma (fun f : (
+Nat
+) => _root_.Option (_root_.Decidable (
+f = 1
+))) := by
+  refine ⟨(
+Nat.succ 0
+  ), ?_⟩
+  first
+  | exact _root_.Option.some (_root_.Decidable.isTrue (by decide))
+    trace "LEANT_BEHAVIOR_DECISION:1"
+  | exact _root_.Option.some (_root_.Decidable.isFalse (by decide))
+    trace "LEANT_BEHAVIOR_DECISION:2"
+  | exact _root_.Option.none
+    trace "LEANT_BEHAVIOR_DECISION:0"
+'''
+        self.assertEqual(capture.combined_decision_subject(code, annotation), ('f', 'f = 1'))
+        # Presence of the annotated text in a comment cannot donate authority
+        # to a different actual field, unlike a mere substring check.
+        mutations = [code.replace('200000', '0'),
+                     code.replace('DECISION:2', 'DECISION:1'),
+                     code.replace('isFalse (by decide)', 'isFalse (by sorry)'),
+                     code.replace('Nat.succ 0\n  ),', 'Nat.zero -- Nat.succ 0\n  ),'),
+                     code.replace('PSigma', 'Option'), code + 'example : True := by trivial\n']
+        for changed in mutations:
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                capture.combined_decision_subject(changed, annotation)
+        with self.assertRaises(ValueError):
+            capture.combined_decision_subject(code, dict(annotation, requested_type='Bool'))
+
     def test_owned_ordinary_type_check(self):
         result = capture.validate_capture(fixture())
         self.assertEqual(result[0][0]['annotation']['owner_engine'], 'djinn')

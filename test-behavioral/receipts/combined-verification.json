@@ -1,0 +1,50 @@
+{
+  "status": "component_accepted_full_native_integration_pending",
+  "leant_base": "deab0b9b5cb194a7dfe56d581bd2af47d567f0f7",
+  "working_djex": "bfc3692e891ed2d81846fb2bd6b54ecd51aa7442",
+  "committed_djex": "4a4ed0fc23f76d7b82b06496e03adfadbf374f84",
+  "archive": {
+    "path": "combined-verification.zip",
+    "sha256": "9ed5ae3982884f18023be3a47c084be263cd4a11c3381c8dd6eddc02b952c73c",
+    "bytes": 3758192,
+    "artifact_count": 2592
+  },
+  "accepted": {
+    "strict_build": true,
+    "production_generated_kernel_controls": 10,
+    "live_smoke_queries": 3,
+    "complete_unit_tests": 702,
+    "unit_suite_seconds": 359.92,
+    "global_method_cells": 6,
+    "method_control_sessions": 9,
+    "trace_validator_tests": 12,
+    "original_bound_exference_append": {
+      "passed": true,
+      "falsified": 548,
+      "inconclusive": 0,
+      "live_process_seconds": 45.96412000001874,
+      "exact_command_sha256": "6884d6f433176d6a83c7ac61c47b64517500a9ed689bffca9bc8b7c11e37e9d2",
+      "full_type_replay": true,
+      "axiom_inventories": "empty"
+    },
+    "original_bound_exference_false": {
+      "passed": true,
+      "falsified": 299,
+      "inconclusive": 0,
+      "live_process_seconds": 75.50122289999854,
+      "exact_command_sha256": "1d30fa321224413ee6a21f125476a51ddcd9d37fc6d218ea3b867a4fef008e2e"
+    }
+  },
+  "retained_failures": [
+    "First complete unit run: 701/702, missing fake-solver event file; unchanged focused and complete reruns pass, no cause proven or limits changed.",
+    "Old trace validator rejected combined-decision; exact checked-pair validation plus 12 adversarial tests and nine live sessions now pass.",
+    "Earlier generated controls failed package visibility and diagnostic spelling checks; raw files preserved.",
+    "Nat identity smoke fixture selected only zero/successor within its four-variant bound; corrected polymorphic fixture passes without raising limits."
+  ],
+  "boundaries": [
+    "Production source/executables match between the failed and passing complete unit runs.",
+    "Methods ran before the three trace-validator files changed; those files are not imported/executed by the positive-method driver. Production/executable bytes match.",
+    "Local contexts, full simplification/recursor matrices and later corpus gates are not claimed by this component receipt.",
+    "No dependency promotion, full Church behavioral matrix, or native tree acceptance is established."
+  ]
+}
