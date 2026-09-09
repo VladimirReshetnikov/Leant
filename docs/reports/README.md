@@ -279,3 +279,5 @@ a forward-looking proposal rather than a dated record:
 - 2026-09-08 — [Semantic auxiliary-provider filtering and tree deadline correction](2026-09-08-semantic-auxiliary-providers.md) — four real-kernel discovery cells, public inventory repair, and corrected timeout acceptance.
 
 - 2026-09-08 — [Further improvements after the fold-carrier experiment](2026-09-08-tree-carrier-retriage.md) — measured branch pruning, bounded experimental tree acceptance, failed regression classification, and revised delivery order.
+
+- 2026-09-08 — [Exference composes supplied folds with function carriers](2026-09-08-function-carrier-search.md) — accepted canonical Haskell tree synthesis, preserved 13/13 Church behavior, complete regression coverage and explicit native integration boundary.

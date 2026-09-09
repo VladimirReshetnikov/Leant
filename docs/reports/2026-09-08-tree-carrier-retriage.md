@@ -1,5 +1,10 @@
 # Further improvements after the fold-carrier experiment
 
+> Follow-up: the [scoped function-carrier repair](2026-09-08-function-carrier-search.md) is now accepted
+> in canonical Haskell Exference. It retains tree and Church behavior, with
+> complete regression coverage. The experiments and pending validation
+> described below are the earlier checkpoint; native integration remains open.
+
 The next delivery is to finish validating the measured Exference fold-carrier
 repair. The recurring native layered-provider timeout remains the release gate.
 Exact Haskell output and the remaining Church constructions follow as bounded,

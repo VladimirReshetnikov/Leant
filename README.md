@@ -204,13 +204,15 @@ Companion documents:
   `elim` functions. Four real-kernel discovery checks and the public tree
   inventories pass. Published Lean accumulator synthesis remains an executed miss;
   Exference/Both timeouts are failed cells, including their False controls. A
-  [new canonical Haskell experiment](docs/reports/2026-09-08-tree-carrier-retriage.md) produces
-  two Exference tree candidates passing all 16 observations at the original bounds,
-  with 1,024 contradictory controls rejecting. Its 92 private engine tests pass,
-  but three typed-rendering failures and a GHC bytecode replay panic leave the
-  permanent regression open. Finishing that experiment is next; the recurring
-  native layered-provider deadline remains the release gate. Exact Haskell output
-  remains an independent delivery. Broad scheduler tuning stays deferred.
+  [canonical Haskell function-carrier repair](docs/reports/2026-09-08-function-carrier-search.md) now
+  accepts two Exference tree candidates passing all 16 observations at the
+  original bounds, with 1,024 contradictory controls rejecting. It retains
+  13/13 extended Church behavior and 350 signatures per Haskell engine; all
+  2,309 tests in 15 complete suites pass across the documented runs, including
+  a complete Length rerun after its test-only lifecycle repair. Native Lean
+  integration of this change is next, with the recurring layered-provider
+  deadline still the release gate. Exact Haskell output remains an independent
+  delivery; broader search estimates were rejected after losing Church composition.
   The committed dependency remains `4a4ed0fc`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).
