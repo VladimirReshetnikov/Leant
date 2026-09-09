@@ -27,12 +27,9 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def require_completed_live_query(transcript):
-    # The shared observation parser establishes actual False observations,
-    # even in a cancelled search. This fixture additionally requires the
-    # command to finish within its deadline, for positive and negative cells.
-    if re.search(r"(?m)^the engine did not finish within [0-9]+s\b", transcript):
-        raise TimeoutError("synthesis command exceeded its prepared deadline")
+# Both recursive fixtures require completion in addition to observations.
+# Keep this public name for existing controls and diagnostic callers.
+require_completed_live_query = existing.require_completed_live_query
 
 
 def hashes(paths):

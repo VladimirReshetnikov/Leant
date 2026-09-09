@@ -200,8 +200,11 @@ Companion documents:
   preserve the older `63a23f58` integration failure. At working Djex
   `bfc3692e`, the fresh complete native suite now passes **701/701**,
   including the layered-provider case at its unchanged deadline, and all
-  six real-kernel method cells pass. Remaining integration gates are running;
-  see the [current decision and preserved evidence](docs/reports/2026-09-07-synthesis-retriage.md).
+  six method cells, nine method-control sessions and all 39 local-context cells
+  pass. The [terminal native report](docs/reports/2026-09-08-native-carrier-integration.md)
+  records 9/12 recursor cells after auditing deadlines: Exference append and
+  Exference/Both False controls time out. Later integration gates were not run.
+  The corrected fixture rejects False observations from timed-out commands.
   The [semantic provider filter](docs/reports/2026-09-08-semantic-auxiliary-providers.md)
   now excludes generated auxiliary eliminators while retaining ordinary user
   `elim` functions. Four real-kernel discovery checks and the public tree
@@ -213,9 +216,11 @@ Companion documents:
   13/13 extended Church behavior and 350 signatures per Haskell engine; all
   2,309 tests in 15 complete suites pass across the documented runs, including
   a complete Length rerun after its test-only lifecycle repair. Native Lean
-  integration is in progress; the next construction check is the original-bound
-  Lean tree matrix. Exact Haskell output is the next independent implementation
-  delivery; broader search estimates were rejected after losing Church composition.
+  integration is incomplete at the recursor gate; native tree acceptance remains
+  open. The [current delivery order](docs/reports/2026-09-07-synthesis-retriage.md)
+  puts exact ordinary Haskell contextual output first (prototype builds; replay
+  acceptance pending), then a focused native timeout diagnosis and the native
+  tree check. Broader search estimates were rejected after losing Church composition.
   The committed dependency remains `4a4ed0fc`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-07-synthesis-retriage.md).

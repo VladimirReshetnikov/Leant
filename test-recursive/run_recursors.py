@@ -22,6 +22,12 @@ from behavior_probe import parse_output
 from run_corpus import reported_axioms, validate_settings
 
 
+def require_completed_live_query(transcript):
+    """Observations from a cancelled prefix do not satisfy query completion."""
+    if re.search(r"(?m)^the engine did not finish within [0-9]+s\b", transcript):
+        raise TimeoutError("synthesis command exceeded its prepared deadline")
+
+
 DATATYPES = [
     "namespace FoldFixture",
     "set_option genSizeOf false in inductive Seq (α : Type) where | nil : Seq α | cons : α → Seq α → Seq α deriving DecidableEq",
@@ -402,6 +408,7 @@ def main():
                 validate_settings(transcript, source)
                 inventory = provider_inventory(transcript, case)
                 row["provider_inventory"] = inventory
+                require_completed_live_query(transcript)
                 result = parse_output(transcript, [case])[0]
                 row["synthesis"] = result
                 validate_candidate(result, case)

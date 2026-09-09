@@ -1,0 +1,257 @@
+{
+  "format": "function-carrier-native-integration-v1",
+  "status": "incomplete",
+  "dependency": "bfc3692e891ed2d81846fb2bd6b54ecd51aa7442",
+  "completed_gates": [
+    "unit",
+    "methods",
+    "method-controls",
+    "local-context"
+  ],
+  "not_run_gates": [
+    "extended-exference",
+    "nested-forall",
+    "signatures-djinn",
+    "signatures-exference"
+  ],
+  "counts": {
+    "unit_tests": 701,
+    "method_cells": 6,
+    "method_control_sessions": 9,
+    "local_context_cells": 39,
+    "exact_local_context_outputs": 18,
+    "recursor_passes": 9,
+    "recursor_failures": 3,
+    "deadline_tests": 4
+  },
+  "corrected_recursor_results": [
+    {
+      "name": "recursor_djinn_native_map",
+      "original_status": "passed",
+      "completed_within_command_deadline": true,
+      "audited_status": "passed",
+      "observations": [
+        "supplied behavioral assertion: 1 passed, 10 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_djinn_native_map-live.stdout.txt",
+        "sha256": "91eeca142f1a5c1e65ca986147c820d9b70dd61092e365b1289936757eff6faf"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_djinn_native_map-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_djinn_native_append",
+      "original_status": "passed",
+      "completed_within_command_deadline": true,
+      "audited_status": "passed",
+      "observations": [
+        "supplied behavioral assertion: 1 passed, 17 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_djinn_native_append-live.stdout.txt",
+        "sha256": "0170f7709f31d76b513a3820f49ca16862524397d6ba469cbfa756ed4f7e4788"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_djinn_native_append-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_djinn_native_length",
+      "original_status": "passed",
+      "completed_within_command_deadline": true,
+      "audited_status": "passed",
+      "observations": [
+        "supplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_djinn_native_length-live.stdout.txt",
+        "sha256": "9a4aef4d0389f82a95df309e80c8229e68cfc5f48e78e819890f6604c0134eb9"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_djinn_native_length-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_djinn_native_reject_all",
+      "original_status": "passed",
+      "completed_within_command_deadline": true,
+      "audited_status": "passed",
+      "observations": [
+        "supplied behavioral assertion: 0 passed, 87 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_djinn_native_reject_all-live.stdout.txt",
+        "sha256": "16ade91e661f66eafa9837aee12213e1fa0aa67622f4bd347f978e84d17c5a64"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_djinn_native_reject_all-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_exference_native_map",
+      "original_status": "passed",
+      "completed_within_command_deadline": true,
+      "audited_status": "passed",
+      "observations": [
+        "supplied behavioral assertion: 1 passed, 10 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_exference_native_map-live.stdout.txt",
+        "sha256": "1f6370f53b5d773f3d51fe87508939fdb7fa03273c6dcbb3c571db26217221e5"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_exference_native_map-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_exference_native_append",
+      "original_status": "failed",
+      "completed_within_command_deadline": false,
+      "audited_status": "failed",
+      "observations": [
+        "supplied behavioral assertion: 0 passed, 513 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_exference_native_append-live.stdout.txt",
+        "sha256": "cd01ba1a9f95f7c7d0f094d5a6a32a9f4f683b02498c4c7c4939bdd7fb29fcaa"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_exference_native_append-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_exference_native_length",
+      "original_status": "passed",
+      "completed_within_command_deadline": true,
+      "audited_status": "passed",
+      "observations": [
+        "supplied behavioral assertion: 1 passed, 25 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_exference_native_length-live.stdout.txt",
+        "sha256": "e2c2651072cff0a41ca65c95efbdbc7cfb0493fe687bdc00ec9623c5c4f635ce"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_exference_native_length-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_exference_native_reject_all",
+      "original_status": "passed",
+      "completed_within_command_deadline": false,
+      "audited_status": "failed",
+      "observations": [
+        "supplied behavioral assertion: 0 passed, 299 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_exference_native_reject_all-live.stdout.txt",
+        "sha256": "6d0183a07b2779dff822f21613baaa8bd7db19ad8cfd374f76373ad4ed11caba"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_exference_native_reject_all-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_both_native_map",
+      "original_status": "passed",
+      "completed_within_command_deadline": true,
+      "audited_status": "passed",
+      "observations": [
+        "supplied behavioral assertion: 1 passed, 18 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_both_native_map-live.stdout.txt",
+        "sha256": "d6e68a4f891c910701d2f77fa08601573792e994c26de6e919009687a3ab4642"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_both_native_map-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_both_native_append",
+      "original_status": "passed",
+      "completed_within_command_deadline": true,
+      "audited_status": "passed",
+      "observations": [
+        "supplied behavioral assertion: 1 passed, 31 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_both_native_append-live.stdout.txt",
+        "sha256": "b68815b1b9acec397afbc66da4cd6d6fb6793a38732b285f0e275d80d85e8334"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_both_native_append-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_both_native_length",
+      "original_status": "passed",
+      "completed_within_command_deadline": true,
+      "audited_status": "passed",
+      "observations": [
+        "supplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_both_native_length-live.stdout.txt",
+        "sha256": "2aee01923275c1ea0fc7380505f0577254588e3bf7983e113e1afa589ad5d6cc"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_both_native_length-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "recursor_both_native_reject_all",
+      "original_status": "passed",
+      "completed_within_command_deadline": false,
+      "audited_status": "failed",
+      "observations": [
+        "supplied behavioral assertion: 0 passed, 379 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+      ],
+      "stdout": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_both_native_reject_all-live.stdout.txt",
+        "sha256": "c8102d1cf8a9f18b28413fa289a5f06b30b2d0decc28ab2225c00e63106b9498"
+      },
+      "stderr": {
+        "path": "C:\\Leant\\dist-newstyle\\function-carrier-native-integration-v1\\native-recursor\\recursor_both_native_reject_all-live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "invalidated_pass_labels": [
+    "recursor_exference_native_reject_all",
+    "recursor_both_native_reject_all"
+  ],
+  "original_inputs_unchanged": true,
+  "archive": {
+    "path": "function-carrier-native-integration.zip",
+    "sha256": "13181410a3781a3ee990f57507560d73986222511eedda5c17752dd00aecde3e",
+    "bytes": 9032720,
+    "members": 6290,
+    "all_member_hashes_verified": true,
+    "hashed_artifacts": 6289,
+    "manifest_member": "manifest.json"
+  },
+  "boundaries": [
+    "This audit executes no synthesis and does not change original receipts.",
+    "Actual False observations from an expired command are not a completed False control.",
+    "The four completed integration gates remain accepted at their recorded inputs.",
+    "The committed dependency is not advanced; later integration gates were not run.",
+    "The corrected fixtures share one completion gate; the production deadline and synthesis limits are unchanged.",
+    "The correction was checked with four deadline tests and all twelve immutable recursor captures; no live rerun is claimed.",
+    "Both mode accepts append; standalone Exference append remains a command timeout.",
+    "This native failure does not invalidate the previously accepted canonical Haskell tree cell."
+  ]
+}
