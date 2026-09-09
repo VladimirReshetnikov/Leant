@@ -287,3 +287,5 @@ a forward-looking proposal rather than a dated record:
 - 2026-09-08 — [Further improvements after the native recursor gates pass](2026-09-08-synthesis-next-deliveries.md) — nine terminal integration gates, the original-bound 12/12 recursor matrix, bounded transfer checks, frontend gaps and the full Church behavioral target.
 
 - 2026-09-08 — [Completed native integration](2026-09-08-combined-native-integration.md) — all ten gates pass, both 350-signature native corpora replay, final inputs match, and Leant promotes the tested Djex dependency.
+- 2026-09-09 — [One-shot contextual output and retained specialization evidence](2026-09-09-one-shot-contextual-output.md)
+- 2026-09-09 — [Further improvements after one-shot contextual acceptance](2026-09-09-synthesis-after-one-shot-acceptance.md)

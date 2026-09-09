@@ -1,5 +1,9 @@
 # Further improvements after the contextual frontend investigation
 
+> Delivery order superseded by [the re-triage after one-shot acceptance](2026-09-09-synthesis-after-one-shot-acceptance.md). The dated investigation below remains historical evidence.
+
+> Subsequent canonical acceptance: [one-shot contextual output](2026-09-09-one-shot-contextual-output.md) closes the stated public matrix and certificate boundary. The deadline repair, remaining frontend forms, native integration and broader goals remain open.
+
 This September 9, 2026 assessment supersedes the delivery order in the
 [deadline/tree report](2026-09-09-synthesis-after-deadline-trace.md). The original
 priorities 1–4 and their completion requirements remain in force. The next

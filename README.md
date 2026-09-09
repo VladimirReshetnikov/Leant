@@ -75,7 +75,7 @@ Companion documents:
 - **[Behavioral assertions](docs/behavioral-synthesis.md)** — the new
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
-- **[Current synthesis re-triage](docs/reports/2026-09-09-synthesis-after-contextual-frontier.md)**
+- **[Current synthesis re-triage](docs/reports/2026-09-09-synthesis-after-one-shot-acceptance.md)**
   — close deadline and contextual-certificate validation, complete public output,
   advance the full Church/default matrix and bound the tree investigation;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
@@ -208,7 +208,7 @@ Companion documents:
   All ten integration gates and the final input-integrity check pass; Leant now
   pins the tested dependency. Earlier deadline failures remain recorded in the
   [historical report](docs/reports/2026-09-08-native-carrier-integration.md).
-  The [new tree/frontend re-triage](docs/reports/2026-09-09-synthesis-after-contextual-frontier.md)
+  The [new tree/frontend re-triage](docs/reports/2026-09-09-synthesis-after-one-shot-acceptance.md)
   records the subsequent native tree and Haskell `foldl1` transfer misses at
   their original limits. A native tree debug expression independently passes
   the full type and all 16 observations, but its live typed-candidate acceptance
@@ -216,10 +216,14 @@ Companion documents:
   traversal; no new Lean request occurs for about 79 seconds before timeout.
   The local deadline repair has nine completed integration gates, including
   705 unit tests and fresh method controls. The final Exference corpus remains
-  interrupted without terminal acceptance. Canonical one-shot frontend tests
-  pass 6/8 cases; the subsequent contextual-certificate extension is unvalidated.
-  The current order closes those gaps, completes public frontend coverage and
-  advances Church behavior, with a bounded independent tree investigation. The
+  interrupted without terminal acceptance. The canonical
+  [one-shot contextual increment](docs/reports/2026-09-09-one-shot-contextual-output.md) now passes
+  **2,371 tests in 16 suites**, **64 public queries** with exact output replay,
+  **350 signatures per Haskell engine**, and **13/13 Exference extended behaviors**.
+  It is separate from native acceptance; the tested Djex dependency remains pinned.
+  The current order closes deadline validation, integrates the accepted Djex
+  revision, completes remaining public frontend forms and advances Church behavior,
+  with a bounded tree investigation. The
   [Haskell implicit-signature REPL increment](docs/reports/2026-09-08-implicit-root-scope.md)
   now passes **361/361 tests**, including all **115 CLI tests**, and **350 Church
   signatures per Haskell engine**. It scopes contextual definitions with GHC
@@ -239,7 +243,7 @@ Companion documents:
   13/13 extended Church behavior and 350 signatures per Haskell engine; all
   2,309 tests in 15 complete suites pass across the documented runs, including
   a complete Length rerun after its test-only lifecycle repair. Native tree
-  acceptance remains open. The [current delivery order](docs/reports/2026-09-09-synthesis-after-contextual-frontier.md)
+  acceptance remains open. The [current delivery order](docs/reports/2026-09-09-synthesis-after-one-shot-acceptance.md)
   closes deadline and contextual-certificate validation, completes Haskell
   frontend gaps and advances Church behavior with a bounded tree investigation. The [combined verifier](docs/reports/2026-09-08-combined-behavioral-verification.md)
   remains covered by the now-passing recursor, fallback and method/cache gates.
@@ -250,7 +254,7 @@ Companion documents:
   estimates were rejected after losing Church composition.
   The committed dependency is `bfc3692e`. The full 13-operation/19-default coverage
   across engines is still open.
-  See the [current retriage and evidence boundaries](docs/reports/2026-09-09-synthesis-after-contextual-frontier.md).
+  See the [current retriage and evidence boundaries](docs/reports/2026-09-09-synthesis-after-one-shot-acceptance.md).
 - **Checked conditional providers in canonical Djex.** The
   [conditional-Given implementation](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)
   and [guarded nested-Given increment](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/docs/reports/2026-09-07-djinn-nested-givens.md)
@@ -649,7 +653,7 @@ queries across all three engines, and six independent candidate replays pass.
 That earlier full boundary run passed 619/620 tests; its one existing
 staged-search timeout passed an unchanged focused retry. Both historical
 receipts remain separate from the successful 647-test aggregate.
-The [implementation re-triage](docs/reports/2026-09-09-synthesis-after-contextual-frontier.md)
+The [implementation re-triage](docs/reports/2026-09-09-synthesis-after-one-shot-acceptance.md)
 tracks that boundary separately from forthcoming recursors, contextual
 dictionaries, and broader Church coverage.
 
