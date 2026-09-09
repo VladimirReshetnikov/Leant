@@ -1,0 +1,112 @@
+{
+  "status": "integration_passed",
+  "parent_status_at_snapshot": "passed",
+  "parent_snapshot_sha256": "eb38b46953b5bda0972e913e0a1f4042ea6c10375ee1de47b0e5f7726ecd5cf1",
+  "dependency": "3adfac5c57ad5e1bec77c598c647f6c8eb38e6e6",
+  "completed_gates": [
+    {
+      "gate": "unit",
+      "receipt_sha256": "be73280ffc54c66f79fdf9cbd2f691af1e18e1cf7370207bd4977e362f769d9e",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "methods",
+      "receipt_sha256": "27ed5cf2e4e50a5b6d919b330232f9f6e20578e98b64631b0be0799a10b98731",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "method-controls",
+      "receipt_sha256": "1d2a579c8df554a5b3dffc6843336889176581b6950632875fb834e0781dfba0",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "local-context",
+      "receipt_sha256": "c92cbb57dc9fb6ce60ed81da7510e912e36568f9e04f1c4c1028c94eebb04d2b",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "simplification",
+      "receipt_sha256": "df58e1b8af224a6a5072d21f82acae07f6517b8c3b51f34407bb4df5bbf48e36",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "native-recursor",
+      "receipt_sha256": "2e9567fa26201c4e50368cf56870adbc3b9531e8b8caa91fa065ef41f9ebc51e",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "extended-exference",
+      "receipt_sha256": "a0c128e87d88d94178d61cc636089b6d304c1de4ef30ca8de5cb40fdf33f0ae4",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "nested-forall",
+      "receipt_sha256": "5cec3531b1367684e93dee7b472bdcd293448f714b4ff028b3ec9f0e59431af8",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "signatures-djinn",
+      "receipt_sha256": "0fbbcc6a0d1a42403ff33687ed3f9035ff37e08bfed5d686898c999e7dd817d2",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "signatures-exference",
+      "receipt_sha256": "adad1113e11b59312b983bde9275a227d773e9e7ef4595a596d3692c7a14aa1f",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    }
+  ],
+  "pending_gates": [],
+  "strict_build": "passed -Werror",
+  "strict_build_receipt_sha256": "c430acdddd9831e27b4f08d40aee451ad35dfcaca894391853d8441c86ce3502",
+  "aggregate_accepted": true,
+  "frozen_inputs_match_at_packaging": true,
+  "counts": {
+    "unit_tests": 705,
+    "method_cells": 6,
+    "method_control_sessions": 9,
+    "local_context_cells": 39,
+    "simplification_queries": 15,
+    "recursor_cells": 12,
+    "recursor_exact_replays": 9,
+    "recursor_completed_false_controls": 3,
+    "extended_exference_operations": 13,
+    "extended_exference_false_controls": 1,
+    "nested_forall_cells": 9,
+    "native_signatures_per_completed_engine": 350
+  },
+  "boundaries": [
+    "All ten native gates are fresh terminal runs against the new dependency and rebuilt executables; no old executable receipt is reused.",
+    "The accepted request-deadline repair remains unchanged. Method-control source guards, query limits, capture format and independent replay checks remain enforced.",
+    "All ten gates are terminal passes and the final parent input-integrity check passed; there are no running child artifacts.",
+    "Source hashes were checked again while packaging; this is not another live synthesis run.",
+    "Native List recursors and type-signature coverage do not establish native tree or complete Church behavioral coverage.",
+    "This integrates the accepted canonical contextual milestone into Leant; it does not complete broader public syntax, provider evidence, native trees or the full 160-cell Church behavior target."
+  ],
+  "archive": {
+    "path": "one-shot-native-integration.zip",
+    "sha256": "3ad290c3456f5c0ac84c85a012f47f55b5d06ababc2181ff3c948b7268baa3b2",
+    "bytes": 11503901,
+    "artifact_count": 3747,
+    "all_members_rehashed": true
+  }
+}

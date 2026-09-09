@@ -190,7 +190,7 @@ Companion documents:
   replay, 28 oracle controls and a live False query pass. Strict builds, all
   **2,308 tests in 15 suites**, and **350 signatures per Haskell engine** pass.
   The [completed native integration](docs/reports/2026-09-08-combined-native-integration.md)
-  now promotes Leant's Djex dependency to the tested `bfc3692e`.
+  previously promoted Leant's Djex dependency to the tested `bfc3692e`.
   [Broader Church coverage](docs/reports/2026-09-07-priority4-behavioral-coverage.md)
   now includes fresh 13/13 Haskell Exference acceptance and historical
   separate-run 12/13 Haskell Djinn and 2/4 Exference explicit-default acceptance. Lean Exference's
@@ -222,17 +222,18 @@ Companion documents:
   [one-shot contextual increment](docs/reports/2026-09-09-one-shot-contextual-output.md) now passes
   **2,371 tests in 16 suites**, **64 public queries** with exact output replay,
   **350 signatures per Haskell engine**, and **13/13 Exference extended behaviors**.
-  It is separate from native acceptance; the tested Djex dependency remains pinned.
-  The current order integrates the accepted canonical Djex revision, completes
-  remaining public frontend forms and advances Church behavior, with a bounded
+  The [fresh native integration](docs/reports/2026-09-09-one-shot-native-integration.md) now promotes
+  the dependency to **`3adfac5c`** after a strict build and **all ten fresh gates**,
+  including **705 unit tests** and both **350-signature** kernel replays.
+  Remaining public frontend forms and Church behavior are next, with a bounded
   tree investigation. The
   [Haskell implicit-signature REPL increment](docs/reports/2026-09-08-implicit-root-scope.md)
   now passes **361/361 tests**, including all **115 CLI tests**, and **350 Church
   signatures per Haskell engine**. It scopes contextual definitions with GHC
   visible type patterns and preserves dictionary payloads in 40 exact positive
   replays. The strengthened synonym test distinguishes retained outer binders
-  from genuinely erased binders. Leant keeps its tested `bfc3692e` dependency
-  pending native integration of this frontend revision. The full Church behavior
+  from genuinely erased binders. The native integration above includes this
+  frontend revision in the tested `3adfac5c` dependency. The full Church behavior
   target and broader contextual evidence remain in the delivery queue.
   The [semantic provider filter](docs/reports/2026-09-08-semantic-auxiliary-providers.md)
   now excludes generated auxiliary eliminators while retaining ordinary user
@@ -246,15 +247,16 @@ Companion documents:
   2,309 tests in 15 complete suites pass across the documented runs, including
   a complete Length rerun after its test-only lifecycle repair. Native tree
   acceptance remains open. The [current delivery order](docs/reports/2026-09-09-synthesis-after-one-shot-acceptance.md)
-  closes deadline and contextual-certificate validation, completes Haskell
-  frontend gaps and advances Church behavior with a bounded tree investigation. The [combined verifier](docs/reports/2026-09-08-combined-behavioral-verification.md)
+  prioritizes remaining Haskell frontend forms and Church behavior after completed
+  deadline and native contextual integration, with a bounded tree investigation.
+  The [combined verifier](docs/reports/2026-09-08-combined-behavioral-verification.md)
   remains covered by the now-passing recursor, fallback and method/cache gates.
   The [ordinary Haskell contextual REPL delivery](docs/reports/2026-09-08-ordinary-contextual-output.md):
   36 explicit-forall public queries and 330 tests across four complete affected
-  suites pass at the documented fixture bounds. Implicit-root scope, one-shot
-  contextual commands and typed list rendering remain open. Broader search
-  estimates were rejected after losing Church composition.
-  The committed dependency is `bfc3692e`. The full 13-operation/19-default coverage
+  suites pass at the documented fixture bounds. The later implicit-root and
+  one-shot increments above extend that output coverage; typed list rendering
+  remains open. Broader search estimates were rejected after losing Church composition.
+  The committed dependency is `3adfac5c`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-09-synthesis-after-one-shot-acceptance.md).
 - **Checked conditional providers in canonical Djex.** The

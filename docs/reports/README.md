@@ -290,3 +290,4 @@ a forward-looking proposal rather than a dated record:
 - 2026-09-09 — [One-shot contextual output and retained specialization evidence](2026-09-09-one-shot-contextual-output.md)
 - 2026-09-09 — [Further improvements after one-shot contextual acceptance](2026-09-09-synthesis-after-one-shot-acceptance.md)
 - 2026-09-09 — [Complete request deadlines pass native integration](2026-09-09-request-deadline-integration.md)
+- 2026-09-09 — [Canonical contextual synthesis passes native integration](2026-09-09-one-shot-native-integration.md)

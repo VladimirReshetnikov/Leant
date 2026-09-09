@@ -1,6 +1,7 @@
 # Further improvements after one-shot contextual acceptance
 
-> Subsequent acceptance: [complete request deadlines](2026-09-09-request-deadline-integration.md) passes all ten native integration gates. Delivery 0 is closed; native integration of the accepted canonical Djex revision is next. The assessment below retains its dated evidence.
+> Subsequent acceptance: [native contextual integration](2026-09-09-one-shot-native-integration.md) passes all ten fresh gates and promotes Djex `3adfac5c`. Deliveries 0 and 1 are closed; remaining public forms and Church behaviors are next, with a bounded native tree investigation. The assessment below retains its dated evidence.
+
 
 This assessment supersedes the delivery order in the
 [contextual frontend investigation](2026-09-09-synthesis-after-contextual-frontier.md).
