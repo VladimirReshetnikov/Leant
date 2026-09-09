@@ -1,0 +1,39 @@
+{
+  "status": "diagnostic_checkpoint_not_acceptance",
+  "leant_base_commit": "530e780eca980e1b7b49b3c27bf526d7bedcf9c7",
+  "djex_commit": "ca7064278b22916a7888ef023a403bf93892db67",
+  "leant_dependency": "bfc3692e891ed2d81846fb2bd6b54ecd51aa7442",
+  "production_changes_uncommitted": [
+    "src/Leant/Backend.hs",
+    "test-unit/BackendTraceSpec.hs"
+  ],
+  "deadline_regressions": {
+    "baseline_failed": 3,
+    "fixed_passed": 3
+  },
+  "unit_tests": {
+    "status": "passed",
+    "count": 705
+  },
+  "integration": {
+    "status": "incomplete",
+    "methods": "passed",
+    "method_controls": "preflight_failed_before_sessions",
+    "reason": "request-capture backend differs from the frozen authority",
+    "remaining_gates": "unexecuted"
+  },
+  "tree": {
+    "status": "90_second_query_timeout",
+    "recorded_requests": 61,
+    "omitted_records": 0,
+    "dropped_events": 0,
+    "exact_previous_debug_expression_submitted": false,
+    "last_response_to_cleanup_seconds": 78.6473915,
+    "boundary": "Invocation trace is not typed graph or kernel acceptance."
+  },
+  "archive": "deadline-tree-retriage.zip",
+  "archive_sha256": "9dc94a0c0ea8f1533784059ef54dff985e68b094a69b942d1f2153b5f7e208ed",
+  "archive_bytes": 974364,
+  "artifacts_excluding_manifest": 98,
+  "all_archive_members_verified": true
+}

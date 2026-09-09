@@ -1,10 +1,9 @@
 # Re-triage after tree transfer and implicit-signature regression
 
-> Subsequent milestone: [implicit-signature scope](2026-09-08-implicit-root-scope.md)
-> now passes 361/361 tests and 350 signatures per Haskell engine. GHC retains
-> the vacuous outer synonym binder; the strengthened test preserves the
-> genuinely erased-binder guard. The failed checkpoint below is historical.
-> Next: native tree tracing, then remaining public frontend and Church behavior.
+> Execution order superseded by the [deadline/tree assessment](2026-09-09-synthesis-after-deadline-trace.md).
+> Implicit-signature REPL acceptance is complete; the tree trace has run.
+> Close deadline integration, then public frontend, bounded tree search
+> and the full Church behavior matrix.
 
 This September 8, 2026 update changes execution order within the active
 priorities 1–4. **Finish the implicit-signature correctness gate, trace the
