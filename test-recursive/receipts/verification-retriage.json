@@ -1,0 +1,46 @@
+{
+  "status": "diagnostic_only_no_new_acceptance",
+  "date": "2026-09-08 America/Los_Angeles",
+  "leant_base": "0ee6cfd2302c9caccbde473b25b274d3a049c821",
+  "working_djex": "bfc3692e891ed2d81846fb2bd6b54ecd51aa7442",
+  "committed_djex": "4a4ed0fc23f76d7b82b06496e03adfadbf374f84",
+  "archive": {
+    "path": "verification-retriage.zip",
+    "sha256": "0103cb9f65ecfcadd3ba4412ddc89720496e4c655898d41a7ca3c78976f17a63",
+    "bytes": 534066,
+    "artifacts": 40
+  },
+  "events_only": {
+    "command_status": "90_second_timeout",
+    "observations": [
+      "the engine did not finish within 90s \u2014 no answer, not a verdict",
+      "supplied behavioral assertion: 0 passed, 385 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    ],
+    "completed_requests_retained": 780,
+    "dropped_events": 8047,
+    "retained_request_seconds": 61.4719565,
+    "retained_read_seconds": 61.1842203,
+    "retained_send_seconds": 0.2355981,
+    "inputs_unchanged": true,
+    "boundary": "Unlabelled retained-tail sums, not whole-query attribution, kernel CPU, or established speedup."
+  },
+  "payload_trace": {
+    "status": "180_second_outer_guard",
+    "boundary": "Only startup snapshot retained; no valid whole-command phase attribution."
+  },
+  "combined_prototype": {
+    "status": "unaccepted_live_environment_failure",
+    "strict_build": "passed",
+    "tag_decoder_focused_test": "passed",
+    "live_queries": 3,
+    "live_observations": [
+      "supplied behavioral assertion: 0 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)",
+      "supplied behavioral assertion: 0 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)",
+      "supplied behavioral assertion: 0 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    ],
+    "inputs_unchanged": true,
+    "environment_failure": "WithoutLean.lean rejects unknown namespace Command and requires import Lean.Elab.Command. Exact live user environment must be preserved.",
+    "boundary": "Driver captured status and exit zero do not establish behavioral acceptance. No full unit run or native recursor speedup at this prototype."
+  },
+  "policy": "No production prototype source or dependency promotion in this documentation milestone."
+}
