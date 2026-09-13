@@ -36,6 +36,12 @@ There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.github
 — an overview and tutorial, with a detailed tour of `:synth`
 ([LaTeX source](docs/Leant_Overview/Leant_Overview.tex)).
 
+The [Church behavior ledger](test-church/behavior-ledger.md) now enumerates all
+160 operation/mode cells. Its selected pinned receipts record 40 historical
+acceptances, four cells with attempts but no indexed acceptance, and 116 cells
+without indexed evidence. These counts do not establish current-revision
+acceptance or prove that an unindexed cell was never attempted.
+
 ## Contents
 
 - [Highlights](#highlights)

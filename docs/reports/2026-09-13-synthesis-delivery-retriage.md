@@ -1,5 +1,7 @@
 # Synthesis delivery re-triage: coverage, scoped evidence and bounded search
 
+> Delivered follow-up: the [160-cell ledger](../../test-church/behavior-ledger.md) and its pinned-receipt generator are implemented. The initial catalog records 40 historically accepted cells, four attempted without indexed acceptance and 116 without indexed evidence. These are not current validation counts. Missing behavior batches are the next capability work.
+
 The next improvement should advance the missing Church behaviors. Build the complete receipt-derived coverage ledger first, then deliver small behavior batches while keeping contextual-constructor acceptance and dictionary-selection repair as separately tracked work. The expanded constructor matrix must no longer be a prerequisite for every independent delivery. This changes the execution order in the [previous assessment](2026-09-12-synthesis-after-contextual-constructor-probes.md); it preserves the active priorities 1–4 and their full completion requirements.
 
 ## Evidence behind the change

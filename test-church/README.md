@@ -1,5 +1,9 @@
 # Church synthesis acceptance in Lean
 
+The [complete 160-cell behavior ledger](behavior-ledger.md) indexes historical
+receipt evidence separately from current validation. See the [maintenance guide](https://github.com/VladimirReshetnikov/Djex/blob/main/test-church/behavior-ledger-guide.md)
+for regeneration, pinned inputs and the meaning of unindexed cells.
+
 The [nested-result graph check](../docs/reports/2026-09-08-nested-forall-graphs.md)
 passes nine native cells independently of the broader Church behavior matrix.
 To rerun it against a built executable, use
