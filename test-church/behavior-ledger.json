@@ -2,13 +2,13 @@
   "schema": "church-behavior-ledger-v1",
   "scope": "13 extended and 19 supplied-default operations across five language/engine modes",
   "validation": "offline pinned-receipt indexing; no synthesis or compiler replay performed",
-  "catalog_scope": "Selected principal P4 receipts: original Haskell extended/default batches, native-Int corrections, focused Exference acceptance, the latest published native Exference integration, and the 2026-09-13 supplied-default selector batches in both languages. Not an exhaustive index of all historical experiments. No indexed evidence does not mean never attempted. Collection order is not a timestamp or latest-run claim.",
+  "catalog_scope": "Selected principal P4 receipts and September 13 selector follow-ups, including the failed native last attempt and its passing working-source renderer follow-up. Not an exhaustive index of all historical experiments. No indexed evidence does not mean never attempted. Collection order is not a timestamp or current-revision validation claim.",
   "current_complete": false,
   "cell_count": 160,
   "historical_counts": {
-    "acceptance_recorded": 60,
+    "acceptance_recorded": 68,
     "attempts_without_recorded_acceptance": 4,
-    "no_recorded_evidence": 96
+    "no_recorded_evidence": 88
   },
   "sources": {
     "haskell-djinn-first-six": {
@@ -613,6 +613,192 @@
         },
         {
           "pointer": "/cells/14",
+          "recorded_status": "passed"
+        }
+      ]
+    },
+    "haskell-last-atkey-2026-09-13": {
+      "source": {
+        "repo": "Djex",
+        "path": "test-church/receipts/supplied-default-last-atkey-haskell-2026-09-13.zip",
+        "sha256": "a6af06e43c00b1bbb3ce2bc7b51776fba64b951b5bebef8e820aa609532b6655",
+        "member": "run/results.json",
+        "member_sha256": "9a345ca92049dda72417e519f25a22879491c519159bd2b9077895bef942d7e1"
+      },
+      "rows": "/cells",
+      "metadata_pointers": {
+        "settings": "/settings",
+        "runtime": "/executable_hashes",
+        "sources": "/source_hashes",
+        "controls": "/oracle_controls"
+      },
+      "recorded_metadata": {
+        "settings": {
+          "value_sha256": "279dfa3a58545daa252d29503b43ace30ec7481174c7b03e8bd551455485dd12",
+          "recorded_value": {
+            "djinn": {
+              "window": 65536,
+              "budget": 500000,
+              "djinn_strategy": "interleave",
+              "steps": 100000,
+              "process_timeout": 300.0,
+              "queue": 8192
+            },
+            "exference": {
+              "window": 256,
+              "budget": 100000,
+              "djinn_strategy": "depth-first",
+              "steps": 100000,
+              "process_timeout": 300.0,
+              "queue": 8192
+            }
+          }
+        },
+        "runtime": {
+          "value_sha256": "6c2f2689e8cdd1f4eb4e20a20b836f883119c2d6a765799f57d73b60f9aae09b",
+          "recorded_value": {
+            "C:\\Djex\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\djex-2026.7.17\\x\\djex\\build\\djex\\djex.exe": "84b0efa9539304e23d461ebe780841295fe3f1dd7c2a530e79199040f66b92c6",
+            "C:\\ghcup\\bin\\ghc.exe": "7c55e201f71860c5babea886007c8fa44b861abf50d1c07e5677eb0bda387a70"
+          }
+        },
+        "sources": {
+          "value_sha256": "99e61a772bbae25d22aafede72e9d4ab2fff6a4893839ca810314261d948b388"
+        },
+        "controls": {
+          "value_sha256": "738ddeecec45c7b8e6924309fd8cf48304b262c834bda41accb2159df1fd5945"
+        }
+      },
+      "control_rows": [
+        {
+          "pointer": "/cells/2",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/5",
+          "recorded_status": "passed"
+        }
+      ]
+    },
+    "lean-last-atkey-before-witness-2026-09-13": {
+      "source": {
+        "repo": "Leant",
+        "path": "test-church/receipts/supplied-default-last-atkey-native-2026-09-13.zip",
+        "sha256": "ee69c04a246435d6ee212d5164840b6615a2509c0682f1dcfc700095dd8f9f4f",
+        "member": "run/results.json",
+        "member_sha256": "e65750a7d0b59cb85eb7cade7fc1e4431f8e16266ac2b5ebdd40d275aafa9716"
+      },
+      "rows": "/cells",
+      "metadata_pointers": {
+        "settings": "/settings",
+        "runtime": "/executable_hashes",
+        "sources": "/source_hashes",
+        "controls": "/oracle_controls"
+      },
+      "recorded_metadata": {
+        "settings": {
+          "value_sha256": "bde57e7f51dba0f411512a4d03f9f636a2242c9b8b8a7547e6fbc676d8ab1f0d",
+          "recorded_value": {
+            "window": 65536,
+            "verify": 65536,
+            "shown": 1,
+            "ranking": "balanced",
+            "djinn_strategy": "interleave",
+            "djinn_choice_budget": 500000,
+            "exference_steps": 100000,
+            "command_timeout_seconds": 90,
+            "separate_process_guard_seconds": 900.0
+          }
+        },
+        "runtime": {
+          "value_sha256": "dd10af688ddf99e6883e203df6890f5e332b4953aa31d39fbd460826ff8c02ab",
+          "recorded_value": {
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe": "790185a4b56e255ee2adb479b3c73d8a342cf443a6eae0742eb6750d5786e66e",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe": "937918675ff15139816bbe2a4f6168fb8b36ea0e0990664311f4902cbce0f6f2",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe": "cf11cebeea855a47477a2648e2b8c10b11b7364e040e499d9cc5e015bfbaa0a2",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe": "7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a"
+          }
+        },
+        "sources": {
+          "value_sha256": "e7c4203356c6ed9d319527f5069b42e3b3283d6df75f34b0e02e58d9cb50673c"
+        },
+        "controls": {
+          "value_sha256": "98d171827193e6a9071441461f7255fc65f13c9f9b70e156313b368d59588ced"
+        }
+      },
+      "control_rows": [
+        {
+          "pointer": "/cells/2",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/5",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/8",
+          "recorded_status": "passed"
+        }
+      ]
+    },
+    "lean-last-atkey-working-witness-2026-09-13": {
+      "source": {
+        "repo": "Leant",
+        "path": "test-church/receipts/trailing-type-witness-working-2026-09-13.zip",
+        "sha256": "d5703deead9d93f25848382adfc8162207d295d152138b2a52402a7326b3c121",
+        "member": "run/results.json",
+        "member_sha256": "b01f68369ce677bcb3d23f19a45e3d1e444b40e14531463681cc75654b5218fa"
+      },
+      "rows": "/cells",
+      "metadata_pointers": {
+        "settings": "/settings",
+        "runtime": "/executable_hashes",
+        "sources": "/source_hashes",
+        "controls": "/oracle_controls"
+      },
+      "recorded_metadata": {
+        "settings": {
+          "value_sha256": "bde57e7f51dba0f411512a4d03f9f636a2242c9b8b8a7547e6fbc676d8ab1f0d",
+          "recorded_value": {
+            "window": 65536,
+            "verify": 65536,
+            "shown": 1,
+            "ranking": "balanced",
+            "djinn_strategy": "interleave",
+            "djinn_choice_budget": 500000,
+            "exference_steps": 100000,
+            "command_timeout_seconds": 90,
+            "separate_process_guard_seconds": 900.0
+          }
+        },
+        "runtime": {
+          "value_sha256": "fc4177f7ebd6096940b6f4acf32726673bfe5c7720defe667e187baf26ac64e5",
+          "recorded_value": {
+            "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe": "e75781a7c629803c56479112ee9df34e0a78032f0c63f9879ae4ccccc7abd9b5",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe": "937918675ff15139816bbe2a4f6168fb8b36ea0e0990664311f4902cbce0f6f2",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe": "cf11cebeea855a47477a2648e2b8c10b11b7364e040e499d9cc5e015bfbaa0a2",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe": "7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a"
+          }
+        },
+        "sources": {
+          "value_sha256": "fe69863508403a9a61ac84479fb85d61cdb6256c81a62d400fd07b40e519a0d7"
+        },
+        "controls": {
+          "value_sha256": "3a56990acab35a6ec8a380c5346e6123d4a60b472cadfe2f84dd3c205b424db8"
+        }
+      },
+      "control_rows": [
+        {
+          "pointer": "/cells/2",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/5",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/8",
           "recorded_status": "passed"
         }
       ]
@@ -1976,8 +2162,17 @@
       "source_case_id": "church_case_031",
       "partiality": "supplied_default",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "haskell-last-atkey-2026-09-13",
+          "pointer": "/cells/0",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/0/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "supplied_default/last/haskell/exference",
@@ -1996,6 +2191,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/runs/2/cells/0/replay"
+        },
+        {
+          "collection": "haskell-last-atkey-2026-09-13",
+          "pointer": "/cells/3",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/3/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2009,8 +2212,25 @@
       "source_case_id": "church_case_031",
       "partiality": "supplied_default",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-last-atkey-before-witness-2026-09-13",
+          "pointer": "/cells/0",
+          "recorded_outcome": "failed_unclassified",
+          "recorded_status": "failed",
+          "recorded_classification": null,
+          "replay_pointer": null
+        },
+        {
+          "collection": "lean-last-atkey-working-witness-2026-09-13",
+          "pointer": "/cells/0",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/0/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "supplied_default/last/lean/exference",
@@ -2021,8 +2241,25 @@
       "source_case_id": "church_case_031",
       "partiality": "supplied_default",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-last-atkey-before-witness-2026-09-13",
+          "pointer": "/cells/3",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/3/replay"
+        },
+        {
+          "collection": "lean-last-atkey-working-witness-2026-09-13",
+          "pointer": "/cells/3",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/3/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "supplied_default/last/lean/both",
@@ -2033,8 +2270,25 @@
       "source_case_id": "church_case_031",
       "partiality": "supplied_default",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-last-atkey-before-witness-2026-09-13",
+          "pointer": "/cells/6",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/6/replay"
+        },
+        {
+          "collection": "lean-last-atkey-working-witness-2026-09-13",
+          "pointer": "/cells/6",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/6/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "supplied_default/at/haskell/djinn",
@@ -2935,8 +3189,17 @@
       "source_case_id": "church_case_248",
       "partiality": "supplied_default",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "haskell-last-atkey-2026-09-13",
+          "pointer": "/cells/1",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/1/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "supplied_default/atKey/haskell/exference",
@@ -2955,6 +3218,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/runs/2/cells/3/replay"
+        },
+        {
+          "collection": "haskell-last-atkey-2026-09-13",
+          "pointer": "/cells/4",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/4/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2968,8 +3239,25 @@
       "source_case_id": "church_case_248",
       "partiality": "supplied_default",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-last-atkey-before-witness-2026-09-13",
+          "pointer": "/cells/1",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/1/replay"
+        },
+        {
+          "collection": "lean-last-atkey-working-witness-2026-09-13",
+          "pointer": "/cells/1",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/1/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "supplied_default/atKey/lean/exference",
@@ -2980,8 +3268,25 @@
       "source_case_id": "church_case_248",
       "partiality": "supplied_default",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-last-atkey-before-witness-2026-09-13",
+          "pointer": "/cells/4",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/4/replay"
+        },
+        {
+          "collection": "lean-last-atkey-working-witness-2026-09-13",
+          "pointer": "/cells/4",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/4/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "supplied_default/atKey/lean/both",
@@ -2992,8 +3297,25 @@
       "source_case_id": "church_case_248",
       "partiality": "supplied_default",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-last-atkey-before-witness-2026-09-13",
+          "pointer": "/cells/7",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/7/replay"
+        },
+        {
+          "collection": "lean-last-atkey-working-witness-2026-09-13",
+          "pointer": "/cells/7",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/7/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "supplied_default/reduce/haskell/djinn",

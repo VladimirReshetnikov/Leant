@@ -1,5 +1,7 @@
 # Synthesis delivery re-triage: coverage, scoped evidence and bounded search
 
+> Remaining-selector follow-up: the [last/atKey evidence and trailing-type repair](2026-09-13-trailing-type-witness-frontier.md) bring the ledger to 68 historically accepted cells. The captured Lean Djinn last miss is repaired in a fresh working-source run; isolated renderer validation is pending before publication. Reductions and the other implementation obligations remain next.
+
 > Native selector follow-up: all [twelve matching Lean selector cells](2026-09-13-native-supplied-default-selectors.md) pass, completing those four operations across all five modes. The ledger now records 60 historically accepted cells, four attempted without indexed acceptance and 96 without indexed evidence. Remaining selectors and reductions are next; the other implementation obligations stay open.
 
 > Capability follow-up: the [eight Haskell supplied-default selector cells](2026-09-13-supplied-default-selectors.md) pass live synthesis and exact replay. The ledger now records 48 historically accepted cells, four attempted without indexed acceptance and 108 without indexed evidence. Matching Lean selectors and other missing behavior batches remain next.

@@ -21,7 +21,7 @@ See `behavior-ledger.json` for individual receipt pointers, hashes, limits and r
 | extended | numeralSuccessor | A | A | ? | A | ? |
 | extended | numeralAdd | A | A | ? | A | ? |
 | supplied_default | head | A | A | A | A | A |
-| supplied_default | last | ? | A | ? | ? | ? |
+| supplied_default | last | A | A | A | A | A |
 | supplied_default | at | F | F | ? | ? | ? |
 | supplied_default | foldl1 | ? | F | ? | ? | ? |
 | supplied_default | foldr1 | ? | ? | ? | ? | ? |
@@ -34,7 +34,7 @@ See `behavior-ledger.json` for individual receipt pointers, hashes, limits and r
 | supplied_default | minimumOn | ? | ? | ? | ? | ? |
 | supplied_default | minMaxBy | ? | ? | ? | ? | ? |
 | supplied_default | minmaxElement | ? | ? | ? | ? | ? |
-| supplied_default | atKey | ? | A | ? | ? | ? |
+| supplied_default | atKey | A | A | A | A | A |
 | supplied_default | reduce | ? | ? | ? | ? | ? |
 | supplied_default | maximum | ? | ? | ? | ? | ? |
 | supplied_default | minimum | ? | ? | ? | ? | ? |

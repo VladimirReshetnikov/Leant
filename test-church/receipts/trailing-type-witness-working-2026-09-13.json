@@ -1,0 +1,58 @@
+{
+  "schema": "church-supplied-default-last-atkey-native-v1",
+  "status": "behavior_batch_passed_working_source",
+  "production_release_accepted": false,
+  "source_base_commit": "d2e5473e1cbabfc36094cd84c651a9793e4fbc68",
+  "dependency_commit": "c1ad560e106f59df07d1a32c3b51158ef749fc99",
+  "production_changes_uncommitted": true,
+  "scope": "last and atKey with supplied defaults in Lean Djinn, Exference and Both",
+  "counts": {
+    "attempted_synthesis_cells": 6,
+    "accepted_synthesis_cells": 6,
+    "exact_candidate_replays": 6,
+    "finite_observations_by_operation": {
+      "last": 24,
+      "atKey": 54
+    },
+    "actual_false_queries": 3,
+    "false_falsifications_by_engine": {
+      "djinn": 623,
+      "exference": 299,
+      "both": 662
+    },
+    "independent_oracle_modules": 2,
+    "empty_candidate_replay_inventories": 90,
+    "owned_processes": 17,
+    "frozen_source_files": 437
+  },
+  "settings": {
+    "window": 65536,
+    "verify": 65536,
+    "shown": 1,
+    "ranking": "balanced",
+    "djinn_strategy": "interleave",
+    "djinn_choice_budget": 500000,
+    "exference_steps": 100000,
+    "command_timeout_seconds": 90,
+    "separate_process_guard_seconds": 900.0
+  },
+  "sources_and_runtimes_unchanged": true,
+  "all_owned_processes_exit_zero": true,
+  "strict_build": "passed -Werror",
+  "raw_receipt_member": "run/results.json",
+  "archive": {
+    "path": "trailing-type-witness-working-2026-09-13.zip",
+    "sha256": "d5703deead9d93f25848382adfc8162207d295d152138b2a52402a7326b3c121",
+    "bytes": 3159684,
+    "artifact_count": 506,
+    "all_members_rehashed": true
+  },
+  "boundaries": [
+    "All six working-tree cells pass at original limits; isolated production validation is a separate pending gate.",
+    "A bounded trailing-type witness repairs the captured Lean Djinn last elaboration failure; other contextual-constructor changes remain uncommitted.",
+    "The accepted production dependency is not promoted by this receipt.",
+    "Default arguments totalize the agreed counterparts; the original partial signatures are not declared total.",
+    "All synthesized implementations have empty axiom inventories; only the exact atKey observer and its oracle proof carry the documented String.length dependencies.",
+    "Finite observations do not establish universal extensional equivalence."
+  ]
+}

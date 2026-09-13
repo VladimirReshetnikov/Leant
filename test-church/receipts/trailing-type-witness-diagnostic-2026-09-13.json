@@ -1,0 +1,14 @@
+{
+  "status": "kernel_diagnostic_not_synthesis_acceptance",
+  "original_variants": {
+    "Replay1.lean": "universe constraint failure",
+    "Replay2.lean": "unsolved type placeholder and binder inference"
+  },
+  "directed_diagnostic": "Unit at the trailing local type argument passes original type and observations with empty inventories",
+  "archive": {
+    "path": "trailing-type-witness-diagnostic-2026-09-13.zip",
+    "sha256": "72aa685f15b94fb14a1f0bdcdd1e683bc32faf1c3937dc9a923d1cce0d1f90c9",
+    "bytes": 7451,
+    "artifact_count": 12
+  }
+}

@@ -37,14 +37,18 @@ There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.github
 ([LaTeX source](docs/Leant_Overview/Leant_Overview.tex)).
 
 The [Church behavior ledger](test-church/behavior-ledger.md) now enumerates all
-160 operation/mode cells. Its selected pinned receipts record 60 historical
-acceptances, four cells with attempts but no indexed acceptance, and 96 cells
+160 operation/mode cells. Its selected pinned receipts record 68 historical
+acceptances, four cells with attempts but no indexed acceptance, and 88 cells
 without indexed evidence. These counts do not establish current-revision
 acceptance or prove that an unindexed cell was never attempted.
 The [supplied-default selector acceptance](docs/reports/2026-09-13-native-supplied-default-selectors.md)
 now covers `head`, `fromJust`, `fromLeft` and `fromRight` in both Haskell engines
 and all three Lean modes: 20 cells with exact replay and actual False controls.
 The twelve Lean replays preserve the full types and have empty axiom inventories.
+The [remaining-selector follow-up](docs/reports/2026-09-13-trailing-type-witness-frontier.md)
+records Haskell `last`/`atKey` acceptance and a working Lean renderer repair that
+closes the native `last` miss at unchanged limits. Isolated validation of that
+renderer change is still required before code publication.
 
 ## Contents
 
