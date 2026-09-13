@@ -802,6 +802,68 @@
           "recorded_status": "passed"
         }
       ]
+    },
+    "lean-last-atkey-isolated-witness-2026-09-13": {
+      "source": {
+        "repo": "Leant",
+        "path": "test-church/receipts/trailing-type-witness-isolated-2026-09-13.zip",
+        "sha256": "d0e00042fe387c52777c1b7a0439a84b8f8ac3d11a0b74f5a509a9782f6f2e10",
+        "member": "last-atkey/results.json",
+        "member_sha256": "aaab262e2e16fd4c12f6cd5620fad37194f8c5213b26c8b6c67c9a1d9e527219"
+      },
+      "rows": "/cells",
+      "metadata_pointers": {
+        "settings": "/settings",
+        "runtime": "/executable_hashes",
+        "sources": "/source_hashes",
+        "controls": "/oracle_controls"
+      },
+      "recorded_metadata": {
+        "settings": {
+          "value_sha256": "bde57e7f51dba0f411512a4d03f9f636a2242c9b8b8a7547e6fbc676d8ab1f0d",
+          "recorded_value": {
+            "window": 65536,
+            "verify": 65536,
+            "shown": 1,
+            "ranking": "balanced",
+            "djinn_strategy": "interleave",
+            "djinn_choice_budget": 500000,
+            "exference_steps": 100000,
+            "command_timeout_seconds": 90,
+            "separate_process_guard_seconds": 900.0
+          }
+        },
+        "runtime": {
+          "value_sha256": "1c15365e8154d389c1c45a241041d4d6fef14ef222e4395be3683da4daa91ecb",
+          "recorded_value": {
+            "C:\\Leant-validation\\trailing-type-witness\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe": "609f8f42b5d43ea84f2bff9ba41b6942d21a9c3ee954bdb29cfb96cfe36f5347",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe": "937918675ff15139816bbe2a4f6168fb8b36ea0e0990664311f4902cbce0f6f2",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe": "cf11cebeea855a47477a2648e2b8c10b11b7364e040e499d9cc5e015bfbaa0a2",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe": "7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a"
+          }
+        },
+        "sources": {
+          "value_sha256": "60915ade9d5fc2243dfc4d4ad2bef614fb19adff9bacccb88d3a12f6ab45695d"
+        },
+        "controls": {
+          "value_sha256": "4ce8ab52a1b059c9b1045a8c859ea6e64d1d106d9fabecb56a87b4acdc28d577"
+        }
+      },
+      "control_rows": [
+        {
+          "pointer": "/cells/2",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/5",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/8",
+          "recorded_status": "passed"
+        }
+      ]
     }
   },
   "cells": [
@@ -2228,6 +2290,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/0/replay"
+        },
+        {
+          "collection": "lean-last-atkey-isolated-witness-2026-09-13",
+          "pointer": "/cells/0",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/0/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2257,6 +2327,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/3/replay"
+        },
+        {
+          "collection": "lean-last-atkey-isolated-witness-2026-09-13",
+          "pointer": "/cells/3",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/3/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2281,6 +2359,14 @@
         },
         {
           "collection": "lean-last-atkey-working-witness-2026-09-13",
+          "pointer": "/cells/6",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/6/replay"
+        },
+        {
+          "collection": "lean-last-atkey-isolated-witness-2026-09-13",
           "pointer": "/cells/6",
           "recorded_outcome": "historical_accepted",
           "recorded_status": "passed",
@@ -3255,6 +3341,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/1/replay"
+        },
+        {
+          "collection": "lean-last-atkey-isolated-witness-2026-09-13",
+          "pointer": "/cells/1",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/1/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -3284,6 +3378,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/4/replay"
+        },
+        {
+          "collection": "lean-last-atkey-isolated-witness-2026-09-13",
+          "pointer": "/cells/4",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/4/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -3308,6 +3410,14 @@
         },
         {
           "collection": "lean-last-atkey-working-witness-2026-09-13",
+          "pointer": "/cells/7",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/7/replay"
+        },
+        {
+          "collection": "lean-last-atkey-isolated-witness-2026-09-13",
           "pointer": "/cells/7",
           "recorded_outcome": "historical_accepted",
           "recorded_status": "passed",

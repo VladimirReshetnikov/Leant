@@ -246,13 +246,19 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
           | force <- [False, True]
           ]
     -- Preserve each bounded provider-assignment choice independently in each
-    -- universe-domain lane. Insensitive spellings collapse in the final nub.
+    -- universe-domain lane. All established fitting/style variants precede
+    -- closed trailing-type fallbacks, so those fallbacks cannot displace the
+    -- existing prefix at the lane cap. Insensitive spellings collapse in nub.
     lanes <- mapM
       (\visibleBinderDomain -> do
-        cohorts <- mapM
-          (mapM (uncurry (variantsFor visibleBinderDomain))) fittedCohorts
-        pure $ take visibleBinderDomainVariantLimit $
-          nub (concatMap roundRobin cohorts))
+        passes <- mapM
+          (\trailingType -> do
+            cohorts <- mapM
+              (mapM (uncurry (variantsFor visibleBinderDomain trailingType)))
+              fittedCohorts
+            pure (concatMap roundRobin cohorts))
+          ["_", "_root_.Unit"]
+        pure $ take visibleBinderDomainVariantLimit $ nub (concat passes))
       visibleBinderDomains
     case nub $ concat lanes of
       [] -> Left "no renderable variant"
@@ -283,7 +289,7 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
       Case scrutinee alternatives -> scrutinee : map snd alternatives
       _ -> []
 
-  variantsFor visibleBinderDomain selectedProviders fitted = do
+  variantsFor visibleBinderDomain trailingType selectedProviders fitted = do
     let (expr, domPairs) = roleRename fitted
         doms = Map.fromList domPairs
         sites = countSites doms expr
@@ -297,13 +303,22 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
         -- qualified fallback; verification keeps the first that
         -- elaborates
         styles = [Idiomatic, Explicit]
-    concat <$> mapM
-      (\set -> mapM
-        (\style ->
-          render cm selectedProviders typeNames style visibleBinderDomain
-            doms 0 (markSites doms set expr))
-        styles)
-      sets
+    -- A transported polytype can exceed the goal's Lean universe, while
+    -- monomorphic reconstruction with @_@ may leave its result type wholly
+    -- unconstrained (for example, an ignored accumulator argument). Retain
+    -- the inferred spellings first, then offer one closed Type witness only
+    -- at the already selected trailing-instantiation sites. Explicit source
+    -- type arguments, provider assignments and mid-spine holes are unchanged.
+    -- These remain target-language proposals requiring full kernel checking;
+    -- the existing per-domain variant cap still bounds the combined list.
+    if trailingType /= "_" && sites == 0 then pure [] else
+      concat <$> mapM
+        (\set -> mapM
+          (\style ->
+            render cm selectedProviders typeNames style visibleBinderDomain trailingType
+              doms 0 (markSites doms set expr))
+          styles)
+        sets
 
   roundRobin rows = case [(item, rest) | item : rest <- rows] of
     [] -> []
@@ -2075,10 +2090,10 @@ visibleBinderDomainVariantLimit :: Int
 visibleBinderDomainVariantLimit = maximumProviderInstantiationAssignments
 
 render
-  :: CtorMap -> ProviderMap -> TypeMap -> Style -> VisibleBinderDomain
+  :: CtorMap -> ProviderMap -> TypeMap -> Style -> VisibleBinderDomain -> String
   -> Map.Map String Frag
   -> Int -> Expression String -> Either String String
-render cm providers typeNames style visibleBinderDomain doms = go
+render cm providers typeNames style visibleBinderDomain trailingType doms = go
  where
   go :: Int -> Expression String -> Either String String
   go req expr = case explicitMixedSpine expr of
@@ -2221,7 +2236,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
         trailing = case Map.lookup key doms of
           Just frag | instantiate -> trailingAlls frag (length argTxts)
           _ -> 0
-        parts = name : woven ++ replicate trailing "_"
+        parts = name : woven ++ replicate trailing trailingType
     in case parts of
       [only] -> Right (at req 2 only)
       _ -> Right (at req 1 (unwords parts))

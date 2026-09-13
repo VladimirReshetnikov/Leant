@@ -1,0 +1,53 @@
+{
+  "schema": "leant-trailing-type-witness-isolated-v1",
+  "status": "passed",
+  "scope": "Isolated trailing-type renderer repair; separate contextual-constructor changes excluded.",
+  "source_base_commit": "d2e5473e1cbabfc36094cd84c651a9793e4fbc68",
+  "dependency_commit": "c1ad560e106f59df07d1a32c3b51158ef749fc99",
+  "counts": {
+    "unit_tests": 707,
+    "accepted_behavior_cells": 6,
+    "false_controls": 3,
+    "false_falsifications_by_engine": {
+      "djinn": 581,
+      "exference": 299,
+      "both": 915
+    },
+    "signature_replays_by_engine": {
+      "djinn": 350,
+      "exference": 350
+    },
+    "frozen_source_files": 437
+  },
+  "strict_build": "passed -Werror",
+  "renderer_contract_checks": [
+    {
+      "name": "provider-original",
+      "expected_exit_code": 0,
+      "exit_code": 0,
+      "source_sha256": "1df8ec5d4a061db2a980bda1fff8698ddcd4ac2c37bb87fa5ed69540b0144637"
+    },
+    {
+      "name": "provider-unit-rejected",
+      "expected_exit_code": 1,
+      "exit_code": 1,
+      "source_sha256": "a6df87fb041b4ca00d571d86a4a5761f9910d93b570ed28360244acd358fe44b"
+    }
+  ],
+  "sources_and_runtimes_unchanged": true,
+  "raw_receipt_member": "results.json",
+  "behavior_receipt_member": "last-atkey/results.json",
+  "archive": {
+    "path": "trailing-type-witness-isolated-2026-09-13.zip",
+    "sha256": "d0e00042fe387c52777c1b7a0439a84b8f8ac3d11a0b74f5a509a9782f6f2e10",
+    "bytes": 3431560,
+    "artifact_count": 548,
+    "all_members_rehashed": true
+  },
+  "boundaries": [
+    "All displayed candidates are independently replayed at full types; finite observations do not establish extensional equivalence.",
+    "The deliberately invalid Unit provider variant is rejected; its nonzero kernel exit is an expected negative check.",
+    "The earlier failed 705/707 run is retained separately in previous-attempt.",
+    "No contextual-constructor change or dependency promotion is accepted by these checks."
+  ]
+}

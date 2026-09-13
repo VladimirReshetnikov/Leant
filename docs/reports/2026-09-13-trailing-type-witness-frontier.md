@@ -1,5 +1,7 @@
 # Remaining selectors and a trailing-type rendering repair
 
+> Accepted follow-up: the [isolated renderer release](2026-09-13-trailing-type-witness-acceptance.md) passes the strict build, all 707 unit tests, all six behavior cells and three False controls, and both 350-signature replay corpora. The earlier diagnostic and unsuccessful first release attempt below remain historical evidence.
+
 Both Haskell engines accept the supplied-default `last` and `atKey` fixtures
 at their original limits. The first matching Lean run accepts five of six
 positives: Djinn's `last` reaches its 90-second command deadline without an

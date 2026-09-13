@@ -25667,8 +25667,12 @@ typeApplicationTests = testGroup "retained type applications"
       renderLeanTerm Map.empty providers Map.empty ([], 0, [])
           (FArr identity (FArr natural natural)) expression
         @?= Right
+          -- Keep inferred provider-result variants first. A closed trailing
+          -- witness is only a proposal: here Unit cannot satisfy the Nat
+          -- use of g, and the kernel verifier must reject that alternative.
           [ "fun f x => let ⟨g, _⟩ := Demo.box f; g _ x"
           , "fun f x => let ⟨g, _⟩ := Demo.box (f _); g _ x"
+          , "fun f x => let ⟨g, _⟩ := Demo.box (f _root_.Unit); g _ x"
           ]
   , testCase "specialize provider results from specified type arguments" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -28386,6 +28390,48 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
             assertBool (label ++ ": staged candidate lost its factory or seed")
               (any (\term -> requiredHead `isInfixOf` term
                 && "Layered.seed" `isInfixOf` term) variants)
+  , testCase "ground an unresolved trailing local type argument after inferred variants" $ do
+      let element = FVar "element"
+          result = FVar "result"
+          churchList = FAll True "result"
+            (FArr (FArr element (FArr result result)) (FArr result result))
+          goal = FAll True "element" (FArr element (FArr churchList element))
+          expression = Lambda [Bind "default", Bind "fold"]
+            (foldl Apply (Local "fold")
+              [ Lambda [Bind "element", Bind "rest", Wildcard]
+                  (Apply (Local "rest") (Local "element"))
+              , Lambda [Bind "value", Wildcard] (Local "value")
+              , Local "default"
+              , Local "fold"
+              ])
+      variants <- expectRight $ renderLeanTerm Map.empty Map.empty Map.empty
+        ([], 0, []) goal expression
+      take 2 variants @?=
+        [ "fun _ x f => f _ (fun a b _ => b a) (fun c _ => c) x f"
+        , "fun _ x f => f _ (fun a b _ => b a) (fun c _ => c) x (f _)"
+        ]
+      assertBool "missing the closed trailing type witness"
+        ("fun _ x f => f _ (fun a b _ => b a) (fun c _ => c) x (f _root_.Unit)" `elem` variants)
+      assertBool "the existing per-domain bounds must remain in force"
+        (length variants <= 96)
+  , testCase "do not ground an explicitly selected local type argument" $ do
+      let element = FVar "element"
+          result = FVar "result"
+          churchList = FAll True "result"
+            (FArr (FArr element (FArr result result)) (FArr result result))
+          goal = FAll True "element" (FArr element (FArr churchList element))
+          expression = Lambda [Bind "default", Bind "fold"]
+            (foldl Apply (Local "fold")
+              [ Lambda [Bind "element", Bind "rest", Wildcard]
+                  (Apply (Local "rest") (Local "element"))
+              , Lambda [Bind "value", Wildcard] (Local "value")
+              , Local "default"
+              , VisibleTypeApplication (Local "fold") inferredVisibleTypeArgument
+              ])
+      variants <- expectRight $ renderLeanTerm Map.empty Map.empty Map.empty
+        ([], 0, []) goal expression
+      assertBool "explicit source selections cannot become default Unit arguments"
+        (all (not . isInfixOf "_root_.Unit") variants)
   , testCase "give constructed sum scrutinees an explicit family fallback" $ do
       left <- expectRight $ mkIdentifier "Left"
       right <- expectRight $ mkIdentifier "Right"
@@ -29269,14 +29315,32 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       case rendered of
         Left err -> assertFailure err
         Right variants -> do
-          assertBool ("renderer exceeded its three 12-variant lanes: "
+          assertBool ("renderer exceeded its three bounded lanes: "
               ++ show variants)
-            (length variants <= 36)
+            (length variants <= 3 * Djex.maximumProviderInstantiationAssignments)
           mapM_
-            (\binderDomain -> assertBool
-              (binderDomain ++ " lane lost its third-site-only variant: "
-                ++ show variants)
-              (expected binderDomain `elem` variants))
+            (\binderDomain -> do
+              let lane = filter
+                    (("(a0_0 : " ++ binderDomain ++ ")") `isInfixOf`) variants
+                  (established, fallbacks) = break
+                    ("_root_.Unit" `isInfixOf`) lane
+              assertBool
+                (binderDomain ++ " lane lost its third-site-only variant: "
+                  ++ show lane)
+                (expected binderDomain `elem` established)
+              assertBool
+                (binderDomain ++ " lane lost or delayed its forced-fit variant: "
+                  ++ show lane)
+                (any ("fun _ z0 => f _ z0" `isInfixOf`) established)
+              assertBool
+                (binderDomain ++ " lane has no closed trailing-type fallback")
+                (not (null fallbacks))
+              assertBool
+                (binderDomain ++ " lane interleaves fallbacks into its prefix: "
+                  ++ show lane)
+                (all ("_root_.Unit" `isInfixOf`) fallbacks)
+              assertBool (binderDomain ++ " lane exceeds its individual cap")
+                (length lane <= Djex.maximumProviderInstantiationAssignments))
             ["_", "Type _", "Prop"]
   , testCase "render alpha-renamed quantified arguments identically" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
