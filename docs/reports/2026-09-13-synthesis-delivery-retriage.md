@@ -1,5 +1,7 @@
 # Synthesis delivery re-triage: coverage, scoped evidence and bounded search
 
+> Native selector follow-up: all [twelve matching Lean selector cells](2026-09-13-native-supplied-default-selectors.md) pass, completing those four operations across all five modes. The ledger now records 60 historically accepted cells, four attempted without indexed acceptance and 96 without indexed evidence. Remaining selectors and reductions are next; the other implementation obligations stay open.
+
 > Capability follow-up: the [eight Haskell supplied-default selector cells](2026-09-13-supplied-default-selectors.md) pass live synthesis and exact replay. The ledger now records 48 historically accepted cells, four attempted without indexed acceptance and 108 without indexed evidence. Matching Lean selectors and other missing behavior batches remain next.
 
 > Delivered follow-up: the [160-cell ledger](../../test-church/behavior-ledger.md) and its pinned-receipt generator are implemented. The initial catalog records 40 historically accepted cells, four attempted without indexed acceptance and 116 without indexed evidence. These are not current validation counts. Missing behavior batches are the next capability work.

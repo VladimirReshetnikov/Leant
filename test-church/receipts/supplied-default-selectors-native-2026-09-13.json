@@ -1,0 +1,53 @@
+{
+  "schema": "church-supplied-default-native-selectors-v1",
+  "status": "behavior_batch_passed",
+  "production_release_accepted": false,
+  "source_base_commit": "154dc56eba3c3a46a8e0afcd879a689f3e66d453",
+  "dependency_commit": "c1ad560e106f59df07d1a32c3b51158ef749fc99",
+  "production_changes_uncommitted": true,
+  "scope": "head, fromJust, fromLeft, fromRight with supplied defaults in Lean Djinn, Exference and Both",
+  "counts": {
+    "synthesis_cells": 12,
+    "exact_candidate_replays": 12,
+    "finite_observations_per_cell": 24,
+    "actual_false_queries": 3,
+    "false_falsifications_by_engine": {
+      "djinn": 581,
+      "exference": 299,
+      "both": 915
+    },
+    "independent_oracle_modules": 4,
+    "empty_candidate_replay_inventories": 192,
+    "owned_processes": 31,
+    "frozen_source_files": 437
+  },
+  "settings": {
+    "window": 65536,
+    "verify": 65536,
+    "shown": 1,
+    "ranking": "balanced",
+    "djinn_strategy": "interleave",
+    "djinn_choice_budget": 500000,
+    "exference_steps": 100000,
+    "command_timeout_seconds": 90,
+    "separate_process_guard_seconds": 900.0
+  },
+  "sources_and_runtimes_unchanged": true,
+  "all_owned_processes_exit_zero": true,
+  "strict_build": "passed -Werror",
+  "raw_receipt_member": "run/results.json",
+  "archive": {
+    "path": "supplied-default-selectors-native-2026-09-13.zip",
+    "sha256": "439d3d68b8720882fa6642ca146fe4629e38f29b2c00547a35529767b24a2af7",
+    "bytes": 3171302,
+    "artifact_count": 554,
+    "all_members_rehashed": true
+  },
+  "boundaries": [
+    "Fresh behavior acceptance against the frozen working sources, not a full regression or constructor release.",
+    "The accepted production dependency is not promoted by this receipt.",
+    "Default arguments totalize the agreed counterparts; the original partial signatures are not declared total.",
+    "All generated replay declarations have empty axiom inventories.",
+    "Finite observations do not establish universal extensional equivalence."
+  ]
+}
