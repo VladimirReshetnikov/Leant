@@ -66,12 +66,13 @@ not a current-revision pass rate or a completeness theorem. Missing indexed
 evidence does not establish that a case was never attempted.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-next addresses [kinded Haskell source binders](docs/reports/2026-09-13-public-kinded-source-frontier.md),
-which both public engines currently refuse before synthesis. The bounded reduction
-ordering experiment passed its build and cursor contracts but failed the focused
-behavioral gate; that variant remains unreleased. Lean Djinn length,
-integer indexing, extrema, broader universe/contextual evidence and supplied-fold
-tree synthesis remain open obligations.
+prioritizes end-to-end [kinded Haskell source support](docs/reports/2026-09-13-public-kinded-source-frontier.md),
+then a small extrema baseline and a separate Lean universe-polymorphism milestone.
+The local checked-kind foundation passes its foundation, integration and API
+suites, but explicit kinded public queries still fail conversion; this work is
+unreleased. Integer indexing, Lean Djinn length, contextual evidence and supplied-fold
+trees remain required. The failed reduction variants stay paused until a trace
+justifies a different construction change.
 
 ## Contents
 
