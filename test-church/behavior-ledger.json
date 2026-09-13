@@ -6,9 +6,9 @@
   "current_complete": false,
   "cell_count": 160,
   "historical_counts": {
-    "acceptance_recorded": 80,
-    "attempts_without_recorded_acceptance": 4,
-    "no_recorded_evidence": 76
+    "acceptance_recorded": 92,
+    "attempts_without_recorded_acceptance": 6,
+    "no_recorded_evidence": 62
   },
   "sources": {
     "haskell-djinn-first-six": {
@@ -922,6 +922,64 @@
           "recorded_status": "passed"
         }
       ]
+    },
+    "lean-matching-extended-seven-2026-09-13": {
+      "source": {
+        "repo": "Leant",
+        "path": "test-church/receipts/matching-extended-native-seven-2026-09-13.zip",
+        "sha256": "001133f85dd1902b5ed4c81fac3646203a95dce67836b3fead5448462856d87d",
+        "member": "run/results.json",
+        "member_sha256": "bfa98aad42e3795e00e729938c05bf6b12e4981717e2c47869047db7136a8d68"
+      },
+      "rows": "/cells",
+      "metadata_pointers": {
+        "settings": "/settings",
+        "runtime": "/executable_hashes",
+        "sources": "/source_hashes",
+        "controls": "/oracle_controls"
+      },
+      "recorded_metadata": {
+        "settings": {
+          "value_sha256": "bde57e7f51dba0f411512a4d03f9f636a2242c9b8b8a7547e6fbc676d8ab1f0d",
+          "recorded_value": {
+            "window": 65536,
+            "verify": 65536,
+            "shown": 1,
+            "ranking": "balanced",
+            "djinn_strategy": "interleave",
+            "djinn_choice_budget": 500000,
+            "exference_steps": 100000,
+            "command_timeout_seconds": 90,
+            "separate_process_guard_seconds": 900.0
+          }
+        },
+        "runtime": {
+          "value_sha256": "1c15365e8154d389c1c45a241041d4d6fef14ef222e4395be3683da4daa91ecb",
+          "recorded_value": {
+            "C:\\Leant-validation\\trailing-type-witness\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe": "609f8f42b5d43ea84f2bff9ba41b6942d21a9c3ee954bdb29cfb96cfe36f5347",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe": "937918675ff15139816bbe2a4f6168fb8b36ea0e0990664311f4902cbce0f6f2",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe": "cf11cebeea855a47477a2648e2b8c10b11b7364e040e499d9cc5e015bfbaa0a2",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe": "7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a"
+          }
+        },
+        "sources": {
+          "value_sha256": "7a253a51d8660b7a1247147d243aee4c6ab722a7f165195640ecb2983a22fa05"
+        },
+        "controls": {
+          "value_sha256": "c9ed017c715ac428ea1a825b893df5a329a4d920c30aee0df44a5eebba3b1aa4"
+        }
+      },
+      "control_rows": [
+        {
+          "pointer": "/cells/7",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/15",
+          "recorded_status": "passed"
+        }
+      ]
     }
   },
   "cells": [
@@ -984,8 +1042,17 @@
       "source_case_id": "church_case_036",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/0",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/0/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/foldr/lean/exference",
@@ -1017,8 +1084,17 @@
       "source_case_id": "church_case_036",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/8",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/8/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/foldl/haskell/djinn",
@@ -1079,8 +1155,17 @@
       "source_case_id": "church_case_037",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/1",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/1/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/foldl/lean/exference",
@@ -1112,8 +1197,17 @@
       "source_case_id": "church_case_037",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/9",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/9/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/length/haskell/djinn",
@@ -1182,8 +1276,17 @@
       "source_case_id": "church_case_060",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/2",
+          "recorded_outcome": "failed_unclassified",
+          "recorded_status": "failed",
+          "recorded_classification": null,
+          "replay_pointer": null
+        }
+      ],
+      "historical_status": "attempts_without_recorded_acceptance"
     },
     {
       "id": "extended/length/lean/exference",
@@ -1215,8 +1318,17 @@
       "source_case_id": "church_case_060",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/10",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/10/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/fromMaybe/haskell/djinn",
@@ -1503,8 +1615,17 @@
       "source_case_id": "church_case_096",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/3",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/3/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/listToMaybe/lean/exference",
@@ -1536,8 +1657,17 @@
       "source_case_id": "church_case_096",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/11",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/11/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/catMaybes/haskell/djinn",
@@ -1598,8 +1728,17 @@
       "source_case_id": "church_case_097",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/4",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/4/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/catMaybes/lean/exference",
@@ -1631,8 +1770,17 @@
       "source_case_id": "church_case_097",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/12",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/12/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/squashMaybe/haskell/djinn",
@@ -1693,8 +1841,17 @@
       "source_case_id": "church_case_099",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/5",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/5/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/squashMaybe/lean/exference",
@@ -1726,8 +1883,17 @@
       "source_case_id": "church_case_099",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/13",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/13/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/isLeft/haskell/djinn",
@@ -1901,8 +2067,17 @@
       "source_case_id": "church_case_107",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/6",
+          "recorded_outcome": "failed_unclassified",
+          "recorded_status": "failed",
+          "recorded_classification": null,
+          "replay_pointer": null
+        }
+      ],
+      "historical_status": "attempts_without_recorded_acceptance"
     },
     {
       "id": "extended/maybeEither/lean/exference",
@@ -1934,8 +2109,17 @@
       "source_case_id": "church_case_107",
       "partiality": "total",
       "current_validation": "not_established_by_historical_index",
-      "history": [],
-      "historical_status": "no_recorded_evidence"
+      "history": [
+        {
+          "collection": "lean-matching-extended-seven-2026-09-13",
+          "pointer": "/cells/14",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/14/replay"
+        }
+      ],
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/either/haskell/djinn",

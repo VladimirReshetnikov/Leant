@@ -1,0 +1,81 @@
+{
+  "schema": "leant-matching-extended-seven-v1",
+  "status": "completed_with_two_djinn_misses",
+  "scope": "Seven extended operations in Lean Djinn and Both: twelve accepted cells and two retained failures at original settings.",
+  "published_renderer_commit": "0345344eef3a16e5fe29c33a4e328a6696fab03f",
+  "source_base_commit": "d2e5473e1cbabfc36094cd84c651a9793e4fbc68",
+  "dependency_commit": "c1ad560e106f59df07d1a32c3b51158ef749fc99",
+  "diagnoses": [
+    {
+      "engine": "djinn",
+      "operation": "length",
+      "classification": "command_deadline_before_provider_discovery",
+      "capture_member": "run/extended_djinn_length.stdout.txt",
+      "capture_sha256": "121d7fe4b6cb0e83745ed0b1ca77fa40d9df1e5ad94e85276e0ae8ebee8651dc"
+    },
+    {
+      "engine": "djinn",
+      "operation": "maybeEither",
+      "classification": "choice_point_limit_with_verification_and_source_graph_failures",
+      "capture_member": "run/extended_djinn_maybeEither.stdout.txt",
+      "capture_sha256": "5fa0c35bdd03f491416d4498c07bafc4cdcbb956562acbb94cb301bdcc4b38ea"
+    }
+  ],
+  "counts": {
+    "attempted_behavior_cells": 14,
+    "accepted_behavior_cells": 12,
+    "failed_behavior_cells": 2,
+    "exact_candidate_replays": 12,
+    "actual_false_queries": 2,
+    "false_falsifications_by_engine": {
+      "djinn": 623,
+      "both": 915
+    },
+    "finite_observations_in_fixture_per_engine": 943,
+    "finite_observations_on_accepted_cells": 1835,
+    "finite_observations_by_operation": {
+      "foldr": 400,
+      "foldl": 400,
+      "length": 44,
+      "listToMaybe": 44,
+      "catMaybes": 40,
+      "squashMaybe": 8,
+      "maybeEither": 7
+    },
+    "positive_oracle_controls": 13,
+    "fully_typed_wrong_oracle_controls": 14,
+    "specialized_adapter_controls": 1,
+    "empty_candidate_replay_inventories": 26,
+    "owned_query_and_kernel_processes": 29,
+    "frozen_source_files": 436
+  },
+  "settings": {
+    "window": 65536,
+    "verify": 65536,
+    "shown": 1,
+    "ranking": "balanced",
+    "djinn_strategy": "interleave",
+    "djinn_choice_budget": 500000,
+    "exference_steps": 100000,
+    "command_timeout_seconds": 90,
+    "separate_process_guard_seconds": 900.0
+  },
+  "sources_and_runtimes_unchanged": true,
+  "all_query_and_kernel_processes_exit_zero": true,
+  "parent_acceptance_exit_code": 1,
+  "raw_receipt_member": "run/results.json",
+  "archive": {
+    "path": "matching-extended-native-seven-2026-09-13.zip",
+    "sha256": "001133f85dd1902b5ed4c81fac3646203a95dce67836b3fead5448462856d87d",
+    "bytes": 3157341,
+    "artifact_count": 549,
+    "all_members_rehashed": true
+  },
+  "boundaries": [
+    "This batch adds finite behavioral acceptance for its twelve operation/mode cells; it is not a current-revision replay of all 160 target cells.",
+    "The published renderer and tests are checked against the isolated source before execution. No source change or rebuild is claimed in this batch.",
+    "All synthesized implementations have empty inventories; only the exact maybeEither oracle proof has propext. Oracle controls retain their separately checked declared inventories.",
+    "Reference implementations and prior synthesized declarations do not enter the live search sessions.",
+    "Contextual-constructor changes and dependency promotion are outside this acceptance."
+  ]
+}

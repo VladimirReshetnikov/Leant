@@ -7,16 +7,16 @@ See `behavior-ledger.json` for individual receipt pointers, hashes, limits and r
 
 | Group | Operation | Haskell Djinn | Haskell Exference | Lean Djinn | Lean Exference | Lean Both |
 | --- | --- | --- | --- | --- | --- | --- |
-| extended | foldr | A | A | ? | A | ? |
-| extended | foldl | A | A | ? | A | ? |
-| extended | length | A | A | ? | A | ? |
+| extended | foldr | A | A | A | A | A |
+| extended | foldl | A | A | A | A | A |
+| extended | length | A | A | F | A | A |
 | extended | fromMaybe | A | A | A | A | A |
 | extended | maybeToList | A | A | A | A | A |
-| extended | listToMaybe | A | A | ? | A | ? |
-| extended | catMaybes | A | A | ? | A | ? |
-| extended | squashMaybe | A | A | ? | A | ? |
+| extended | listToMaybe | A | A | A | A | A |
+| extended | catMaybes | A | A | A | A | A |
+| extended | squashMaybe | A | A | A | A | A |
 | extended | isLeft | A | A | A | A | A |
-| extended | maybeEither | F | A | ? | A | ? |
+| extended | maybeEither | F | A | F | A | A |
 | extended | either | A | A | A | A | A |
 | extended | numeralSuccessor | A | A | A | A | A |
 | extended | numeralAdd | A | A | A | A | A |

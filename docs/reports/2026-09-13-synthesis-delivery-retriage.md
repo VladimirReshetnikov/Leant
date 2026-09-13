@@ -1,12 +1,12 @@
 # Synthesis delivery re-triage after selector acceptance
 
-The [trailing-type renderer release](2026-09-13-trailing-type-witness-acceptance.md) is now accepted after isolated validation. The [matching six-operation batch](2026-09-13-matching-extended-native-six.md) adds twelve accepted Lean Djinn/Both cells. Continue with the remaining seven extended operations in those modes, then supplied-default behavior batches. Preserve scoped dictionary selections as the next substantive evidence repair; keep the contextual-constructor search misses separately attributable. The coverage ledger is delivered infrastructure, no longer a proposed feature.
+The [trailing-type renderer release](2026-09-13-trailing-type-witness-acceptance.md) is now accepted after isolated validation. The [matching six-operation batch](2026-09-13-matching-extended-native-six.md) adds twelve accepted Lean Djinn/Both cells. The [remaining extended matrix](2026-09-13-matching-extended-native-frontier.md) adds twelve more acceptances and exposes Djinn-only `length` and `maybeEither` misses. Address provider admission for `length`, keep the separate `maybeEither` search/evidence diagnosis, and continue supplied-default behavior batches. Preserve scoped dictionary selections as the next substantive evidence repair; keep the contextual-constructor search misses separately attributable. The coverage ledger is delivered infrastructure, no longer a proposed feature.
 
 This assessment preserves the original priorities 1–4 and their completion requirements. It changes execution order based on current evidence, while keeping the separate contextual-constructor source changes unaccepted.
 
 ## Current evidence and release boundary
 
-- The [Church behavior ledger](../../test-church/behavior-ledger.md) enumerates exactly 160 cells. Its selected receipts record **80 historical acceptances, four attempted cells without indexed acceptance, and 76 cells without indexed evidence**. These are not a current-revision pass rate, and missing indexed evidence does not mean never attempted.
+- The [Church behavior ledger](../../test-church/behavior-ledger.md) enumerates exactly 160 cells. Its selected receipts record **92 historical acceptances, six attempted cells without indexed acceptance, and 62 cells without indexed evidence**. These are not a current-revision pass rate, and missing indexed evidence does not mean never attempted.
 - The six supplied-default selectors `head`, `last`, `fromJust`, `fromLeft`, `fromRight`, and `atKey` have recorded acceptance across both Haskell engines and Lean Djinn, Exference, and Both. The new Lean Djinn `last` renderer change now has a separate complete isolated release receipt; the earlier working-source receipt alone was insufficient. See the [selector report](2026-09-13-native-supplied-default-selectors.md) and [last/atKey report](2026-09-13-trailing-type-witness-frontier.md).
 - The isolated renderer checkout uses committed Leant `d2e5473e1cbabfc36094cd84c651a9793e4fbc68` and clean Djex `c1ad560e106f59df07d1a32c3b51158ef749fc99`, with only the renderer delta and two new tests. The first attempt passed its strict build but only **705/707 unit tests** and stopped before later gates. After the ordering repair and justified rendering-contract updates, the second attempt passes **707/707**, all six live behavior cells and three False controls, and both 350-signature replay corpora.
 - The two failures concern a newly added `Unit` variant in the provider-result rendering list and an existing three-lane, 36-variant expectation. The repair preserves established variants ahead of fallbacks within each lane and checks the existing 32-variant cap. An independent kernel check additionally rejects the invalid new provider proposal at its original target. The first failed attempt remains archived separately.
@@ -29,11 +29,11 @@ These are dependency priorities, not instructions to run competing heavy validat
 
 ## What remains in the 160-cell target
 
-There are **80 cells without indexed acceptance**, divided as follows:
+There are **68 cells without indexed acceptance**, divided as follows:
 
 | Batch | Cells | Proposed handling |
 | --- | ---: | --- |
-| Remaining seven extended operations in Lean Djinn and Both | 14 | Run `foldr`, `foldl`, `length`, `listToMaybe`, `catMaybes`, `squashMaybe`, and `maybeEither` against their original fixtures. Record Both acceptance from actual Both queries. |
+| Lean Djinn `length` and `maybeEither` | 2 | `length` times out before provider discovery; test admission of the complete capped inventory under the original deadline. `maybeEither` reaches the choice-point limit with verification/graph failures requiring separate attribution. Both mode has actual acceptance for both. |
 | Haskell Djinn `maybeEither` | 1 | Retain its recorded failed attempt; attribute the search/evidence boundary before choosing a repair. |
 | Supplied-default `foldl1`, `foldr1`, and `reduce`, all five modes | 15 | Next new operation family. Exercise empty/default behavior and nonempty accumulator behavior. |
 | Nine extrema operations, all five modes | 45 | Group comparator-based, projection-based, and paired results by actual dependencies. Exercise singleton, ties, order, and supplied defaults; record each operation/mode separately. |
