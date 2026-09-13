@@ -46,6 +46,32 @@ records the remaining scope and preserved historical failures.
 emitted by the built unit executable. That component check establishes serializer
 validity; the production matrix establishes public command acceptance.
 
+## Contextual constructors
+
+`run_constructors.py` is the new acceptance driver for exact universe-zero
+constructor metadata and its composition with lexical dictionaries. The full
+matrix has 21 positives and six actual `where False` controls across Djinn,
+Exference and Both. It covers method-selected and argument-only singletons,
+preserved tails, an `Option` wrapper, nested lists and nested dictionary scopes.
+Methods are discovered live with cap 1; argument-only cases disable discovery.
+
+```powershell
+python -X utf8 -B test-context/run_constructors.py --leant <built-leant.exe> --output dist-newstyle/contextual-constructors/run-1
+```
+
+The driver retains a 32-candidate/verification window, 20,000 steps/choices and
+45-second command deadline. It checks exact source graph ownership and replays
+each displayed implementation at its original type and observations in an
+independent kernel process with empty axiom inventories. Reference implementations
+never enter search sessions. Source, input and runtime hashes must remain fixed.
+`--engine` and `--operation` select diagnostics; a selected subset cannot establish
+acceptance of the full matrix. A process exit without the required positive or
+actual predicate rejection is a failed case. Each failed case is retained while
+the driver continues through the remaining selected cases. The
+[complete diagnostic](../docs/reports/2026-09-13-contextual-constructor-frontier.md)
+records 17/21 positive replays and 6/6 False controls; this new matrix is not yet
+accepted. Its plan-ordering experiment was reverted after the run.
+
 ## Direct renderer component
 
 `run_replay.py` exercises the isolated `Leant.Synth.ContextRender` module using

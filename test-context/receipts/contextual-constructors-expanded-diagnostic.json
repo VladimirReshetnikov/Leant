@@ -1,0 +1,337 @@
+{
+  "schema": 1,
+  "status": "diagnostic_complete_acceptance_failed",
+  "scope": "Uncommitted contextual-constructor implementation plus unsuccessful specialized-plan ordering experiment; not a release acceptance.",
+  "source_and_input_hashes_unchanged": true,
+  "exact_replay_sources_unchanged": true,
+  "positive_count": 21,
+  "positive_replay_passes": 17,
+  "false_control_count": 6,
+  "false_control_passes": 6,
+  "oracle_passes": 27,
+  "failed_cases": [
+    {
+      "name": "construct_djinn_method_tail",
+      "engine": "djinn",
+      "operation": "method_tail",
+      "failure": "ValueError('expected exactly one verified displayed output')"
+    },
+    {
+      "name": "construct_djinn_nested_context",
+      "engine": "djinn",
+      "operation": "nested_context",
+      "failure": "ValueError('Leant reported a command or backend error: synthesis engine error: context-source: missing Djinn graph: DjinnTermGraphSourceTypingFailure \"SourceGraphTypingFailure \\\\\"ambiguous lexical Given type instantiation\\\\\"\"')"
+    },
+    {
+      "name": "construct_exference_nested_context",
+      "engine": "exference",
+      "operation": "nested_context",
+      "failure": "ValueError('expected exactly one verified displayed output')"
+    },
+    {
+      "name": "construct_both_nested_context",
+      "engine": "both",
+      "operation": "nested_context",
+      "failure": "ValueError('Leant reported a command or backend error: synthesis engine error: context-source: missing Djinn graph: DjinnTermGraphSourceTypingFailure \"SourceGraphTypingFailure \\\\\"ambiguous lexical Given type instantiation\\\\\"\"')"
+    }
+  ],
+  "cases": [
+    {
+      "name": "construct_djinn_method",
+      "engine": "djinn",
+      "operation": "method",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_djinn_method_false",
+      "engine": "djinn",
+      "operation": "method",
+      "expected": "no_candidate",
+      "status": "no_candidate"
+    },
+    {
+      "name": "construct_djinn_argument",
+      "engine": "djinn",
+      "operation": "argument",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_djinn_argument_false",
+      "engine": "djinn",
+      "operation": "argument",
+      "expected": "no_candidate",
+      "status": "no_candidate"
+    },
+    {
+      "name": "construct_djinn_method_tail",
+      "engine": "djinn",
+      "operation": "method_tail",
+      "expected": "candidate",
+      "status": "failed"
+    },
+    {
+      "name": "construct_djinn_argument_tail",
+      "engine": "djinn",
+      "operation": "argument_tail",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_djinn_wrapper",
+      "engine": "djinn",
+      "operation": "wrapper",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_djinn_nested_list",
+      "engine": "djinn",
+      "operation": "nested_list",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_djinn_nested_context",
+      "engine": "djinn",
+      "operation": "nested_context",
+      "expected": "candidate",
+      "status": "failed"
+    },
+    {
+      "name": "construct_exference_method",
+      "engine": "exference",
+      "operation": "method",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_exference_method_false",
+      "engine": "exference",
+      "operation": "method",
+      "expected": "no_candidate",
+      "status": "no_candidate"
+    },
+    {
+      "name": "construct_exference_argument",
+      "engine": "exference",
+      "operation": "argument",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_exference_argument_false",
+      "engine": "exference",
+      "operation": "argument",
+      "expected": "no_candidate",
+      "status": "no_candidate"
+    },
+    {
+      "name": "construct_exference_method_tail",
+      "engine": "exference",
+      "operation": "method_tail",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_exference_argument_tail",
+      "engine": "exference",
+      "operation": "argument_tail",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_exference_wrapper",
+      "engine": "exference",
+      "operation": "wrapper",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_exference_nested_list",
+      "engine": "exference",
+      "operation": "nested_list",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_exference_nested_context",
+      "engine": "exference",
+      "operation": "nested_context",
+      "expected": "candidate",
+      "status": "failed"
+    },
+    {
+      "name": "construct_both_method",
+      "engine": "both",
+      "operation": "method",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_both_method_false",
+      "engine": "both",
+      "operation": "method",
+      "expected": "no_candidate",
+      "status": "no_candidate"
+    },
+    {
+      "name": "construct_both_argument",
+      "engine": "both",
+      "operation": "argument",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_both_argument_false",
+      "engine": "both",
+      "operation": "argument",
+      "expected": "no_candidate",
+      "status": "no_candidate"
+    },
+    {
+      "name": "construct_both_method_tail",
+      "engine": "both",
+      "operation": "method_tail",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_both_argument_tail",
+      "engine": "both",
+      "operation": "argument_tail",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_both_wrapper",
+      "engine": "both",
+      "operation": "wrapper",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_both_nested_list",
+      "engine": "both",
+      "operation": "nested_list",
+      "expected": "candidate",
+      "status": "candidate"
+    },
+    {
+      "name": "construct_both_nested_context",
+      "engine": "both",
+      "operation": "nested_context",
+      "expected": "candidate",
+      "status": "failed"
+    }
+  ],
+  "process_count": 71,
+  "process_exit_codes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "archive": {
+    "path": "contextual-constructors-expanded-diagnostic.zip",
+    "sha256": "3fd965de955fb444193c63c2b53c53a5990f674b5a34921dcc2b2c92d2a71be8",
+    "bytes": 2040649,
+    "artifact_count": 543,
+    "manifest_member": "manifest.json"
+  },
+  "omitted_runtime_binaries": [
+    {
+      "path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+      "sha256": "e9cd4b49c3d4124bbd0c56f97b787890c84ab6ec287dc917c830fb1eabf40eb7",
+      "reason": "runtime binary retained by identity, not redistributed"
+    },
+    {
+      "path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe",
+      "sha256": "937918675ff15139816bbe2a4f6168fb8b36ea0e0990664311f4902cbce0f6f2",
+      "reason": "runtime binary retained by identity, not redistributed"
+    },
+    {
+      "path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+      "sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+      "reason": "runtime binary retained by identity, not redistributed"
+    },
+    {
+      "path": "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe",
+      "sha256": "cf11cebeea855a47477a2648e2b8c10b11b7364e040e499d9cc5e015bfbaa0a2",
+      "reason": "runtime binary retained by identity, not redistributed"
+    },
+    {
+      "path": "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+      "sha256": "7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a",
+      "reason": "runtime binary retained by identity, not redistributed"
+    }
+  ]
+}

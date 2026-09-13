@@ -267,9 +267,12 @@ Companion documents:
   build, **705 unit tests and all ten native gates**, including both 350-signature
   kernel replays. Leant now pins the tested dependency. A subsequent uncommitted
   repair passes all six contextual-list probes across Djinn, Exference and Both,
-  with exact kernel replay, and all six existing method-discovery cases. These
-  development results still need actual list False controls and full regression
-  acceptance before publication. The linked re-triage puts that acceptance gate
+  with exact kernel replay, and all six existing method-discovery cases. The
+  [expanded diagnostic](docs/reports/2026-09-13-contextual-constructor-frontier.md)
+  completes 17/21 positive replays and all six actual False controls. Djinn's
+  method-with-tail case and nested-dictionary behavior in all three modes remain
+  open; an ineffective ordering experiment was reverted. Full regression
+  acceptance remains required before publication. The linked re-triage puts that gate
   first, followed by missing Church behaviors and public query forms.
   Broader search estimates were rejected after losing Church composition.
   The committed dependency is `c1ad560e`. The full 13-operation/19-default coverage
