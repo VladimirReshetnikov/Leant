@@ -296,3 +296,5 @@ a forward-looking proposal rather than a dated record:
 - 2026-09-09 — [Contextual constructors and polymorphic list output](2026-09-09-contextual-list-output.md) — checked constructor plans, method-free outer/nested contexts, retained binder scope and exact public-output acceptance.
 
 - 2026-09-09 — [Further improvements after contextual list acceptance](2026-09-09-synthesis-after-contextual-list-acceptance.md) — accepted canonical repair, six native source-admission refusals, separate integration gate and bounded remaining delivery order.
+
+- 2026-09-12 — [Native integration of canonical contextual list construction](2026-09-12-contextual-list-native-integration.md) — exact dependency promotion after 705 unit tests and ten fresh native gates; Lean contextual list admission remains open.

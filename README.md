@@ -76,8 +76,8 @@ Companion documents:
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
 - **[Current synthesis re-triage](docs/reports/2026-09-09-synthesis-after-contextual-list-acceptance.md)**
-  — integrate the accepted Haskell list revision, address Lean contextual
-  list admission, then deliver missing Church behaviors and public query forms;
+  — native integration is accepted; address Lean contextual list admission,
+  then deliver missing Church behaviors and public query forms;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -247,10 +247,9 @@ Companion documents:
   2,309 tests in 15 complete suites pass across the documented runs, including
   a complete Length rerun after its test-only lifecycle repair. Native tree
   acceptance remains open. The [current delivery order](docs/reports/2026-09-09-synthesis-after-contextual-list-acceptance.md)
-  prioritizes native integration of the accepted Haskell list revision and
-  exact Lean contextual list admission, then missing Church behaviors and public
-  query forms. Earlier deadline/contextual integration is complete; the new list
-  revision remains unpromoted and the tree investigation remains bounded.
+  prioritizes exact Lean contextual list admission, then missing Church
+  behaviors and public query forms. The canonical list dependency now passes
+  native compatibility integration; the tree investigation remains bounded.
   The [combined verifier](docs/reports/2026-09-08-combined-behavioral-verification.md)
   remains covered by the now-passing recursor, fallback and method/cache gates.
   The [ordinary Haskell contextual REPL delivery](docs/reports/2026-09-08-ordinary-contextual-output.md):
@@ -264,14 +263,16 @@ Companion documents:
   from arguments under unused outer/nested contexts. Root binder names remain
   source-scoped when nested binders are alpha-renamed. Both Haskell signature
   corpora pass 350/350 and extended Exference retains 13/13 behaviors.
-  Native integration of this new canonical revision remains pending. A strict
-  native build passes, but six fresh contextual list probes are refused before
+  The [fresh native integration](docs/reports/2026-09-12-contextual-list-native-integration.md) passes a strict
+  build, **705 unit tests and all ten native gates**, including both 350-signature
+  kernel replays. Leant now pins the tested dependency. The separate six
+  contextual list probes remain refused before
   search across Djinn, Exference and Both. Their six reference implementations
   pass kernel checking; the source packet currently rejects the universe arguments
   carried by `List`. The linked re-triage separates this admission work from
   compatibility gates and preserves the existing refusal guards.
   Broader search estimates were rejected after losing Church composition.
-  The committed dependency is `3adfac5c`. The full 13-operation/19-default coverage
+  The committed dependency is `c1ad560e`. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-09-synthesis-after-contextual-list-acceptance.md).
 - **Checked conditional providers in canonical Djex.** The

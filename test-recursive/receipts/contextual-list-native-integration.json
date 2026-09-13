@@ -1,0 +1,113 @@
+{
+  "status": "integration_passed",
+  "parent_status_at_snapshot": "passed",
+  "parent_snapshot_sha256": "0467d457cb1fb2e6e0e01cc28ea27b6068bb481e43f2675b58a5e6b143ee53ca",
+  "dependency": "c1ad560e106f59df07d1a32c3b51158ef749fc99",
+  "completed_gates": [
+    {
+      "gate": "unit",
+      "receipt_sha256": "0e190d26b748f4fb6261d514525ecdb5e0b416c6cbb56c252c3db24205a3b009",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "methods",
+      "receipt_sha256": "031176ab77af1a91627644215fd202f219c99e46e20a9174ed85c46f6178cffc",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "method-controls",
+      "receipt_sha256": "3f80b265793b9eedcabe432846e0a6d8db11a003580b1b808d650a53e45dd168",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "local-context",
+      "receipt_sha256": "63f13177b09b5dffad670b7eab365700b596bdbae67106962dd003359146e5fc",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "simplification",
+      "receipt_sha256": "9943f92b2be233c4bb8283d878481267bb26f27a15574eff36d09e2eabb12277",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "native-recursor",
+      "receipt_sha256": "3e62cee7009c425c609a326b3b979983e025bb492dbc5ed23dd98be19f052316",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "extended-exference",
+      "receipt_sha256": "6ebf96dc38150269b32d6ed0c95039d10081c0e253065baab0995fd4324a2b59",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "nested-forall",
+      "receipt_sha256": "211ae93daef8001f4705c0e0410aff4a8d51359bb7b7939457494f543c7e9cb6",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "signatures-djinn",
+      "receipt_sha256": "f81ee55987c3c9bfd1307cdb84dc47ee61677f61fc5e2a10c0e5e06807ecd6b7",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    },
+    {
+      "gate": "signatures-exference",
+      "receipt_sha256": "a6d80beb4d928d4ebccdf3f79eacf034ff06b5a6c1b23db5cf45b26899e7669d",
+      "retained": false,
+      "status": "passed",
+      "changed_trace_fixture_inputs": []
+    }
+  ],
+  "pending_gates": [],
+  "strict_build": "passed -Werror",
+  "strict_build_receipt_sha256": "35d5d10e47509acb4d3f8fc9b64a6631fb87477549f4e434f09485c5c0080b68",
+  "aggregate_accepted": true,
+  "frozen_inputs_match_at_packaging": true,
+  "counts": {
+    "unit_tests": 705,
+    "method_cells": 6,
+    "method_control_sessions": 9,
+    "local_context_cells": 39,
+    "simplification_queries": 15,
+    "recursor_cells": 12,
+    "recursor_exact_replays": 9,
+    "recursor_completed_false_controls": 3,
+    "extended_exference_operations": 13,
+    "extended_exference_false_controls": 1,
+    "nested_forall_cells": 9,
+    "native_signatures_per_completed_engine": 350
+  },
+  "boundaries": [
+    "All ten native gates are fresh terminal runs against the new dependency and rebuilt executables; no old executable receipt is reused.",
+    "The accepted request-deadline repair remains unchanged. Method-control source guards, query limits, capture format and independent replay checks remain enforced.",
+    "All ten gates are terminal passes and the final parent input-integrity check passed; there are no running child artifacts.",
+    "Source hashes were checked again while packaging; this is not another live synthesis run.",
+    "Native List recursors and type-signature coverage do not establish native tree or complete Church behavioral coverage.",
+    "The six contextual List diagnostic queries remain refused at source admission; these compatibility gates do not accept those queries or add constant universe metadata.",
+    "This integrates the accepted canonical contextual milestone into Leant; it does not complete broader public syntax, provider evidence, native trees or the full 160-cell Church behavior target."
+  ],
+  "archive": {
+    "path": "contextual-list-native-integration.zip",
+    "sha256": "28e9c1c6ca40023174bfdfbf165b27415e7a41573d1d66623883f406ab9b0d27",
+    "bytes": 11507937,
+    "artifact_count": 3747,
+    "all_members_rehashed": true
+  }
+}
