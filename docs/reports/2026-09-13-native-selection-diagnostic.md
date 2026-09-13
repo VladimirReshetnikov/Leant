@@ -20,7 +20,7 @@ The isolated checkout uses Leant `d9dfcfad0158092e094e45931d1db0e503e6aded` with
 | Both actual False controls | 2/2 |
 | Djinn full signature corpus | 350/350 candidates, axiom-free exact kernel replay passes |
 
-The Exference signature gate was still running when this diagnostic was captured and is excluded from the receipt. The complete integration run is not accepted. Build, unit, and selection integrity checks pass for their respective source/runtime scopes; this report does not claim the still-running controller's final integrity result.
+The initial diagnostic was captured while the Exference signature gate was running. That gate subsequently completed: **350/350 candidates and axiom-free exact kernel replay pass in Exference too**. The final controller confirms unchanged sources, runtimes and controller. Its overall status remains failed solely because the selection matrix failed. The [terminal supplement](https://github.com/VladimirReshetnikov/Leant/blob/main/test-context/receipts/native-scoped-selection-terminal-2026-09-13.json) and [archive](https://github.com/VladimirReshetnikov/Leant/blob/main/test-context/receipts/native-scoped-selection-terminal-2026-09-13.zip) retain this final result and the Exference signature artifacts; the initial checkpoint archive is unchanged.
 
 The matrix uses 32 candidates/verifications, 20,000 search steps/choices, a 45-second query deadline, and a 180-second outer process guard. The global inventory contains only `Ctx.C.out`, with provider cap one; provider discovery is disabled for the local callback cases. Reference implementations are confined to separate replay/oracle files.
 

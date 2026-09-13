@@ -1,0 +1,47 @@
+{
+  "status": "failed",
+  "source_commit": "d9dfcfad0158092e094e45931d1db0e503e6aded",
+  "dependency_commit": "a4c1bad92d1c63bb533113a7497a577c418559db",
+  "gates": [
+    {
+      "gate": "unit",
+      "exit_code": 0
+    },
+    {
+      "gate": "selections",
+      "exit_code": 1
+    },
+    {
+      "gate": "signatures-djinn",
+      "exit_code": 0,
+      "complete_replay": true
+    },
+    {
+      "gate": "signatures-exference",
+      "exit_code": 0,
+      "complete_replay": true
+    }
+  ],
+  "sources_unchanged": true,
+  "runtimes_unchanged": true,
+  "controller_unchanged": true,
+  "schema": 1,
+  "supplements": "native-scoped-selection-diagnostic-2026-09-13.json",
+  "archive": "native-scoped-selection-terminal-2026-09-13.zip",
+  "archive_bytes": 86450,
+  "archive_sha256": "ea83618baf94cbe5eded0b412a3742a76efce1f0c04b752ba0427255cdff02d1",
+  "member_sha256": {
+    "signatures-exference.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "signatures-exference.stdout.txt": "7bd8fc7a9eca5882cc1952fc697d143ee16c2f40076b641cde5a905b9f6d6bea",
+    "signatures-exference/Candidates.lean": "c6337d72f81f1175d1a4ca079bc8655a4275d6d86a5371c595f0b40182d6381b",
+    "signatures-exference/Types.lean": "1897b6f0288abc859ee488c24d474f19228d7c1cc2996016f0e216b9c897f24e",
+    "signatures-exference/kernel-output.txt": "cf6a4667156a646f1afa20ba86cf8ff0d51e68c96aa7e0e70a268f5b63ea004e",
+    "signatures-exference/leant-output.txt": "beb38a4390921c3288f49cb40e89920cf6aec51f65279e65bbf1921ece7c3e9a",
+    "signatures-exference/manifest.json": "7fcd5399369e6e06e8f9f79eaa46c468a3dab409ec3209bc0bc32066679da623",
+    "signatures-exference/results.json": "47da1a45917a6fe0aca2f3ccabdf09ae0c574e73a6c4b4c9f8c44e8787aa5ebb",
+    "signatures-exference/synth-church.txt": "ebf9910a5e0d0cf5cb4db022bd3f93af63d7511d37a5dbf6b24232ed87b6eabc",
+    "terminal-results.json": "a7224ffb4693369b633b2c906174a19bcbf18ea347e212c9688cc9a3211f9284"
+  },
+  "production_dependency_promoted": false,
+  "church_behavior_cells_added": 0
+}
