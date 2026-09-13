@@ -52,8 +52,11 @@ three False controls, and both 350-signature kernel replay corpora pass.
 Established variants precede the bounded `Unit` fallbacks within each universe
 lane, and every candidate still requires Lean verification. The
 [current re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-starts with one bounded constructor-integration pass, then reduction construction
-and separately validated extrema. The
+now prioritizes reduction construction and separately validated extrema. The
+[bounded constructor closure](docs/reports/2026-09-13-constructor-closure-after-selections.md)
+passes all three previously failing nested-context cases with exact Lean replay;
+Djinn method/tail and its canonical regression still miss at 32 candidates, so
+the constructor patch remains unaccepted. The
 [Exference lexical-selection repair](docs/reports/2026-09-13-exference-scoped-selections.md)
 and its native integration are delivered. Checked type and
 dictionary selections now survive source lowering and occurrence-sensitive
@@ -322,12 +325,12 @@ Companion documents:
   with exact kernel replay, and all six existing method-discovery cases. The
   [expanded diagnostic](docs/reports/2026-09-13-contextual-constructor-frontier.md)
   completes 17/21 positive replays and all six actual False controls. Djinn's
-  method-with-tail case and nested-dictionary behavior in all three modes remain
-  open; an ineffective ordering experiment was reverted. Full regression
+  method-with-tail case remains open; the subsequent bounded pass closes nested
+  dictionaries in all three modes; an ineffective ordering experiment was reverted. Full regression
   acceptance remains required before publication. The latest captured-core
   experiments still miss the required tail behavior at the original bound. The
-  revised order starts with bounded constructor acceptance, then reduction
-  construction and extrema. The ledger and scoped dictionary-selection repair
+  bounded constructor pass now closes the three nested-context cases but leaves
+  method/tail open; reduction construction and extrema are next. The ledger and scoped dictionary-selection repair
   are delivered; broader source obligations remain tracked separately.
   Broader search estimates were rejected after losing Church composition.
   The current dependency is `ebadbefd`, with complete native selection acceptance. The full 13-operation/19-default coverage
