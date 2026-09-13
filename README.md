@@ -52,7 +52,8 @@ three False controls, and both 350-signature kernel replay corpora pass.
 Established variants precede the bounded `Unit` fallbacks within each universe
 lane, and every candidate still requires Lean verification. The
 [current re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-now prioritizes reduction construction and separately validated extrema. The
+now prioritizes the exact Djinn method/tail failure, then reduction term
+construction, the eight independent Church misses, and extrema batches. The
 [bounded constructor closure](docs/reports/2026-09-13-constructor-closure-after-selections.md)
 passes all three previously failing nested-context cases with exact Lean replay;
 Djinn method/tail and its canonical regression still miss at 32 candidates, so
@@ -75,6 +76,13 @@ requires per-cell behavioral validation. The
 [provider-admission experiment](docs/reports/2026-09-13-behavioral-provider-admission.md)
 admitted both numeric providers but did not fix Djinn `length`; further scheduling
 changes require a derivation trace. Its scheduling patch remains unaccepted.
+The [reduction carrier trace and experiment](docs/reports/2026-09-13-reduction-carrier-boundary.md)
+identify a missing witness carrier in the inspected root routes. A bounded
+continuation-carrier rule passes strict builds and 97 private Exference tests,
+but neither the focused Djinn regression nor native Exference `foldl1` passes.
+The rule remains unreleased; the smaller method/tail reproducer is the next
+bounded investigation, while reductions and extrema remain required.
+
 The [native reduction baseline](docs/reports/2026-09-13-native-reductions-baseline.md)
 now records all nine Lean `foldl1`/`foldr1`/`reduce` misses at the original
 deadlines, with passing oracle and False controls. No reduction acceptance
