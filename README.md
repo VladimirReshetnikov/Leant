@@ -67,11 +67,16 @@ evidence does not establish that a case was never attempted.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
 prioritizes end-to-end [kinded Haskell source support](docs/reports/2026-09-13-public-kinded-source-frontier.md),
-then a small extrema baseline and a separate Lean universe-polymorphism milestone.
+with engine checking and original-signature replay as the next gate. A ten-cell
+extrema baseline runs at the next integration checkpoint, followed by a separate
+Lean universe-polymorphism milestone.
 The [checked source-kind transport prerequisite](docs/reports/2026-09-13-source-kind-transport-prerequisite.md)
 preserves ground-kind forall annotations through conversion and synonym expansion,
 with 539 foundation and 171 integration tests passing. Public kinded queries still
-fail conversion until engine and rendering integration is complete. Integer indexing,
+fail conversion in the published implementation. An unpublished parser/request
+prototype passes 539 foundation, 187 integration and 38 API tests, but all eight
+public probes reach an explicit execution guard: it adds no synthesis acceptance.
+The delivery plan distinguishes that local progress from the release. Integer indexing,
 Lean Djinn length, contextual evidence and supplied-fold trees remain required.
 The failed reduction variants stay paused until a trace justifies a different
 construction change.
