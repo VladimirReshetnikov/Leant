@@ -58,10 +58,13 @@ not establish that a case was never attempted. Constructor acceptance adds no
 Church behavior cells by association.
 
 The [current delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-next targets reduction term construction, the eight independent Church cases
-and extrema batches. The [carrier-only reduction experiment](docs/reports/2026-09-13-reduction-carrier-boundary.md)
-remains unreleased after failing its behavioral gates. General source-language,
-universe and public-query obligations remain part of the practical goal.
+records a local `maybeEither` candidate passing exact behavior checks in both
+languages, with broader release validation still pending. It next targets
+reduction carrier admission and step construction, Lean Djinn `length`, integer
+indexing and extrema batches. Both the [carrier-only reduction experiment](docs/reports/2026-09-13-reduction-carrier-boundary.md)
+and the later required-assumption extension failed their reduction gates.
+Source-language, universe, contextual-evidence, supplied-fold tree and public-query
+support remain explicit obligations of the practical goal.
 
 ## Contents
 
