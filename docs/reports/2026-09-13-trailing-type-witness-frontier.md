@@ -6,7 +6,10 @@ positives: Djinn's `last` reaches its 90-second command deadline without an
 accepted output. Its generated candidate 45 identifies a concrete rendering
 boundary. A bounded renderer change then passes all six positives and all
 three False controls in a fresh working-source run. Isolated production
-validation is running separately; the renderer change is not yet published.
+validation subsequently passed its strict build but failed two of 707 unit
+tests: an exact rendering-list assertion and a three-lane variant-count
+assertion. Its later behavior and signature gates did not run. The renderer
+change is not yet published; see the [updated re-triage](2026-09-13-synthesis-delivery-retriage.md).
 
 ## Completed behavior evidence
 

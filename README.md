@@ -47,8 +47,12 @@ and all three Lean modes: 20 cells with exact replay and actual False controls.
 The twelve Lean replays preserve the full types and have empty axiom inventories.
 The [remaining-selector follow-up](docs/reports/2026-09-13-trailing-type-witness-frontier.md)
 records Haskell `last`/`atKey` acceptance and a working Lean renderer repair that
-closes the native `last` miss at unchanged limits. Isolated validation of that
-renderer change is still required before code publication.
+closes the native `last` miss at unchanged limits. Its isolated strict build
+passes, but two of 707 unit tests fail on rendering compatibility and variant
+counts; the later isolated behavior/signature gates have not run. The
+[current re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
+prioritizes renderer compatibility, the 92 cells without indexed acceptance,
+and preservation of scoped dictionary selections.
 
 ## Contents
 
@@ -90,8 +94,8 @@ Companion documents:
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
 - **[Current synthesis re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)**
-  — prioritize the complete Church behavior ledger and missing behaviors;
-  track bounded constructor acceptance and scoped dictionary evidence separately;
+  — finish renderer compatibility, close missing behavior cells, and preserve
+  scoped dictionary evidence; track constructor search failures separately;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**

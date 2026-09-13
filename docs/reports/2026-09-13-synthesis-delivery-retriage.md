@@ -1,70 +1,65 @@
-# Synthesis delivery re-triage: coverage, scoped evidence and bounded search
+# Synthesis delivery re-triage after selector acceptance
 
-> Remaining-selector follow-up: the [last/atKey evidence and trailing-type repair](2026-09-13-trailing-type-witness-frontier.md) bring the ledger to 68 historically accepted cells. The captured Lean Djinn last miss is repaired in a fresh working-source run; isolated renderer validation is pending before publication. Reductions and the other implementation obligations remain next.
+The immediate release task is to reconcile the trailing-type renderer repair with its existing compatibility and variant-budget contracts. Then close missing Church behavior cells in small batches. Preserve scoped dictionary selections as the next substantive evidence repair; keep the contextual-constructor search misses separately attributable. The coverage ledger is delivered infrastructure, no longer a proposed feature.
 
-> Native selector follow-up: all [twelve matching Lean selector cells](2026-09-13-native-supplied-default-selectors.md) pass, completing those four operations across all five modes. The ledger now records 60 historically accepted cells, four attempted without indexed acceptance and 96 without indexed evidence. Remaining selectors and reductions are next; the other implementation obligations stay open.
+This assessment preserves the original priorities 1–4 and their completion requirements. It changes execution order based on current evidence, without accepting the pending source changes.
 
-> Capability follow-up: the [eight Haskell supplied-default selector cells](2026-09-13-supplied-default-selectors.md) pass live synthesis and exact replay. The ledger now records 48 historically accepted cells, four attempted without indexed acceptance and 108 without indexed evidence. Matching Lean selectors and other missing behavior batches remain next.
+## Current evidence and release boundary
 
-> Delivered follow-up: the [160-cell ledger](../../test-church/behavior-ledger.md) and its pinned-receipt generator are implemented. The initial catalog records 40 historically accepted cells, four attempted without indexed acceptance and 116 without indexed evidence. These are not current validation counts. Missing behavior batches are the next capability work.
+- The [Church behavior ledger](../../test-church/behavior-ledger.md) enumerates exactly 160 cells. Its selected receipts record **68 historical acceptances, four attempted cells without indexed acceptance, and 88 cells without indexed evidence**. These are not a current-revision pass rate, and missing indexed evidence does not mean never attempted.
+- The six supplied-default selectors `head`, `last`, `fromJust`, `fromLeft`, `fromRight`, and `atKey` have recorded acceptance across both Haskell engines and Lean Djinn, Exference, and Both. The new Lean Djinn `last` result depends on an unpublished renderer change; working-source behavior acceptance does not establish release readiness. See the [selector report](2026-09-13-native-supplied-default-selectors.md) and [last/atKey report](2026-09-13-trailing-type-witness-frontier.md).
+- The isolated renderer checkout uses committed Leant `d2e5473e1cbabfc36094cd84c651a9793e4fbc68` and clean Djex `c1ad560e106f59df07d1a32c3b51158ef749fc99`, with only the renderer delta and two new tests. Its strict build passes, but **705/707 unit tests pass**. The controller stops there: its six-case live behavior gate and both 350-signature replay gates did not run.
+- The two failures concern a newly added `Unit` variant in the provider-result rendering list and an existing three-lane, 36-variant expectation. They establish a compatibility decision to resolve, not a demonstrated kernel-soundness failure. Do not mechanically relax the assertions or call the renderer accepted from the separate 6/6 working-source run.
+- The [constructor diagnostic](2026-09-13-contextual-constructor-frontier.md) remains **17/21 positives and 6/6 actual False controls**. Its four failures comprise a Djinn method/tail bounded miss, ambiguous scoped reconstruction in Djinn and Both, and a separate Exference bounded miss.
+- The previous production integration remains revision-specific: [705 native unit tests and both 350-signature replays](2026-09-12-contextual-list-native-integration.md). It does not validate the dirty constructor or renderer sources.
 
-The next improvement should advance the missing Church behaviors. Build the complete receipt-derived coverage ledger first, then deliver small behavior batches while keeping contextual-constructor acceptance and dictionary-selection repair as separately tracked work. The expanded constructor matrix must no longer be a prerequisite for every independent delivery. This changes the execution order in the [previous assessment](2026-09-12-synthesis-after-contextual-constructor-probes.md); it preserves the active priorities 1–4 and their full completion requirements.
+The isolated failure evidence is local at `C:/Leant-validation/trailing-type-witness/dist-newstyle/trailing-type-witness-isolated-v1/results.json` and `unit/unit.stdout.txt`. The unfiltered suite completed in 284.04 seconds. The controller records unchanged inputs. This re-triage does not add a new acceptance receipt or modify ledger counts.
 
-## Evidence behind the change
+## Delivery order and concrete exit criteria
 
-The published baseline remains the [accepted native integration](2026-09-12-contextual-list-native-integration.md): ten gates, 705 native unit tests and both 350-signature kernel replays, with Leant using Djex `c1ad560e`. Those results belong to their recorded revision. They do not validate the subsequent dirty working trees.
+| Order | Improvement | Why now | Acceptance boundary |
+| --- | --- | --- | --- |
+| 1 | Finish the bounded trailing-type renderer repair. | A real generated `last` candidate already passes when its unresolved trailing type is instantiated with `Unit`; the current proposal also changes other renderings. | Decide and document which unresolved sites may receive the fallback. Preserve explicit type selections, provider ownership, useful earlier variants, and bounded enumeration. Resolve both failing regressions with a justified contract; then pass the isolated full suite, six `last`/`atKey` positives, three False controls, and both signature replay corpora. Publish this small change independently of constructor work. |
+| 2 | Close the missing Church behavior cells. | This directly measures the requested practical capability. The ledger now identifies the gaps without another infrastructure project. | First check for existing usable receipts; otherwise run the matching Lean Djinn/Both extended cases and nonempty reductions in bounded batches. Require original full types, defaults, provider sets and limits, live synthesis, actual False controls, and exact independent replay. Diagnose a failed batch and continue independent batches. |
+| 3 | Preserve selected type arguments and dictionary occurrences through reconstruction. | The nested-context failure identifies evidence that is checked and then lost. This is more specific than another ranking experiment. | Carry scoped selections through erasure and reconstruction. Cover alpha-renaming, nested binders, equal-predicate dictionaries with different payloads, wrong-scope evidence, and missing-evidence refusal. Replay the complete target. Retain ambiguity rejection when the proof does not determine a choice. |
+| 4 | Finish contextual-constructor acceptance and supplied-fold/tree composition. | Ordinary data remains an original requirement; the expanded probes expose both evidence and search issues. | Trace the exact native request, including strategy and candidate accounting. Repair Djinn method/tail composition at its original 32-candidate bound and investigate Exference nested contexts independently. Require the complete 21-positive/six-control matrix and affected full suites before broad acceptance. Publish canonical Djex first, then validate the exact Leant dependency. |
+| 5 | Finish public query and provider coverage. | Existing internal capability should become reliably reachable through the agreed syntax, before large new language expansions. | Complete applicable named-function `where` one-shot entrances and kinded Haskell binders. Treat derived methods, conditional/superclass dictionaries, and broader Lean universes as separate increments, each with positive and refusal cases. Haskell kinds and Lean universes require distinct evidence. |
 
-The [expanded constructor diagnostic](2026-09-13-contextual-constructor-frontier.md) passes 17 of 21 positives and all six actual False controls. It exposes three obligations, rather than one undifferentiated constructor problem:
+These are dependency priorities, not instructions to run competing heavy validations. One build/runtime owner freezes each run. A stalled independent batch does not block all other deliveries.
 
-| Boundary | Observed failure | Appropriate next step |
+## What remains in the 160-cell target
+
+There are **92 cells without indexed acceptance**, divided as follows:
+
+| Batch | Cells | Proposed handling |
+| --- | ---: | --- |
+| All 13 extended operations in Lean Djinn and Both | 26 | Recover any qualifying historical evidence first. Run the missing modes against their original fixtures after renderer stabilization; do not infer Both acceptance from either constituent engine. |
+| Haskell Djinn `maybeEither` | 1 | Retain its recorded failed attempt; attribute the search/evidence boundary before choosing a repair. |
+| Supplied-default `foldl1`, `foldr1`, and `reduce`, all five modes | 15 | Next new operation family. Exercise empty/default behavior and nonempty accumulator behavior. |
+| Nine extrema operations, all five modes | 45 | Group comparator-based, projection-based, and paired results by actual dependencies. Exercise singleton, ties, order, and supplied defaults; record each operation/mode separately. |
+| Supplied-default native-`Int` `at`, all five modes | 5 | Keep distinct from accepted `atKey`. Preserve the declared integer primitive, negative/out-of-range behavior, and full type. Both Haskell modes already have attempts without indexed acceptance. |
+
+The nine extrema operations are `maximumBy`, `maximumOn`, `minimumBy`, `minimumOn`, `minMaxBy`, `minmaxElement`, `maximum`, `minimum`, and `minMax`. Existing attempts and receipts determine implementation work; absence from this index alone does not establish a missing capability.
+
+## Other ideas reconsidered
+
+| Idea | Decision | Promotion trigger |
 | --- | --- | --- |
-| Djinn method-and-tail composition | The required program is absent from the original 32-candidate prefix. | Trace the exact captured request through proof construction, candidate accounting and source reconstruction. Establish which branch or rule prevents the composition from reaching the prefix. |
-| Djinn nested dictionaries, also affecting Both | Source reconstruction reports `ambiguous lexical Given type instantiation`. | Preserve the actual selected type arguments and lexical dictionary occurrence through erasure and reconstruction. Retain the ambiguity guard when evidence is absent. |
-| Exference nested dictionaries | Seven verified candidates fail the observations before the original step/queue limits stop search. | Investigate its search path independently. A Djinn source-evidence repair is not evidence that this search miss is solved. |
+| More coverage-ledger machinery | Maintain, do not expand by default. | A concrete missing provenance or outcome distinction. The 160-key index and 15 ledger tests are already delivered. |
+| Failure-directed rendering and source-selected type arguments | Promote narrowly. | The two renderer regressions show the cost of broad fallback generation. Use actual binder/kind/universe evidence where available; consider diagnostic-directed retries only with preserved candidate identity and limits. Do not build a general retry framework to fix one case. |
+| Exact request capture and candidate accounting | Promote as focused diagnostics. | Reproduce the native method/tail failure with identical providers, assignments, strategy, and limits; identify derivation loss, truncation, duplicate work, or reconstruction refusal. Simplified passing fixtures are insufficient. |
+| Search-order or derived-value redesign | Defer until a causal trace. | Earlier priority and checked-derived-value experiments failed the real 32-candidate fixture. Both experiments were reverted; retained logs are diagnostic evidence. Show which missing branch a new rule recovers at unchanged bounds. |
+| Clear unsuccessful-query explanations | Add alongside the touched failure path. | Distinguish unsupported source, bounded exhaustion, reconstruction failure, and verification failure. Never report a bounded miss as impossibility. |
+| Duplicate suppression and observation caching | Conditional optimization. | Measure repeated work and establish keys containing scope, selected type arguments, dictionaries, environment, and observations. Printed equality is insufficient. |
+| Broader provider discovery and ranking | Defer broad expansion. | Evidence that usable providers are excluded or delayed after admission and reconstruction work correctly. Larger inventories can make bounded search worse. |
+| More verifier workers, transport tuning, general memoization | Defer. | A measured bottleneck and an end-to-end improvement without weakening replay or process isolation. |
+| General recursion/induction, dependent or indexed synthesis, a Lean-native engine | Future scope. | A required practical example that existing representations and supplied folds cannot express, with termination and equality obligations identified. |
+| Editor integration and platform tooling | Later product work. | Stable command behavior and materially broader accepted practical coverage. |
 
-The previously proposed exact native capture is now available locally. It includes the abstract list/element types, qualified method, polymorphic nil/cons values, competing zero/successor values and empty provider assignments. The canonical regression using this world reproduces the tail miss; the earlier simplified fixture did not. This makes environment fidelity an immediate requirement for future search experiments.
+## Completion and publication
 
-Two further local experiments fail that captured regression: enabling the existing composition-priority traversal for the contextual plan, and exposing independently checked derived values with explicit proof-cost charges. The latter builds with `-Werror`, but the focused test still fails at 32 candidates. Its output includes a method-derived singleton that ignores the supplied tail. That is useful diagnostic evidence, not the required behavior. The priority-traversal experiment has been reverted; the derived-value experiment remains uncommitted and unaccepted at this assessment. These local logs are not a new archived acceptance receipt:
+The practical target remains **(13 extended + 19 supplied-default operations) × (2 Haskell engines + 3 Lean modes) = 160 behavior cells**, with controls and independent replay additional. Lean counterparts of partial functions retain the agreed supplied default or inhabitance assumption. Named-function-plus-`where` remains the behavioral query interface.
 
-- Djex `dist-newstyle/contextual-polymorphic-priority-v1.log`.
-- Djex `dist-newstyle/contextual-polymorphic-derived-build-v2.log`.
-- Djex `dist-newstyle/contextual-polymorphic-derived-v2.log`.
+The 160 cells are a regression target, not a mathematical completeness theorem for arbitrary rank-N or impredicative inhabitation. Source-evidence, ordinary-data, contextual-provider, and public-query obligations remain part of the original goal even after the matrix passes.
 
-The complete native unit run remains 707/709, followed by fixes and two passing focused source-wiring checks. A fresh complete 709-test run is still required for a release. Neither that requirement nor a green build supplies missing behavior coverage.
-
-## Revised delivery order
-
-These are execution priorities, not a renumbering or reduction of the original implementation goal.
-
-| Order | Deliverable | Acceptance and stopping rule |
-| --- | --- | --- |
-| 1 | A complete, small Church behavior ledger. | Enumerate exactly 160 distinct operation/mode keys. Link evidence by source revision, fixture, limits and runtime identity. Record unrun, refused, bounded miss, reconstruction failure, replay failure and accepted outcomes separately. Keep historical acceptance distinct from current validation. Do not fill cells from signature tests or supporting constructor probes. |
-| 2 | Missing Church behaviors in small independent batches. | Start with Haskell Djinn `maybeEither` and supplied-default selectors/nonempty reductions; order extrema and native-`Int` indexing from their actual failures. For each batch require live synthesis, original types/providers/limits, observations, actual False controls and independent replay of exact displayed output. Record the cause of a miss before moving to the next independent batch. |
-| 3 | A bounded contextual-constructor release, without hiding expanded failures. | Define the supported boundary explicitly and run its complete acceptance matrix plus affected regressions. The six singleton probes alone are insufficient. Retain all four expanded failures in the register. A smaller release is permissible only if its unsupported cases have explicit, checked behavior and the release makes no broader claim; the full 21-positive target remains open. Publish canonical Djex first, then validate and promote that exact Leant dependency. |
-| 4 | Preserve scoped provider selections through source reconstruction. | Carry the proof's chosen type instantiation and dictionary occurrence as checked evidence, including alpha-renaming and nested scopes. Test distinct outer/inner payloads, equal-predicate dictionary occurrences, wrong-scope selections and missing-evidence refusal. Require exact full-type replay. Do not replace a scoped choice with a type hole or relax ambiguity rejection. |
-| 5 | Finish public query access, then broaden provider evidence. | Complete applicable named-function `where` one-shot entrances and kinded Haskell binders using existing parsing/evidence paths. Add derived methods, conditional/superclass dictionaries and broader Lean universes as separate increments with dedicated fixtures. Haskell kinds and Lean universes are distinct obligations. |
-
-Independent work here means independent dependencies, not concurrent heavy builds. Keep one build/runtime owner and freeze each validation run's inputs. Before any implementation release, remove ineffective experiments or give their retained parts an independently demonstrated purpose, run the appropriate complete suites and preserve the accepted baseline.
-
-## Other improvements reconsidered
-
-| Idea | Revised decision | What would justify promotion |
-| --- | --- | --- |
-| Exact native-to-core reproduction | Promote now as a small diagnostic tool. The simplified fixture concealed the actual miss. | Capture the real environment, binder order, providers, assignments, strategy and limits; verify that the reduced regression reproduces the public failure. The first saved preparation dump used DepthFirst, so it must not be described as a complete Interleave request capture. |
-| Candidate accounting and provenance | Promote only enough to explain the current 32-candidate failure. | Relate raw proof work, emitted groups, reconstructed variants and verified observations to stable scoped identities. Distinguish a missing derivation from work lost to duplicate candidates or reconstruction. |
-| Search ordering, fairness and derived-value rules | Require a causal trace before another experiment. Several ordering variants have failed the real fixture. | Show the useful branch, the point where it is delayed or unavailable, and improvement at unchanged original bounds without loss of proof accounting or existing behavior. A scheduler redesign is not yet justified. |
-| Complete coverage index | Immediate delivery infrastructure. | The 160-key ledger above, with no duplicate keys or blended pass rate across incompatible revisions. Keep the implementation small; a general orchestration framework is unnecessary. |
-| Public explanations of unsuccessful search | Add when touching the corresponding failure path. | Report unsupported source, bounded exhaustion, reconstruction failure and verification failure accurately. A bounded miss must not be presented as impossibility. |
-| Exact replay and negative controls | Continue as release requirements. | New emitted syntax or evidence forms require matching replay coverage; passing examples alone do not prove universal behavior. |
-| Duplicate suppression and observation caching | Still conditional, not a default next optimization. | Measure repeated equivalent work and establish keys including lexical scope, selected type arguments, dictionary evidence, environment and predicates. Printed equality is insufficient. |
-| Provider ranking and larger inventories | Defer broad changes. | Demonstrate lost recall after source admission and evidence reconstruction. Retain the existing targeted session-method preference while testing constructor enrichment. |
-| Native tree investigation | One bounded attribution batch at a stable milestone. | Correlate discovery, candidate forcing, graph checking, rendering and backend requests while preserving the original observations and False controls. Record an unresolved result and return to the behavior queue if no cause is established. |
-| More verifier workers, transport/RTS tuning, general memoization | Defer. | A measured bottleneck or repeated equivalent subproblem with safe scope keys; end-to-end latency alone is insufficient. |
-| General recursion, induction, dependent/indexed synthesis, Lean-native engine | Separate future expansions. | A required example that existing data representations and supplied folds cannot express, with termination and equality obligations identified. |
-| Editor integration and additional platform tooling | Later product work. | Stable public command semantics and broader accepted practical coverage. |
-
-## Completion boundary
-
-The full target remains **(13 extended + 19 supplied-default operations) × (2 Haskell engines + 3 Lean modes) = 160 behavior cells**, with controls and independent replays additional. This is the size of the target, not a count of missing cells. The agreed Lean counterparts of partial operations use supplied defaults or inhabitance assumptions. Named-function-plus-`where` syntax remains the public behavioral interface.
-
-The main change in this re-triage is to stop expanding a single acceptance task indefinitely. Preserve its exact failures, deliver independent coverage, and return with evidence-driven repairs. Stable milestones still require current root READMEs and pushes to `origin/main` in both repositories. This assessment delivers documentation only; it does not accept the local code experiments, promote Leant's dependency or close the broader implementation goal.
+Keep root READMEs current and push stable milestones to `origin/main` in both repositories. This assessment publishes documentation only; the renderer and contextual-constructor changes remain unaccepted implementation work, and Leant's production dependency is unchanged.
