@@ -52,14 +52,16 @@ three False controls, and both 350-signature kernel replay corpora pass.
 Established variants precede the bounded `Unit` fallbacks within each universe
 lane, and every candidate still requires Lean verification. The
 [current re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes finishing the scoped type/dictionary evidence repair, then tracing
-reusable accumulator support for reductions and extrema. The isolated Djex repair
-preserves distinct global dictionary selections through public batch/stream
-synthesis and GHC replay; full validation and native integration remain pending.
-The local callback regression needs an explicitly polymorphic test argument;
-a focused replay of the unchanged candidate body succeeds with that argument.
-Reductions and extrema account for 60 of the 68 cells without indexed acceptance;
-shared support still requires per-cell validation. The
+prioritizes native integration of the
+[accepted Djex source-selection repair](docs/reports/2026-09-13-scoped-source-selections.md),
+then reusable accumulator support for reductions and extrema. Checked type and
+dictionary selections now survive source lowering and occurrence-sensitive
+duplicate comparison. Public batch/stream replay covers global providers and
+local rank-N callbacks; the full Haskell integration and 138-test CLI suites pass.
+Both engines also pass all 350 Church signature checks and 50 scope probes each.
+Leant dependency promotion still requires native validation. Reductions and extrema
+account for 60 of the 68 cells without indexed acceptance; shared support still
+requires per-cell behavioral validation. The
 [provider-admission experiment](docs/reports/2026-09-13-behavioral-provider-admission.md)
 admitted both numeric providers but did not fix Djinn `length`; further scheduling
 changes require a derivation trace. Its scheduling patch remains unaccepted.
