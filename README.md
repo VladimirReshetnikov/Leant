@@ -52,14 +52,19 @@ three False controls, and both 350-signature kernel replay corpora pass.
 Established variants precede the bounded `Unit` fallbacks within each universe
 lane, and every candidate still requires Lean verification. The
 [current re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes native integration of the
+prioritizes Exference's remaining lexical-selection failure and native integration of the
 [accepted Djex source-selection repair](docs/reports/2026-09-13-scoped-source-selections.md),
-then reusable accumulator support for reductions and extrema. Checked type and
+then a bounded constructor-integration pass and reusable reduction carriers. Checked type and
 dictionary selections now survive source lowering and occurrence-sensitive
 duplicate comparison. Public batch/stream replay covers global providers and
 local rank-N callbacks; the full Haskell integration and 138-test CLI suites pass.
 Both engines also pass all 350 Church signature checks and 50 scope probes each.
-Leant dependency promotion still requires native validation. Reductions and extrema
+The [new native selection diagnostic](docs/reports/2026-09-13-native-selection-diagnostic.md)
+passes all 707 unit tests, eight of twelve selection positives, and four of six
+actual False controls. Djinn and Both pass their cases; all Both positives come
+from Djinn. Exference produces no candidates, so its False cases do not establish
+actual predicate rejection. Leant dependency promotion remains pending.
+Reductions and extrema
 account for 60 of the 68 cells without indexed acceptance; shared support still
 requires per-cell behavioral validation. The
 [provider-admission experiment](docs/reports/2026-09-13-behavioral-provider-admission.md)
