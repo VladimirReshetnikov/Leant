@@ -1,0 +1,48 @@
+{
+  "schema": "behavioral-provider-admission-diagnostic-v1",
+  "status": "completed_without_acceptance",
+  "base_commit": "dccad48b57f7af9c859e654115776dd93bc9db87",
+  "dependency_commit": "c1ad560e106f59df07d1a32c3b51158ef749fc99",
+  "scope": "An isolated unpublished Main.hs provider-first scheduling experiment at the original Lean Djinn length bounds.",
+  "strict_build_exit_code": 0,
+  "length": {
+    "status": "failed",
+    "original_deadline_seconds": 90,
+    "exact_provider_inventory": [
+      "BehaviorExtendedNumeric.zero",
+      "BehaviorExtendedNumeric.successor"
+    ],
+    "observations": {
+      "passed": 0,
+      "falsified": 88,
+      "inconclusive": 0
+    },
+    "end": "command_deadline"
+  },
+  "false_controls": {
+    "provider_free": {
+      "passed": 0,
+      "falsified": 623,
+      "inconclusive": 0
+    },
+    "same_environment_with_two_providers": {
+      "passed": 0,
+      "falsified": 512,
+      "inconclusive": 0
+    }
+  },
+  "sources_runtimes_controller_unchanged": true,
+  "archive": {
+    "path": "behavioral-provider-admission-diagnostic-2026-09-13.zip",
+    "sha256": "acc36b74849cd2677abd60fba1e0693dfacf46a0a35eeb5f2db55024b30dd776",
+    "bytes": 2948633,
+    "artifact_count": 461,
+    "all_members_rehashed": true
+  },
+  "boundaries": [
+    "No behavior acceptance and no scheduler release.",
+    "Admission of the exact numeric providers is established; admission alone did not fix the query.",
+    "Raw captures retain backend-request failures separately from falsifications. No impossibility claim.",
+    "The original 14-line experiment is preserved as change.diff and source/src/Main.hs."
+  ]
+}
