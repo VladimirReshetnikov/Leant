@@ -1,0 +1,227 @@
+{
+  "status": "diagnostic_complete",
+  "acceptance": false,
+  "dependency": "c1ad560e106f59df07d1a32c3b51158ef749fc99",
+  "leant_source_revision": "48700faaf0fd556f460b40e46a8d3f5488b09ad0",
+  "classification": "six_source_admission_refusals",
+  "cases": [
+    {
+      "name": "native_list_djinn_method",
+      "type": "∀ (α : Type), [Ctx.C α] → List Nat",
+      "predicate": "(@native_list_djinn_method Nat (@Ctx.C.mk Nat 7) = [7]) ∧ (@native_list_djinn_method Nat (@Ctx.C.mk Nat 11) = [11])",
+      "command": ":synth native_list_djinn_method : ∀ (α : Type), [Ctx.C α] → List Nat where (@native_list_djinn_method Nat (@Ctx.C.mk Nat 7) = [7]) ∧ (@native_list_djinn_method Nat (@Ctx.C.mk Nat 11) = [11])",
+      "engine": "djinn",
+      "expected": "candidate",
+      "mode": "where",
+      "exit_code": 0,
+      "status": "unaccepted",
+      "oracle": {
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "ListOracle.reference": [],
+          "ListOracle.passes": []
+        }
+      },
+      "diagnostic": "expected exactly one verified displayed output",
+      "classification": "source_admission_refusal"
+    },
+    {
+      "name": "native_list_djinn_argument",
+      "type": "∀ (α β : Type), [Ctx.C α] → β → List β",
+      "predicate": "(@native_list_djinn_argument Nat Nat (@Ctx.C.mk Nat 7) 37 = [37]) ∧ (@native_list_djinn_argument Nat Bool (@Ctx.C.mk Nat 11) true = [true])",
+      "command": ":synth native_list_djinn_argument : ∀ (α β : Type), [Ctx.C α] → β → List β where (@native_list_djinn_argument Nat Nat (@Ctx.C.mk Nat 7) 37 = [37]) ∧ (@native_list_djinn_argument Nat Bool (@Ctx.C.mk Nat 11) true = [true])",
+      "engine": "djinn",
+      "expected": "candidate",
+      "mode": "where",
+      "exit_code": 0,
+      "status": "unaccepted",
+      "oracle": {
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "ListOracle.reference": [],
+          "ListOracle.passes": []
+        }
+      },
+      "diagnostic": "expected exactly one verified displayed output",
+      "classification": "source_admission_refusal"
+    },
+    {
+      "name": "native_list_exference_method",
+      "type": "∀ (α : Type), [Ctx.C α] → List Nat",
+      "predicate": "(@native_list_exference_method Nat (@Ctx.C.mk Nat 7) = [7]) ∧ (@native_list_exference_method Nat (@Ctx.C.mk Nat 11) = [11])",
+      "command": ":synth native_list_exference_method : ∀ (α : Type), [Ctx.C α] → List Nat where (@native_list_exference_method Nat (@Ctx.C.mk Nat 7) = [7]) ∧ (@native_list_exference_method Nat (@Ctx.C.mk Nat 11) = [11])",
+      "engine": "exference",
+      "expected": "candidate",
+      "mode": "where",
+      "exit_code": 0,
+      "status": "unaccepted",
+      "oracle": {
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "ListOracle.reference": [],
+          "ListOracle.passes": []
+        }
+      },
+      "diagnostic": "expected exactly one verified displayed output",
+      "classification": "source_admission_refusal"
+    },
+    {
+      "name": "native_list_exference_argument",
+      "type": "∀ (α β : Type), [Ctx.C α] → β → List β",
+      "predicate": "(@native_list_exference_argument Nat Nat (@Ctx.C.mk Nat 7) 37 = [37]) ∧ (@native_list_exference_argument Nat Bool (@Ctx.C.mk Nat 11) true = [true])",
+      "command": ":synth native_list_exference_argument : ∀ (α β : Type), [Ctx.C α] → β → List β where (@native_list_exference_argument Nat Nat (@Ctx.C.mk Nat 7) 37 = [37]) ∧ (@native_list_exference_argument Nat Bool (@Ctx.C.mk Nat 11) true = [true])",
+      "engine": "exference",
+      "expected": "candidate",
+      "mode": "where",
+      "exit_code": 0,
+      "status": "unaccepted",
+      "oracle": {
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "ListOracle.reference": [],
+          "ListOracle.passes": []
+        }
+      },
+      "diagnostic": "expected exactly one verified displayed output",
+      "classification": "source_admission_refusal"
+    },
+    {
+      "name": "native_list_both_method",
+      "type": "∀ (α : Type), [Ctx.C α] → List Nat",
+      "predicate": "(@native_list_both_method Nat (@Ctx.C.mk Nat 7) = [7]) ∧ (@native_list_both_method Nat (@Ctx.C.mk Nat 11) = [11])",
+      "command": ":synth native_list_both_method : ∀ (α : Type), [Ctx.C α] → List Nat where (@native_list_both_method Nat (@Ctx.C.mk Nat 7) = [7]) ∧ (@native_list_both_method Nat (@Ctx.C.mk Nat 11) = [11])",
+      "engine": "both",
+      "expected": "candidate",
+      "mode": "where",
+      "exit_code": 0,
+      "status": "unaccepted",
+      "oracle": {
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "ListOracle.reference": [],
+          "ListOracle.passes": []
+        }
+      },
+      "diagnostic": "expected exactly one verified displayed output",
+      "classification": "source_admission_refusal"
+    },
+    {
+      "name": "native_list_both_argument",
+      "type": "∀ (α β : Type), [Ctx.C α] → β → List β",
+      "predicate": "(@native_list_both_argument Nat Nat (@Ctx.C.mk Nat 7) 37 = [37]) ∧ (@native_list_both_argument Nat Bool (@Ctx.C.mk Nat 11) true = [true])",
+      "command": ":synth native_list_both_argument : ∀ (α β : Type), [Ctx.C α] → β → List β where (@native_list_both_argument Nat Nat (@Ctx.C.mk Nat 7) 37 = [37]) ∧ (@native_list_both_argument Nat Bool (@Ctx.C.mk Nat 11) true = [true])",
+      "engine": "both",
+      "expected": "candidate",
+      "mode": "where",
+      "exit_code": 0,
+      "status": "unaccepted",
+      "oracle": {
+        "status": "passed",
+        "source_unchanged": true,
+        "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+        "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+        "kernel_unchanged": true,
+        "axiom_inventories": {
+          "ListOracle.reference": [],
+          "ListOracle.passes": []
+        }
+      },
+      "diagnostic": "expected exactly one verified displayed output",
+      "classification": "source_admission_refusal"
+    }
+  ],
+  "strict_build": "passed",
+  "strict_build_sources_still_unchanged": true,
+  "limitations": [
+    "No synthesized candidate was accepted.",
+    "The six reference implementations and predicates passed separate kernel checks with empty axiom inventories.",
+    "No False controls were run in this diagnostic.",
+    "Ten native integration gates for this dependency have not run; no dependency promotion is justified.",
+    "Source hashes match the earlier strict build and packaging-time recheck; this is not a full acceptance input freeze.",
+    "The first diagnostic attempt stopped on an invalid unused-instance binder in its second oracle; the corrected fresh six-case run is archived here."
+  ],
+  "runtime_identities": {
+    "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe": "a6d95739705de2e64bda24d2001a0f2bb2a54cc7c2d08778933796a627dac4b3",
+    "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe": "937918675ff15139816bbe2a4f6168fb8b36ea0e0990664311f4902cbce0f6f2",
+    "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+    "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe": "cf11cebeea855a47477a2648e2b8c10b11b7364e040e499d9cc5e015bfbaa0a2",
+    "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe": "7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a"
+  },
+  "artifact_count": 51,
+  "archive": "contextual-list-admission-diagnostic.zip",
+  "archive_sha256": "ca9ac166154c4d38c44a96e399a93509a57c2b797dc899b9ff921af943f17984",
+  "archive_bytes": 130136,
+  "artifacts": {
+    "dist-newstyle/build-contextual-list-native-v1.py": "9ab18f7757bfddcbcb8757f71a0dea1445324a05c2b2af3be52cf0b404e6ce56",
+    "dist-newstyle/contextual-list-native-build-v1/processes.json": "4e258482b2a1bc1595350b06234e76cd25503b301ebf29756be9a3771298868a",
+    "dist-newstyle/contextual-list-native-build-v1/results.json": "35d5d10e47509acb4d3f8fc9b64a6631fb87477549f4e434f09485c5c0080b68",
+    "dist-newstyle/contextual-list-native-build-v1/strict-build.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/contextual-list-native-build-v1/strict-build.stdout.txt": "6e5acc422b50075b305723acbf87f3d0ca042ff2b250ae11cdbec799434b21fe",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_argument-oracle.lean": "c442ec02def39181a20049dcd581499e532aa846196a10bfaade3fe235853eca",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_argument-oracle.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_argument-oracle.stdout.txt": "474a3a60d7e817e1af91b4a13c8e5fc06a1c8265f2bfdc301da6e5a991720b2a",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_argument.input.txt": "5872475a1ef9b87450281bea423fe409b11290b47ef900bf76ae0693191fd13d",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_argument.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_argument.stdout.txt": "8c490e6a52e10323a4221ff29ad0578f2af1aced7b738f8ad81ea991dadbe0c3",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_method-oracle.lean": "457811e786bb3b0f68b6cb2f9c7b0d597a5e88a2726f479afc8633e9e5ad5e11",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_method-oracle.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_method-oracle.stdout.txt": "4241c4ff5aab417fbc9c566d85c7548f4214ccd8113e6346ce53f8b30494a3f7",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_method.input.txt": "def7bf01d1a2167e22c436ebe3c5c9f598c3fc9cd2d542a6f344498b7c856987",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_method.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_both_method.stdout.txt": "48bdc605bab98f8277a79585050b2f66c2eb31521ec3916acffcf0f4dd82546c",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_argument-oracle.lean": "c442ec02def39181a20049dcd581499e532aa846196a10bfaade3fe235853eca",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_argument-oracle.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_argument-oracle.stdout.txt": "771d0527428cd7a032c42fd5f02110e89f29f8492ccc1c366ca6ab5334dfc1ab",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_argument.input.txt": "62e9dc8f930e0b4b722160dc1b6fdff79822dfef01d7a48cf1ecb7aeb9466146",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_argument.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_argument.stdout.txt": "689749064f7ac0531cdf6aa529b97f3f915ad7ce275f782bc1665cbe9c1a0bf4",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_method-oracle.lean": "457811e786bb3b0f68b6cb2f9c7b0d597a5e88a2726f479afc8633e9e5ad5e11",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_method-oracle.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_method-oracle.stdout.txt": "4241c4ff5aab417fbc9c566d85c7548f4214ccd8113e6346ce53f8b30494a3f7",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_method.input.txt": "640cd4268aedd1809ac0a9f37a03a6c2a4afaabf372da0516b24438d7e0ba4f7",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_method.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_djinn_method.stdout.txt": "2780cf7d13bcc07742a20f73275e8d6b3aca72785d7d81c74fb7fb5156be7fe1",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_argument-oracle.lean": "c442ec02def39181a20049dcd581499e532aa846196a10bfaade3fe235853eca",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_argument-oracle.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_argument-oracle.stdout.txt": "1173247023d5e6be3f7b3aa56fb3b101c58bccd562a34dcd877e543b7952e638",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_argument.input.txt": "9aec610e806dc6aafa4cd5921c451ccb8c18263231b891ee39f2b063e9c1221b",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_argument.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_argument.stdout.txt": "be798c7fe657554f30278f08c6fd7b9266a95a9cb8beb38219919b6ea61a41ae",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_method-oracle.lean": "457811e786bb3b0f68b6cb2f9c7b0d597a5e88a2726f479afc8633e9e5ad5e11",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_method-oracle.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_method-oracle.stdout.txt": "4241c4ff5aab417fbc9c566d85c7548f4214ccd8113e6346ce53f8b30494a3f7",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_method.input.txt": "f45f55e0b809d178666d24e708495c711eccb27d8e63b891b7d4705dac20264a",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_method.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dist-newstyle/native-contextual-lists-probe-v2/native_list_exference_method.stdout.txt": "8a037274621c3f3b5a8bcddb1d6ece2baf816940f23c08ab3380a032e4906d1d",
+    "dist-newstyle/native-contextual-lists-probe-v2/processes.json": "02d5da8a2f610a3bfe2d3a1a262f05b17e7223e1fb94088d266124eb5b58bcf6",
+    "dist-newstyle/native-contextual-lists-probe-v2/results.json": "c2772f94088c2ad451e91f0dba40647bb2a3a70224835f2d0b9112236a5ca720",
+    "dist-newstyle/package-native-contextual-list-diagnostic-v1.py": "f20c990a8188b1387d576d3ec68a2d8fa2d42a3d05efe281861ec8b483f1f86b",
+    "dist-newstyle/probe-native-contextual-lists-v2.py": "ebc3c88b83467c69b3e07623512f33aff16db5ef9ed18a4b30f02e16be6780e0",
+    "lib/Djex/test-church/behavior_runtime.py": "610aba95c2be827c72b2756c6b88b074166921b733523a3d40c1c23d99a3007a",
+    "src/Leant/Synth/ContextSource.hs": "ace5febe3d37f0fad9e85b35dd51ac7bc4256de0b16efa1b2658015ceae11d7a",
+    "src/Leant/Synth/Fragment.hs": "8e97aea2ff616b7433df5bad1155940ea41f630506cb1679ecad14fd3833e030",
+    "test-church/behavior_partial_probe.py": "cb82c8ca6c67a40486acfca4cef0143f28e076959da56b2fe9844579f940254e",
+    "test-context/global-methods/commands/method_djinn_where.commands.txt": "7fe9e7aaace00bd00da98faf6d7cc8862b89b7b1538c99b6a7ef328409a8f07f",
+    "test-context/run_production.py": "59e626db506eb1a73293962538296267c8abce4f726c62a39446d654148e1212"
+  }
+}
