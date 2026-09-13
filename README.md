@@ -58,11 +58,15 @@ cells without indexed evidence, out of 160. These are historical receipt counts,
 not a current-revision pass rate or a completeness theorem. Missing indexed
 evidence does not establish that a case was never attempted.
 
-The [delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md) retains
-reductions, Lean Djinn length, integer indexing, extrema and the broader source-language,
-universe, supplied-fold tree and public-query obligations. The earlier
-[carrier-only reduction experiment](docs/reports/2026-09-13-reduction-carrier-boundary.md)
-and the unsuccessful required-use extension remain diagnostic evidence.
+The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
+prioritizes finishing Lean strict-implicit source support, a bounded reduction
+construction experiment, and an independent public-query/binder coverage milestone.
+The strict-implicit prototype has passed its strict build, eight focused unit
+tests, nine live synthesis/replay cases and six rejection controls; broader
+release validation remains pending at this triage snapshot. Reduction
+carrier admission now passes in an isolated experiment, but synthesis still misses.
+Lean Djinn length, integer indexing, extrema, broader universe/contextual evidence
+and supplied-fold tree synthesis remain open obligations.
 
 ## Contents
 
