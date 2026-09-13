@@ -75,9 +75,9 @@ Companion documents:
 - **[Behavioral assertions](docs/behavioral-synthesis.md)** — the new
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
-- **[Current synthesis re-triage](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md)**
-  — native integration is accepted; address Lean contextual list admission,
-  then deliver missing Church behaviors and public query forms;
+- **[Current synthesis re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)**
+  — prioritize the complete Church behavior ledger and missing behaviors;
+  track bounded constructor acceptance and scoped dictionary evidence separately;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -208,7 +208,7 @@ Companion documents:
   All ten integration gates and the final input-integrity check pass; Leant now
   pins the tested dependency. Earlier deadline failures remain recorded in the
   [historical report](docs/reports/2026-09-08-native-carrier-integration.md).
-  The [new tree/frontend re-triage](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md)
+  The [new tree/frontend re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
   records the subsequent native tree and Haskell `foldl1` transfer misses at
   their original limits. A native tree debug expression independently passes
   the full type and all 16 observations, but its live typed-candidate acceptance
@@ -246,9 +246,10 @@ Companion documents:
   13/13 extended Church behavior and 350 signatures per Haskell engine; all
   2,309 tests in 15 complete suites pass across the documented runs, including
   a complete Length rerun after its test-only lifecycle repair. Native tree
-  acceptance remains open. The [current delivery order](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md)
-  prioritizes exact Lean contextual list admission, then missing Church
-  behaviors and public query forms. The canonical list dependency now passes
+  acceptance remains open. The [current delivery order](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
+  prioritizes the complete Church behavior ledger and missing behaviors, with
+  constructor acceptance, scoped dictionary evidence and public query forms
+  tracked separately. The canonical list dependency now passes
   native compatibility integration; the tree investigation remains bounded.
   The [combined verifier](docs/reports/2026-09-08-combined-behavioral-verification.md)
   remains covered by the now-passing recursor, fallback and method/cache gates.
@@ -272,12 +273,15 @@ Companion documents:
   completes 17/21 positive replays and all six actual False controls. Djinn's
   method-with-tail case and nested-dictionary behavior in all three modes remain
   open; an ineffective ordering experiment was reverted. Full regression
-  acceptance remains required before publication. The linked re-triage puts that gate
-  first, followed by missing Church behaviors and public query forms.
+  acceptance remains required before publication. The latest captured-core
+  experiments still miss the required tail behavior at the original bound. The
+  revised order starts with the 160-cell coverage ledger and missing Church
+  behaviors, with bounded constructor acceptance and scoped dictionary-selection
+  repair tracked separately.
   Broader search estimates were rejected after losing Church composition.
   The committed dependency is `c1ad560e`. The full 13-operation/19-default coverage
   across engines is still open.
-  See the [current retriage and evidence boundaries](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md).
+  See the [current retriage and evidence boundaries](docs/reports/2026-09-13-synthesis-delivery-retriage.md).
 - **Checked conditional providers in canonical Djex.** The
   [conditional-Given implementation](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)
   and [guarded nested-Given increment](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/docs/reports/2026-09-07-djinn-nested-givens.md)
@@ -676,7 +680,7 @@ queries across all three engines, and six independent candidate replays pass.
 That earlier full boundary run passed 619/620 tests; its one existing
 staged-search timeout passed an unchanged focused retry. Both historical
 receipts remain separate from the successful 647-test aggregate.
-The [implementation re-triage](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md)
+The [implementation re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
 tracks that boundary separately from forthcoming recursors, contextual
 dictionaries, and broader Church coverage.
 

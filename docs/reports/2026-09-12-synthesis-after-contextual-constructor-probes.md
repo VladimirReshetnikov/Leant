@@ -1,5 +1,7 @@
 # Further improvements after contextual constructor probes
 
+> Delivery order superseded by the [coverage and scoped-evidence re-triage](2026-09-13-synthesis-delivery-retriage.md). Independent Church batches no longer wait for the complete expanded constructor repair; all existing acceptance obligations remain tracked.
+
 > Subsequent diagnostic: the [complete constructor frontier](2026-09-13-contextual-constructor-frontier.md) records 17/21 positive replays and 6/6 False controls. Four cases remain open; an ineffective plan-ordering experiment was reverted. The implementation acceptance gate remains pending.
 
 The next delivery is acceptance of the contextual-constructor repair already in progress, followed by missing Church behaviors. General search expansion, larger budgets and a new engine remain lower priority. This assessment supersedes the delivery order in the [previous re-triage](2026-09-09-synthesis-after-contextual-list-acceptance.md), while preserving the original priorities 1–4 and their completion requirements.
