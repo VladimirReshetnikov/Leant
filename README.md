@@ -52,18 +52,18 @@ three False controls, and both 350-signature kernel replay corpora pass.
 Established variants precede the bounded `Unit` fallbacks within each universe
 lane, and every candidate still requires Lean verification. The
 [current re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes Exference's remaining lexical-selection failure and native integration of the
-[accepted Djex source-selection repair](docs/reports/2026-09-13-scoped-source-selections.md),
+prioritizes native integration of the
+[new Exference lexical-selection repair](docs/reports/2026-09-13-exference-scoped-selections.md),
 then a bounded constructor-integration pass and reusable reduction carriers. Checked type and
 dictionary selections now survive source lowering and occurrence-sensitive
 duplicate comparison. Public batch/stream replay covers global providers and
-local rank-N callbacks; the full Haskell integration and 138-test CLI suites pass.
-Both engines also pass all 350 Church signature checks and 50 scope probes each.
-The [new native selection diagnostic](docs/reports/2026-09-13-native-selection-diagnostic.md)
-passes all 707 unit tests, eight of twelve selection positives, and four of six
-actual False controls. Djinn and Both pass their cases; all Both positives come
-from Djinn. Exference produces no candidates, so its False cases do not establish
-actual predicate rejection. Leant dependency promotion remains pending.
+local rank-N callbacks. The Exference increment passes all 97 private engine,
+515 Exference, and 156 integration tests. Both engines also pass all 350 Church
+signature checks and 50 scope probes each.
+The new native run passes all 12 selection positives, all six actual False
+controls, and all 707 unit tests. Every positive has independent exact Lean
+replay, including the formerly failing Exference cases. Dependency promotion
+awaits completion of the native signature replay gates.
 Reductions and extrema
 account for 60 of the 68 cells without indexed acceptance; shared support still
 requires per-cell behavioral validation. The
@@ -73,7 +73,9 @@ changes require a derivation trace. Its scheduling patch remains unaccepted.
 The [native reduction baseline](docs/reports/2026-09-13-native-reductions-baseline.md)
 now records all nine Lean `foldl1`/`foldr1`/`reduce` misses at the original
 deadlines, with passing oracle and False controls. No reduction acceptance
-is claimed.
+is claimed. The function-carrier witnesses now compile in both Haskell and
+Lean, with axiom-free Lean definitions; synthesis reachability remains to be
+established. See the [selection and carrier report](docs/reports/2026-09-13-exference-scoped-selections.md).
 The [matching extended-operation batch](docs/reports/2026-09-13-matching-extended-native-six.md)
 adds live acceptance for `fromMaybe`, `maybeToList`, `isLeft`, `either`,
 `numeralSuccessor` and `numeralAdd` in Lean Djinn and Both: twelve exact replays,
