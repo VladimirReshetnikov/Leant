@@ -87,10 +87,12 @@ data LeanClassInfo = LeanClassInfo
 data LeanNominalInfo = LeanNominalInfo
   { contextNominalLeanName :: LeanName
   , contextNominalKindArity :: Int
+  , contextNominalConstantLevels :: [LeanLevel]
   } deriving (Eq, Show)
 
 data LeanProviderInfo variable = LeanProviderInfo
   { contextProviderLeanName :: LeanName
+  , contextProviderConstantLevels :: [LeanLevel]
   , contextProviderSourceType :: LeanType variable
   } deriving (Eq, Show)
 
@@ -229,7 +231,8 @@ renderLeanContextGraph environment graph = do
           (Set.null (T.freeVariables $ eraseLeanType $ contextProviderSourceType provider)
             && sameProjection metadata (contextProviderSourceType provider)) $
           Left $ ProviderTypeMetadataMismatch name
-        pure $ "@" ++ globalName (contextProviderLeanName provider)
+        checked $ constantText environment (contextProviderLeanName provider)
+          (contextProviderConstantLevels provider)
       Q.TypedLambda patterns body -> do
         checked $ when (null patterns) $ Left UnsupportedContextPattern
         (parameters, nested, residual) <- checked $
@@ -535,7 +538,9 @@ typeText environment = go (0 :: Int)
       info <- maybe (Left $ MissingNominalMetadata name) Right $ Map.lookup name $ contextRenderNominals environment
       let arity = contextNominalKindArity info
       when (arity < 0 || arity > 64) $ Left $ InvalidNominalKindMetadata name
-      pure ("@" ++ globalName (contextNominalLeanName info), arity)
+      rendered <- constantText environment (contextNominalLeanName info)
+        (contextNominalConstantLevels info)
+      pure (rendered, arity)
     LeanApplication function argument -> do
       (functionText, functionKind) <- go depth scope function
       (argumentText, argumentKind) <- go depth scope argument
@@ -597,7 +602,20 @@ binderDomainText environment domain = do
     left <- render parameter
     right <- render result
     pure $ parens $ left ++ " → " ++ right
-  levelText :: Int -> LeanLevel -> Either ContextRenderError String
+  levelText = universeText environment
+
+constantText :: ContextRenderEnvironment variable -> LeanName -> [LeanLevel]
+  -> Either ContextRenderError String
+constantText environment name levels = do
+  when (observedListLength 64 levels > 64) $ Left ContextProjectionLimitExceeded
+  arguments <- mapM (universeText environment 128) levels
+  pure $ "@" ++ globalName name ++
+    (if null arguments then "" else ".{" ++ intercalate ", " arguments ++ "}")
+
+universeText :: ContextRenderEnvironment variable -> Int -> LeanLevel
+  -> Either ContextRenderError String
+universeText environment = levelText
+ where
   levelText fuel _ | fuel <= 0 = Left ContextProjectionLimitExceeded
   levelText _ LeanLevelZero = Right "0"
   levelText _ (LeanLevelParameter name@(LeanName parts)) = do

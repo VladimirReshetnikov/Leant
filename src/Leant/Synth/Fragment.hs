@@ -94,8 +94,10 @@ import qualified Data.Set as Set
 import Text.Read (readMaybe)
 import Leant.Synth.ContextSource
   ( ContextSource, ContextSourceType (..), ContextSourceVisibility (..)
-  , mkContextSource, mkContextProviderSource, contextSourceType, contextSourceName
+  , mkContextSource, mkContextSourceWithConstructors, mkContextProviderSource
+  , mkContextProviderSourceAt, contextSourceType, contextSourceName
   )
+import Leant.Synth.ContextRender (LeanLevel (..))
 
 
 import Leant.Synth.ProviderCache
@@ -274,6 +276,9 @@ contextSourceFragment = convert . contextSourceType
   convert source = case source of
     ContextVariable variable -> FVar variable
     ContextNominal parts _ arguments ->
+      let name = contextSourceName parts
+      in FApp False name (AppNominal name) $ map convert arguments
+    ContextNominalAt parts _ _ arguments ->
       let name = contextSourceName parts
       in FApp False name (AppNominal name) $ map convert arguments
     ContextArrow domain result -> FArr (convert domain) (convert result)
@@ -1555,7 +1560,7 @@ contextSourcePrelude =
   , "    | _ =>"
   , "      match e.getAppFn with"
   , "      | .const constant levels =>"
-  , "        if !levels.isEmpty then return none"
+  , "        if levels.any (fun level => level != .zero) then return none"
   , "        if (← Meta.isClass? e).isSome then return none"
   , "        let some name := contextName? constant | return none"
   , "        let some arity ← contextTypeZeroArity? 65 (← inferType e.getAppFn) | return none"
@@ -1565,14 +1570,65 @@ contextSourcePrelude =
   , "        for argument in arguments do"
   , "          let some text ← contextSourceType? fuel depth scope argument | return none"
   , "          argumentsText := argumentsText ++ \" \" ++ text"
-  , "        pure (some (\"(nominal \" ++ name ++ \" \" ++ toString arity"
-  , "          ++ \" (args\" ++ argumentsText ++ \"))\"))"
+  , "        let levelsText := String.intercalate \" \" (levels.map fun _ => \"0\")"
+  , "        pure (some (\"(nominal-at \" ++ name ++ \" \" ++ toString arity"
+  , "          ++ \" (levels \" ++ levelsText ++ \") (args\" ++ argumentsText ++ \"))\"))"
   , "      | _ => pure none"
+  , ""
+  , "-- Inspect actual inductive declarations at the goal's exact constant levels."
+  , "-- The bounded positive inventory supplies values, never elimination authority."
+  , "private partial def contextNominalOccurrences (fuel : Nat) (e : Expr) :"
+  , "    MetaM (List (Name × List Level)) := do"
+  , "  match fuel with"
+  , "  | 0 => pure []"
+  , "  | fuel + 1 =>"
+  , "    let e ← whnfR (← instantiateMVars e).consumeMData"
+  , "    match e with"
+  , "    | .forallE _ domain body _ =>"
+  , "      let left ← contextNominalOccurrences fuel domain"
+  , "      withLocalDeclD (Name.mkSimple \"contextConstructorScope\") domain fun localValue => do"
+  , "        pure (left ++ (← contextNominalOccurrences fuel (body.instantiate1 localValue)))"
+  , "    | _ =>"
+  , "      let mut result := []"
+  , "      if let .const name levels := e.getAppFn then"
+  , "        if let .inductInfo _ ← getConstInfo name then"
+  , "          if !Lean.isClass (← getEnv) name then result := [(name, levels)]"
+  , "      for argument in e.getAppArgs do"
+  , "        result := result ++ (← contextNominalOccurrences fuel argument)"
+  , "      pure result"
+  , ""
+  , "private def contextConstructorPackets (goal : Expr) : MetaM String := do"
+  , "  let mut pending ← contextNominalOccurrences 256 goal"
+  , "  let mut visited : List (Name × List Level) := []"
+  , "  let mut entries : Array String := #[]"
+  , "  for _ in [:64] do"
+  , "    let next :: tail := pending | break"
+  , "    pending := tail"
+  , "    if visited.contains next then continue"
+  , "    visited := next :: visited"
+  , "    let (family, levels) := next"
+  , "    if levels.any (fun level => level != .zero) then continue"
+  , "    let .inductInfo declaration ← getConstInfo family | continue"
+  , "    if Lean.isClass (← getEnv) family || family.isInternalDetail then continue"
+  , "    for constructor in declaration.ctors do"
+  , "      if entries.size >= 64 then break"
+  , "      if constructor.isInternalDetail then continue"
+  , "      let .ctorInfo info ← getConstInfo constructor | continue"
+  , "      if info.induct != family || info.levelParams.length != levels.length then continue"
+  , "      let some name := contextName? constructor | continue"
+  , "      let sourceType := info.type.instantiateLevelParams info.levelParams levels"
+  , "      let some source ← contextSourceType? 256 0 [] sourceType | continue"
+  , "      let levelsText := String.intercalate \" \" (levels.map fun _ => \"0\")"
+  , "      entries := entries.push (\"(constructor \" ++ name ++ \" (levels \" ++ levelsText ++ \") \" ++ source ++ \")\")"
+  , "      pending := pending ++ (← contextNominalOccurrences 256 sourceType)"
+  , "  pure (\" (constructors \" ++ String.intercalate \" \" entries.toList ++ \")\")"
   , ""
   , "def contextSourcePacket (e : Expr) : MetaM String := do"
   , "  if !(← contextUsesGiven 256 e) then return \"\""
   , "  match ← contextSourceType? 256 0 [] e with"
-  , "  | some source => pure (\" (context-source 1 \" ++ source ++ \")\")"
+  , "  | some source => do"
+  , "    let constructors ← contextConstructorPackets e"
+  , "    pure (\" (context-source 2 \" ++ source ++ constructors ++ \")\")"
   , "  | none => pure (\" (context-source unsupported \" ++ esc"
   , "      \"exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows\" ++ \")\")"
   , ""
@@ -1662,8 +1718,9 @@ defaultProviderCap = 80
 providerProgramWith :: Int -> [String] -> ProviderQuery -> String
 providerProgramWith = providerProgramWithSourceMode False
 
--- Contextual discovery prioritizes direct session-class projections within
--- the existing cap and requests their complete schemes, without resolver-
+-- Contextual discovery prioritizes session values, including direct class
+-- projections, before imported result-head matches within the existing cap.
+-- It requests their complete schemes, without resolver-
 -- derived global instance evidence. Ordinary discovery keeps its own policy.
 contextualProviderProgramWith :: Int -> [String] -> ProviderQuery -> String
 contextualProviderProgramWith = providerProgramWithSourceMode True
@@ -1748,8 +1805,12 @@ providerProgramWithSourceMode exactSource cap sessionNames query = unlines $
   , "            preferred := preferred.push n"
   , "          else"
   , "            fallback := fallback.push n"
-  , "    let chosen := (sessionPreferred.toList ++ preferred.toList"
-  , "      ++ sessionFallback.toList ++ fallback.toList"
+  , if exactSource
+      then "    let chosen := (sessionPreferred.toList ++ sessionFallback.toList"
+      else "    let chosen := (sessionPreferred.toList ++ preferred.toList"
+  , if exactSource
+      then "      ++ preferred.toList ++ fallback.toList"
+      else "      ++ sessionFallback.toList ++ fallback.toList"
   , "      ++ workerPreferred.toList ++ workerFallback.toList).take "
       ++ show cap
   , "    let mut body := \"\""
@@ -1880,7 +1941,45 @@ parseContextSourcePacket (TSym "1" : rest) = do
   case remaining of
     [TR, TR] -> mkContextSource source
     _ -> Left "context-source: trailing or missing source-packet delimiters"
+parseContextSourcePacket (TSym "2" : payload) = do
+  (source, afterSource) <- parseContextSourceType 256 payload
+  case afterSource of
+    TL : TSym "constructors" : body -> do
+      (constructors, remaining) <- parseConstructors 0 body
+      case remaining of
+        [TR, TR] -> mkContextSourceWithConstructors source constructors
+        _ -> Left "context-source: trailing constructor-packet tokens"
+    _ -> Left "context-source: missing constructor inventory"
+ where
+  parseConstructors _ (TR : remaining) = Right ([], remaining)
+  parseConstructors count (TL : TSym "constructor" : TL : TSym "name" : body)
+      | count < (64 :: Int) = do
+    (parts, afterName) <- names 0 body
+    (levels, afterLevels) <- parseContextLevels afterName
+    (source, afterSource) <- parseContextSourceType 256 afterLevels
+    packet <- mkContextProviderSourceAt levels source
+    case afterSource of
+      TR : tailTokens -> do
+        (rest, remaining) <- parseConstructors (count + 1) tailTokens
+        pure ((parts, packet) : rest, remaining)
+      _ -> Left "context-source: missing constructor delimiter"
+  parseConstructors _ _ = Left "context-source: malformed or excessive constructor inventory"
+  names _ (TR : remaining) = Right ([], remaining)
+  names count (TStr part : remaining) | count < (64 :: Int) = do
+    (rest, final) <- names (count + 1) remaining
+    pure (part : rest, final)
+  names _ _ = Left "context-source: malformed constructor name"
 parseContextSourcePacket _ = Left "context-source: malformed or unsupported source-packet version"
+
+parseContextLevels :: [Tok] -> Either String ([LeanLevel], [Tok])
+parseContextLevels (TL : TSym "levels" : body) = levels 0 body
+ where
+  levels _ (TR : remaining) = Right ([], remaining)
+  levels count (TSym "0" : remaining) | count < (64 :: Int) = do
+    (rest, final) <- levels (count + 1) remaining
+    pure (LeanLevelZero : rest, final)
+  levels _ _ = Left "context-source: constant levels require bounded explicit zeros"
+parseContextLevels _ = Left "context-source: missing constant universe arguments"
 
 parseContextSourceType :: Int -> [Tok] -> Either String (ContextSourceType, [Tok])
 parseContextSourceType fuel _ | fuel <= 0 = Left "context-source: source nesting exceeds limit"
@@ -1897,14 +1996,15 @@ parseContextSourceType fuel (TL : TSym tag : rest) = case (tag, rest) of
     (domain, afterDomain) <- descend body
     (result, remaining) <- descend afterDomain
     finish (ContextArrow domain result) remaining
-  ("nominal", body) -> named False body
-  ("given", body) -> named True body
+  ("nominal", body) -> named False False body
+  ("nominal-at", body) -> named False True body
+  ("given", body) -> named True False body
   _ -> Left "context-source: unsupported source type form"
  where
   descend = parseContextSourceType (fuel - 1)
   finish value (TR : remaining) = Right (value, remaining)
   finish _ _ = Left "context-source: missing source-type delimiter"
-  named given body = do
+  named given exactLevels body = do
     (parts, afterName) <- case body of
       TL : TSym "name" : names -> nameParts 0 names
       _ -> Left "context-source: missing canonical name components"
@@ -1913,14 +2013,16 @@ parseContextSourceType fuel (TL : TSym tag : rest) = case (tag, rest) of
         Just number | number >= 0 && number <= (64 :: Int) -> Right (number, remaining)
         _ -> Left "context-source: unsupported source arity"
       _ -> Left "context-source: missing source arity"
-    (arguments, afterArguments) <- case afterArity of
+    (levels, afterLevels) <- if exactLevels then parseContextLevels afterArity else Right ([], afterArity)
+    (arguments, afterArguments) <- case afterLevels of
       TL : TSym "args" : values -> argumentsOf 0 values
       _ -> Left "context-source: missing ordered source arguments"
     if length arguments /= arity then Left "context-source: source arity does not match its arguments"
     else if given then do
       (result, remaining) <- descend afterArguments
       finish (ContextGiven parts arity arguments result) remaining
-    else finish (ContextNominal parts arity arguments) afterArguments
+    else finish (if exactLevels then ContextNominalAt parts arity levels arguments
+          else ContextNominal parts arity arguments) afterArguments
   nameParts _ (TR : remaining) = Right ([], remaining)
   nameParts count (TStr part : remaining) | count < (64 :: Int) = do
     (parts, final) <- nameParts (count + 1) remaining

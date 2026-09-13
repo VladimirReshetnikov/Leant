@@ -2,7 +2,7 @@
 -- source packets. These tests do not claim that the generated Lean serializer
 -- or displayed terms have passed Lean; the live command/replay suite owns that
 -- separate acceptance boundary.
-module ContextSourceSpec (tests) where
+module ContextSourceSpec (tests, inspectConstructorPreparation) where
 
 import Control.DeepSeq (force)
 import Control.Exception (evaluate)
@@ -24,6 +24,45 @@ import Leant.Synth.Length.Presentation
 import Leant.Synth.Verification (VariantVerdict (VariantAccepted), verifyCandidateGroups)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
+
+-- Diagnostic entry point: consume the actual serializer's saved packets and
+-- inspect the retained Djinn request, without rebuilding a similar environment
+-- by hand. This does not replace live behavioral/kernel acceptance.
+inspectConstructorPreparation :: FilePath -> FilePath -> IO ()
+inspectConstructorPreparation goalPath providerPath = do
+  goal <- readFile goalPath >>= expectRight . parseGoalSexp
+  source <- requireMetadata goal
+  providerGoal <- readFile providerPath >>= expectRight . parseGoalSexp
+  providerSource <- contextSourceWithoutConstructors <$> requireMetadata providerGoal
+  strategy <- maybe (fail "missing interleave strategy") pure $ parseSynthDjinnStrategy "interleave"
+  let parts = ["Ctx", "C", "out"]
+      provider = ProviderFragWithContextSource (contextSourceName parts)
+        (contextSourceFragment providerSource) parts (Right providerSource)
+      limits = defaultSynthLimits
+        { synthLimitWindow = 32, synthLimitTried = 32, synthLimitShown = 1
+        , synthLimitBudget = Just 20000, synthLimitDjinnStrategy = strategy }
+      outcome = synthesizeContextualWithProvidersSkippingDetailedWith True limits
+        EngineDjinn 20000 Set.empty [provider] source (pgFrag goal)
+  step <- expectRight $ advanceDetailedSynthCursor 1 $ startDetailedSynthCursor outcome
+  group <- case step of
+    DetailedSynthCursorCandidateBatch batch _ -> case detailedCandidateBatchGroups batch of
+      first : _ -> pure first
+      _ -> fail "prepared contextual world produced no first group"
+    DetailedSynthCursorEngineFailed failure -> fail failure
+    _ -> fail "prepared contextual world produced no candidate"
+  authority <- maybe (fail "prepared candidate has no exact authority") pure $
+    detailedCandidateGroupSourceAuthority group
+  foldCandidateSourceAuthority
+    (\owned -> do
+      let prepared = djinnSourcePreparation owned
+      print ("source", inspectedSourceGoal prepared)
+      print ("search", inspectedSearchGoal prepared)
+      print ("declarations", inspectedDeclarations prepared)
+      print ("assignments", inspectedAllProviderAssignments prepared)
+      print ("bindings", inspectedProviderBindings prepared)
+      print ("request", djinnSourceRequest owned)
+      print ("variants", detailedCandidateGroupVariants group))
+    (const $ fail "Djinn inspection received Exference authority") authority
 
 tests :: TestTree
 tests = testGroup "Production lexical Given source metadata"
@@ -159,6 +198,68 @@ tests = testGroup "Production lexical Given source metadata"
    , testCase "ordinary context-free wire keeps the existing route" $ do
        parsed <- expectRight $ parseGoalSexp "(goal type (query (roots) (head)) (all \"a\" (-> (var \"a\") (var \"a\"))))"
        parsedGoalContextSource parsed @?= Nothing
+   , testCase "source-owned List constructors retain explicit levels through each engine's exact renderer" $
+       forM_ [EngineDjinn, EngineExference, EngineBoth] $ \engine -> do
+         parsed <- expectRight $ parseGoalSexp $ constructorGoal [nilConstructor]
+         source <- requireMetadata parsed
+         length (contextSourceConstructors source) @?= 1
+         let limits = defaultSynthLimits { synthLimitWindow = 8, synthLimitBudget = Just 4096 }
+         step <- expectRight $ advanceDetailedSynthCursor 1 $ startDetailedSynthCursor $
+           synthesizeContextualWithProvidersSkippingDetailedWith False limits engine 4096
+             Set.empty [] source (pgFrag parsed)
+         groups <- case step of
+           DetailedSynthCursorCandidateBatch batch _ -> pure $ detailedCandidateBatchGroups batch
+           DetailedSynthCursorEngineFailed failure -> fail failure
+           DetailedSynthCursorNoTerm notes -> fail $ "no source-owned constructor candidate: " ++ show notes
+           _ -> fail "source-owned constructor search returned no candidate batch"
+         assertBool "constructor search produced no owned group" $ not $ null groups
+         forM_ groups $ \group -> do
+           detailedCandidateGroupRoute group @?= RouteTypedCandidate
+           assertBool "constructor constant lost its explicit universe selection" $
+             all ("«List».«nil».{0}" `isInfixOf`) $ detailedCandidateGroupVariants group
+           forM_ (detailedCandidateGroupVerificationVariants group) $ \variant -> do
+             origin <- maybe (fail "constructor output lost exact source origin") pure $
+               detailedVerificationVariantExactTypedOrigin variant
+             renderExactTypedVariantOrigin origin @?= Right (detailedCandidateGroupVariants group)
+   , testCase "constructor packets refuse duplicate owners and unrelated result families" $
+       forM_ [ [nilConstructor, nilConstructor]
+             , ["(constructor (name \"Other\" \"mk\") (levels) (nominal (name \"Other\") 0 (args)))"]
+             ] $ \entries -> do
+         parsed <- expectRight $ parseGoalSexp $ constructorGoal entries
+         assertUnsupported parsed
+   , testCase "a discovered constructor shares only its identical complete source packet" $ do
+       parsed <- expectRight $ parseGoalSexp $ constructorGoal [nilConstructor]
+       source <- requireMetadata parsed
+       (parts, constructor) <- case contextSourceConstructors source of
+         [entry] -> pure entry
+         _ -> fail "expected one owned constructor"
+       let provider packet' = ProviderFragWithContextSource (contextSourceName parts)
+             (contextSourceFragment packet') parts (Right packet')
+           run engine packet' = synthesizeContextualWithProvidersSkippingDetailedWith False
+             defaultSynthLimits { synthLimitWindow = 8, synthLimitBudget = Just 4096 }
+             engine 4096 Set.empty [provider packet'] source (pgFrag parsed)
+       forM_ [EngineDjinn, EngineExference, EngineBoth] $ \engine -> do
+         step <- expectRight $ advanceDetailedSynthCursor 1 $ startDetailedSynthCursor $ run engine constructor
+         case step of
+           DetailedSynthCursorCandidateBatch batch _ ->
+             assertBool "identical constructor overlap lost its candidate" $
+               not $ null $ detailedCandidateBatchGroups batch
+           DetailedSynthCursorEngineFailed failure -> fail failure
+           _ -> fail "identical constructor overlap returned no candidate"
+       -- The projected search type is identical, but this value lacks the
+       -- actual constant's universe argument. It must not replace List.nil.{0}.
+       missingLevels <- expectRight $ mkContextProviderSource $ contextSourceType constructor
+       contextSourceFragment missingLevels @?= contextSourceFragment constructor
+       case run EngineDjinn missingLevels of
+         Left failure -> assertBool "missing overlap ownership diagnostic" $
+           "constructor and provider source ownership conflict" `isInfixOf` failure
+         Right _ -> assertFailure "constructor overlap erased conflicting constant levels"
+   , testCase "constant universe metadata is explicit, bounded and never inferred" $
+       forM_ ["(levels 1)", "(levels u)", "(levels " ++ unwords (replicate 65 "0") ++ ")"] $ \levels -> do
+         let source = all' "a" $ given "a" $
+               "(nominal-at (name \"List\") 1 " ++ levels ++ " (args " ++ var "a" ++ "))"
+         parsed <- expectRight $ parseGoalSexp $ packet source
+         assertUnsupported parsed
    , testCase "legacy contextual wire explicitly lacks source metadata" $ do
        parsed <- expectRight $ parseGoalSexp "(goal type (query (roots) (head)) (inst \"C Nat\" (atom unsafe \"Nat\")))"
        assertUnsupported parsed
@@ -212,6 +313,19 @@ sourceOf label = case [source | (name, source, _) <- fixtures, name == label] of
 
 packet :: String -> String
 packet source = "(goal type (query (roots \"ContextFixture\") (head)) (atom unsafe \"legacy\") (context-source 1 " ++ source ++ "))"
+
+constructorGoal :: [String] -> String
+constructorGoal entries =
+  "(goal type (query (roots \"List\" \"ContextFixture\") (head \"List\")) (atom unsafe \"legacy\") (context-source 2 "
+    ++ all' "a" (given "a" $ listSource $ var "a")
+    ++ " (constructors " ++ unwords entries ++ ")))"
+
+nilConstructor :: String
+nilConstructor = "(constructor (name \"List\" \"nil\") (levels 0) (all implicit \"element\" "
+  ++ listSource (var "element") ++ "))"
+
+listSource :: String -> String
+listSource argument = "(nominal-at (name \"List\") 1 (levels 0) (args " ++ argument ++ "))"
 
 all' :: String -> String -> String
 all' variable body = "(all explicit " ++ show variable ++ " " ++ body ++ ")"

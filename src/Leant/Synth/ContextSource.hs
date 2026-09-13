@@ -4,7 +4,9 @@
 -- actual introduction/application witnesses, never recovered from erasure.
 module Leant.Synth.ContextSource
   ( ContextSource, ContextSourceType (..), ContextSourceVisibility (..)
-  , mkContextSource, mkContextProviderSource, contextSourceType, contextSourceHasGiven
+  , mkContextSource, mkContextSourceWithConstructors, mkContextProviderSource
+  , mkContextProviderSourceAt, contextSourceConstructors, contextSourceWithoutConstructors
+  , contextSourceType, contextSourceHasGiven
   , contextSourceName
   , PreparedContextSource, prepareContextSource, prepareContextSourceProviders
   , renderPreparedContextGraph
@@ -26,20 +28,58 @@ data ContextSourceVisibility = ContextExplicit | ContextImplicit
 
 -- Every type binder and nominal/class parameter in version 1 has the exact
 -- domain Type 0. A nominal/class declaration must itself end in Type 0.
--- Higher sorts, Prop domains, strict implicit binders, dependent term arrows,
--- and universe-polymorphic constants are refused by the source serializer.
+-- The exact nominal form also retains universe-zero constant instantiations.
+-- Higher sorts, Prop domains, strict implicit binders and dependent term
+-- arrows remain refused; constant selections must not be inferred or erased.
 data ContextSourceType
   = ContextVariable String
   | ContextNominal [String] Int [ContextSourceType]
+  | ContextNominalAt [String] Int [LeanLevel] [ContextSourceType]
   | ContextArrow ContextSourceType ContextSourceType
   | ContextForall ContextSourceVisibility String ContextSourceType
   | ContextGiven [String] Int [ContextSourceType] ContextSourceType
   deriving (Eq, Show)
 
-newtype ContextSource = ContextSource ContextSourceType deriving (Eq, Show)
+data ContextSource = ContextSource
+  { contextSourceType :: ContextSourceType
+  , contextSourceValueLevels :: [LeanLevel]
+  , contextSourceConstructors :: [([String], ContextSource)]
+  } deriving (Eq, Show)
 
-contextSourceType :: ContextSource -> ContextSourceType
-contextSourceType (ContextSource source) = source
+contextSourceWithoutConstructors :: ContextSource -> ContextSource
+contextSourceWithoutConstructors source = source { contextSourceConstructors = [] }
+
+-- Constructor packets originate in the actual inductive declaration inventory.
+-- They are closed source-owned values; they never authorize case completeness.
+mkContextSourceWithConstructors
+  :: ContextSourceType -> [([String], ContextSource)] -> Either String ContextSource
+mkContextSourceWithConstructors source constructors = do
+  root <- mkContextSource source
+  when (length constructors > 64) $ Left "context-source: constructor inventory exceeds limit"
+  _ <- foldM add (Set.empty, nominalNames source) constructors
+  pure root { contextSourceConstructors = constructors }
+ where
+  add (owners, reachable) (parts, packet) = do
+    _ <- either (Left . show) Right $ mkLeanName parts
+    when (Set.member parts owners || not (null $ contextSourceConstructors packet)) $
+      Left "context-source: duplicate or nested constructor inventory"
+    family <- case resultType $ contextSourceType packet of
+      ContextNominal name _ _ -> Right name
+      ContextNominalAt name _ _ _ -> Right name
+      _ -> Left "context-source: constructor result is not nominal"
+    unless (Set.member family reachable) $
+      Left "context-source: constructor family is not reachable from the goal"
+    pure (Set.insert parts owners, Set.union reachable $ nominalNames $ contextSourceType packet)
+  resultType (ContextForall _ _ body) = resultType body
+  resultType (ContextArrow _ body) = resultType body
+  resultType body = body
+  nominalNames current = case current of
+    ContextVariable{} -> Set.empty
+    ContextNominal name _ args -> Set.insert name $ Set.unions $ map nominalNames args
+    ContextNominalAt name _ _ args -> Set.insert name $ Set.unions $ map nominalNames args
+    ContextArrow a b -> Set.union (nominalNames a) (nominalNames b)
+    ContextForall _ _ body -> nominalNames body
+    ContextGiven _ _ args body -> Set.unions $ map nominalNames (body : args)
 
 contextSourceName :: [String] -> String
 contextSourceName = intercalate "."
@@ -50,6 +90,7 @@ contextSourceHasGiven source = case source of
   ContextArrow a b -> contextSourceHasGiven a || contextSourceHasGiven b
   ContextForall _ _ body -> contextSourceHasGiven body
   ContextNominal _ _ arguments -> any contextSourceHasGiven arguments
+  ContextNominalAt _ _ _ arguments -> any contextSourceHasGiven arguments
   ContextVariable{} -> False
 
 mkContextSource :: ContextSourceType -> Either String ContextSource
@@ -60,6 +101,17 @@ mkContextSource = validateContextSource True
 mkContextProviderSource :: ContextSourceType -> Either String ContextSource
 mkContextProviderSource = validateContextSource False
 
+mkContextProviderSourceAt :: [LeanLevel] -> ContextSourceType -> Either String ContextSource
+mkContextProviderSourceAt levels source = do
+  validateConstantLevels levels
+  packet <- mkContextProviderSource source
+  pure packet { contextSourceValueLevels = levels }
+
+validateConstantLevels :: [LeanLevel] -> Either String ()
+validateConstantLevels levels =
+  unless (length levels <= 64 && all (== LeanLevelZero) levels) $
+    Left "context-source: constant levels require explicit universe-zero instantiations"
+
 validateContextSource :: Bool -> ContextSourceType -> Either String ContextSource
 validateContextSource requireGiven source = do
   (_, classes, nominals) <- inspect 4096 Set.empty Map.empty Map.empty source
@@ -68,7 +120,7 @@ validateContextSource requireGiven source = do
   when (requireGiven && not (contextSourceHasGiven source)) $
     Left "context-source: packet has no lexical Given context"
   _ <- sourceUniverse source
-  pure $ ContextSource source
+  pure $ ContextSource source [] []
  where
   inspect fuel _ _ _ _ | fuel <= (0 :: Int) = Left "context-source: source exceeds node limit"
   inspect fuel scope classes nominals current = case current of
@@ -83,22 +135,25 @@ validateContextSource requireGiven source = do
       (remaining, afterClasses, afterNominals) <- inspect (fuel - 1) scope classes nominals domain
       inspect remaining scope afterClasses afterNominals result
     ContextNominal name arity arguments -> do
-      updated <- insertName name arity arguments nominals
+      inspect fuel scope classes nominals $ ContextNominalAt name arity [] arguments
+    ContextNominalAt name arity levels arguments -> do
+      validateConstantLevels levels
+      updated <- insertName name arity arguments (arity, levels) nominals
       inspectArguments (fuel - 1) scope classes updated arguments
     ContextGiven name arity arguments body -> do
-      updated <- insertName name arity arguments classes
+      updated <- insertName name arity arguments arity classes
       (remaining, afterClasses, afterNominals) <- inspectArguments (fuel - 1) scope updated nominals arguments
       inspect remaining scope afterClasses afterNominals body
   inspectArguments fuel scope classes nominals = foldM
     (\(remaining, cs, ns) -> inspect remaining scope cs ns) (fuel, classes, nominals)
-  insertName parts arity arguments names = do
+  insertName parts arity arguments metadata names = do
     _ <- either (Left . show) Right $ mkLeanName parts
     unless (arity >= 0 && arity <= 64 && length arguments == arity) $
       Left "context-source: unsaturated or unsupported nominal/class arity"
     let name = contextSourceName parts
     case Map.lookup name names of
-      Just previous | previous /= arity -> Left "context-source: inconsistent source arity"
-      _ -> pure $ Map.insert name arity names
+      Just previous | previous /= metadata -> Left "context-source: inconsistent source arity or universe arguments"
+      _ -> pure $ Map.insert name metadata names
 
 -- Version 1's source domains suffice to compute this restricted universe
 -- fragment. A forall over Type 0 may itself live in Type 1; it cannot silently
@@ -109,6 +164,7 @@ sourceUniverse source = case source of
   ContextArrow domain result -> max <$> sourceUniverse domain <*> sourceUniverse result
   ContextForall _ _ body -> max 1 <$> sourceUniverse body
   ContextNominal _ _ arguments -> checkArguments arguments >> pure 0
+  ContextNominalAt _ _ _ arguments -> checkArguments arguments >> pure 0
   ContextGiven _ _ arguments body -> checkArguments arguments >> sourceUniverse body
  where
   checkArguments arguments = do
@@ -131,7 +187,8 @@ prepareContextSource
   -> T.Type String
   -> ContextSource
   -> Either String PreparedContextSource
-prepareContextSource classes nominals goal (ContextSource source) = do
+prepareContextSource classes nominals goal packet = do
+  let source = contextSourceType packet
   (projection, classEntries, nominalEntries) <- project source
   aligned <- alignProjection Map.empty projection goal
   pure $ PreparedContextSource aligned (Map.fromList classEntries) (Map.fromList nominalEntries) Map.empty
@@ -142,7 +199,8 @@ prepareContextSource classes nominals goal (ContextSource source) = do
       (a, ac, an) <- project domain
       (b, bc, bn) <- project result
       pure (LeanArrow a b, ac ++ bc, an ++ bn)
-    ContextNominal parts arity arguments -> do
+    ContextNominal parts arity arguments -> project $ ContextNominalAt parts arity [] arguments
+    ContextNominalAt parts arity levels arguments -> do
       (private, actualArity) <- maybe (Left "context-source: nominal has no source-owned translation") Right $
         Map.lookup (contextSourceName parts) nominals
       unless (arity == actualArity) $ Left "context-source: translated nominal kind changed"
@@ -150,7 +208,7 @@ prepareContextSource classes nominals goal (ContextSource source) = do
       projected <- traverse project arguments
       pure (foldl LeanApplication (LeanNominal private) $ map first projected,
         concatMap second projected,
-        (private, LeanNominalInfo name arity) : concatMap third projected)
+        (private, LeanNominalInfo name arity levels) : concatMap third projected)
     ContextForall{} -> do
       let (binders, afterBinders) = allSpine current
           (contexts, body) = givenSpine afterBinders
@@ -217,7 +275,7 @@ prepareContextSourceProviders classes nominals bindings initial =
       { preparedContextClasses = combinedClasses
       , preparedContextNominals = combinedNominals
       , preparedContextProviders = Map.insert private
-          (LeanProviderInfo foreignName $ preparedContextRoot provider)
+          (LeanProviderInfo foreignName (contextSourceValueLevels source) $ preparedContextRoot provider)
           (preparedContextProviders prepared)
       }
   merge left right = do
@@ -303,7 +361,7 @@ renderPreparedContextGraph prepared graph = do
     (\(name, metadata) -> do
       source <- maybe (Left "context-source: global provider lacks a complete source packet") Right $
         Map.lookup name $ preparedContextProviders prepared
-      pure (name, LeanProviderInfo (contextProviderLeanName source) metadata))
+      pure (name, LeanProviderInfo (contextProviderLeanName source) (contextProviderConstantLevels source) metadata))
     [ (name, metadata)
     | (owner, metadata) <- Map.toList nodes
     , Just current <- [Q.lookupTermNode owner graph]

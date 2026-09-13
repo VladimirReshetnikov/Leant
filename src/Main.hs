@@ -156,6 +156,7 @@ import Leant.Synth.Behavioral
   , decodeBehavioralDecisionTags
   , proveBehavioralBy
   )
+import Leant.Synth.ContextSource (contextSourceConstructors, contextSourceWithoutConstructors)
 import Leant.Synth.Fragment
   ( Frag (..)
   , GoalSort (..)
@@ -2998,13 +2999,27 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
         | Just active <- behavioral = behavioralRunDeadline active
         | limit <= 0 = Nothing
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
-      runSynthesis includeLibrary checked laneEngine providers accumulation =
+      runSynthesis includeLibrary checked laneEngine providers accumulation = do
+        initial <- runSynthesisPass False includeLibrary checked laneEngine providers accumulation
+        let enrich = case synthLaneRunEnd initial of
+              SynthLaneRunTimedOut -> False
+              SynthLaneRunCursorAdmissionFailed _ -> False
+              SynthLaneRunEngineFailed _ -> False
+              SynthLaneRunStoppedByDisposition -> False
+              _ -> contextualConstructorsAvailable && not includeLibrary
+        if enrich
+          then runSynthesisPass True False
+            (Set.union checked $ Set.fromList $ synthLaneRunCheckedFrontierSpellings initial)
+            laneEngine providers (synthLaneRunAccumulation initial)
+          else pure initial
+      runSynthesisPass includeConstructors includeLibrary checked laneEngine providers accumulation =
         let base = case contextSource of
               Just (Left failure) -> Left failure
               Just (Right source) ->
                 synthesizeContextualWithProvidersSkippingDetailedWith
                   (isJust behavioral) limits laneEngine (rsSynthSteps state)
-                  checked providers source fragment
+                  checked providers
+                  (if includeConstructors then source else contextSourceWithoutConstructors source) fragment
               Nothing -> case behavioral of
                 Nothing -> synthesizeWithProvidersSkippingDetailedWith limits
                   laneEngine (rsSynthSteps state) checked providers fragment
@@ -3188,10 +3203,19 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
     let accumulation = synthLaneRunAccumulation baseline
         checked = Set.fromList
           (synthLaneRunCheckedFrontierSpellings baseline)
-    if null providers
+    if null providers && not contextualConstructorsAvailable
       then report runDeadline baseline
       else runProviderLanes runDeadline Nothing (runLane False)
-        checked accumulation (providerStagesWithRanking ranking laneEngine providers)
+        checked accumulation
+        (if null providers then [(laneEngine, [])]
+          else providerStagesWithRanking ranking laneEngine providers)
+
+  -- Preserve the established provider-free context search before enriching
+  -- its world. Constructor values remain available even when discovery is
+  -- disabled or has no values, and all lanes retain this command's deadline.
+  contextualConstructorsAvailable = case parsedGoalContextSource parsed of
+    Just (Right source) -> not $ null $ contextSourceConstructors source
+    _ -> False
 
   runProviderLanes runDeadline fallback runLane checked accumulation lanes =
     case lanes of

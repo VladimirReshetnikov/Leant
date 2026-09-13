@@ -288,7 +288,7 @@ import Leant.Synth.Fragment
   )
 import Leant.Synth.ContextSource
   ( ContextSource, PreparedContextSource, prepareContextSource, prepareContextSourceProviders
-  , contextSourceName
+  , contextSourceName, contextSourceConstructors
   , renderPreparedContextGraph
   )
 import Leant.Synth.Render
@@ -1504,7 +1504,15 @@ synthesizeContextualWithProvidersSkippingDetailedWith
   :: Bool -> SynthLimits -> SynthEngine -> Int -> Set.Set String
   -> [ProviderFrag] -> ContextSource -> Frag -> Either String DetailedSynthOutcome
 synthesizeContextualWithProvidersSkippingDetailedWith streaming limits engine steps checked
-    providers source frag = do
+    suppliedProviders source frag = do
+  suppliedPackets <- mapM contextualProviderPacket suppliedProviders
+  constructorEntries <- mapM (retainConstructor suppliedPackets) $ contextSourceConstructors source
+  let constructors =
+        [ ProviderFragWithContextSource (contextSourceName parts)
+            (contextSourceFragment packet) parts (Right packet)
+        | Just (parts, packet) <- constructorEntries
+        ]
+      providers = suppliedProviders ++ constructors
   mapM_ contextualProviderPacket providers
   unless (frag == contextSourceFragment source) $
     Left "context-source: packet does not own the supplied search fragment"
@@ -1513,6 +1521,16 @@ synthesizeContextualWithProvidersSkippingDetailedWith streaming limits engine st
   -- Exact-context collection is incremental in both command modes. The
   -- Boolean still owns behavioral search policy, including unused inputs.
   Right $ deferDetailedOutcome run
+ where
+  -- A discovered value and an intrinsic constructor can name the same actual
+  -- declaration. Reuse it only when the complete source packet agrees,
+  -- including constant levels. A matching printed name is not authority.
+  retainConstructor supplied entry@(parts, packet) =
+    case [other | (name, other) <- supplied, name == parts] of
+      [] -> Right $ Just entry
+      matches
+        | all (== packet) matches -> Right Nothing
+        | otherwise -> Left "context-source: constructor and provider source ownership conflict"
 
 -- Only the command-local source wire can authorize a contextual value. Its
 -- complete scheme owns the fragment; ordinary snapshots remain unsupported.

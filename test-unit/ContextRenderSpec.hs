@@ -107,7 +107,7 @@ tests = testGroup "direct Lean lexical context rendering"
       renderLeanContextGraph environment
           { contextRenderClasses = Map.empty
           , contextRenderNominals = Map.insert className
-              (LeanNominalInfo (lean ["ContextFixture", "C"]) 1)
+              (LeanNominalInfo (lean ["ContextFixture", "C"]) 1 [])
               (contextRenderNominals environment)
           } graph @?= Left (MissingClassMetadata className)
   , testCase "reject a class kind-arity claim inconsistent with the selected source type" $ do
@@ -121,7 +121,7 @@ tests = testGroup "direct Lean lexical context rendering"
           changed = project (Map.singleton boundA explicitType) providerType
       renderLeanContextGraph environment
           { contextRenderProviders = Map.singleton providerName $
-              LeanProviderInfo (lean ["ContextFixture", "observe"]) changed
+              LeanProviderInfo (lean ["ContextFixture", "observe"]) [] changed
           } graph @?= Left (ProviderTypeMetadataMismatch providerName)
   , testCase "missing selected-type metadata is not an elaborator placeholder" $ do
       let (environment, graph) = rankNFixture
@@ -317,7 +317,7 @@ providerFixture =
   in (environment
       { contextRenderNodeTypes = Map.insert (nid 4) providerProjection $ contextRenderNodeTypes environment
       , contextRenderProviders = Map.singleton providerName $
-          LeanProviderInfo (lean ["ContextFixture", "observe"]) providerProjection
+          LeanProviderInfo (lean ["ContextFixture", "observe"]) [] providerProjection
       }, graph)
  where
   a = T.TypeVariable rigidA
@@ -411,9 +411,9 @@ fixture binders providers selections source =
   ( ContextRenderEnvironment
       { contextRenderClasses = Map.singleton className $
           LeanClassInfo (lean ["ContextFixture", "C"]) [0]
-      , contextRenderNominals = Map.singleton natName $ LeanNominalInfo (lean ["Nat"]) 0
+      , contextRenderNominals = Map.singleton natName $ LeanNominalInfo (lean ["Nat"]) 0 []
       , contextRenderProviders = Map.fromList
-          [(name, LeanProviderInfo (lean ["ContextFixture", "observe"]) $ project binders ty)
+          [(name, LeanProviderInfo (lean ["ContextFixture", "observe"]) [] $ project binders ty)
           | (name, ty) <- providers]
       , contextRenderNodeTypes = Map.fromList
           [(key, project binders $ Q.termNodeType current) | (key, current) <- Q.termGraphSourceNodes source]

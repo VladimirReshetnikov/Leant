@@ -715,6 +715,8 @@ main = do
   case arguments of
     ["--emit-synthesis-prelude"] ->
       ByteString.putStr $ TextEncoding.encodeUtf8 $ Text.pack $ synthPrelude []
+    ["--inspect-context-constructor-preparation", goalPacket, providerPacket] ->
+      ContextSourceSpec.inspectConstructorPreparation goalPacket providerPacket
     ["--emit-context-replay"] -> either (fail . show)
       (ByteString.putStr . TextEncoding.encodeUtf8 . Text.pack)
       ContextRenderSpec.contextReplaySource
@@ -17291,7 +17293,7 @@ assertLengthAssessmentMainLaneScheduling = do
     , "runSynthesis includeLibrary checked laneEngine providers accumulation ="
     , "base = case contextSource of"
     , "Just (Left failure) -> Left failure"
-    , "Just (Right source) -> synthesizeContextualWithProvidersSkippingDetailedWith (isJust behavioral) limits laneEngine (rsSynthSteps state) checked providers source fragment"
+    , "Just (Right source) -> synthesizeContextualWithProvidersSkippingDetailedWith (isJust behavioral) limits laneEngine (rsSynthSteps state) checked providers (if includeConstructors then source else contextSourceWithoutConstructors source) fragment"
     , "Nothing -> case behavioral of"
     , "Nothing -> synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
     , "Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
@@ -17341,7 +17343,8 @@ assertLengthAssessmentMainLaneScheduling = do
     , "checked = Set.fromList (synthLaneRunCheckedFrontierSpellings baseline)"
     , "then report runDeadline baseline"
     , "else runProviderLanes runDeadline Nothing (runLane False) checked accumulation"
-    , "checked accumulation (providerStagesWithRanking ranking laneEngine providers)"
+    , "if null providers && not contextualConstructorsAvailable"
+    , "checked accumulation (if null providers then [(laneEngine, [])] else providerStagesWithRanking ranking laneEngine providers)"
     ]
   assertBool "baseline continuation duplicated its ranked provider schedule"
     $ length (mainSourcePositions
@@ -17681,7 +17684,7 @@ assertLengthAssessmentMainParallelBaseline = do
       serialSection)
     [ "base = case contextSource of"
     , "Just (Left failure) -> Left failure"
-    , "Just (Right source) -> synthesizeContextualWithProvidersSkippingDetailedWith (isJust behavioral) limits laneEngine (rsSynthSteps state) checked providers source fragment"
+    , "Just (Right source) -> synthesizeContextualWithProvidersSkippingDetailedWith (isJust behavioral) limits laneEngine (rsSynthSteps state) checked providers (if includeConstructors then source else contextSourceWithoutConstructors source) fragment"
     , "Nothing -> case behavioral of"
     , "Nothing -> synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
     , "Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
