@@ -75,7 +75,7 @@ Companion documents:
 - **[Behavioral assertions](docs/behavioral-synthesis.md)** — the new
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
-- **[Current synthesis re-triage](docs/reports/2026-09-09-synthesis-after-contextual-list-acceptance.md)**
+- **[Current synthesis re-triage](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md)**
   — native integration is accepted; address Lean contextual list admission,
   then deliver missing Church behaviors and public query forms;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
@@ -208,7 +208,7 @@ Companion documents:
   All ten integration gates and the final input-integrity check pass; Leant now
   pins the tested dependency. Earlier deadline failures remain recorded in the
   [historical report](docs/reports/2026-09-08-native-carrier-integration.md).
-  The [new tree/frontend re-triage](docs/reports/2026-09-09-synthesis-after-contextual-list-acceptance.md)
+  The [new tree/frontend re-triage](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md)
   records the subsequent native tree and Haskell `foldl1` transfer misses at
   their original limits. A native tree debug expression independently passes
   the full type and all 16 observations, but its live typed-candidate acceptance
@@ -246,7 +246,7 @@ Companion documents:
   13/13 extended Church behavior and 350 signatures per Haskell engine; all
   2,309 tests in 15 complete suites pass across the documented runs, including
   a complete Length rerun after its test-only lifecycle repair. Native tree
-  acceptance remains open. The [current delivery order](docs/reports/2026-09-09-synthesis-after-contextual-list-acceptance.md)
+  acceptance remains open. The [current delivery order](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md)
   prioritizes exact Lean contextual list admission, then missing Church
   behaviors and public query forms. The canonical list dependency now passes
   native compatibility integration; the tree investigation remains bounded.
@@ -265,16 +265,16 @@ Companion documents:
   corpora pass 350/350 and extended Exference retains 13/13 behaviors.
   The [fresh native integration](docs/reports/2026-09-12-contextual-list-native-integration.md) passes a strict
   build, **705 unit tests and all ten native gates**, including both 350-signature
-  kernel replays. Leant now pins the tested dependency. The separate six
-  contextual list probes remain refused before
-  search across Djinn, Exference and Both. Their six reference implementations
-  pass kernel checking; the source packet currently rejects the universe arguments
-  carried by `List`. The linked re-triage separates this admission work from
-  compatibility gates and preserves the existing refusal guards.
+  kernel replays. Leant now pins the tested dependency. A subsequent uncommitted
+  repair passes all six contextual-list probes across Djinn, Exference and Both,
+  with exact kernel replay, and all six existing method-discovery cases. These
+  development results still need actual list False controls and full regression
+  acceptance before publication. The linked re-triage puts that acceptance gate
+  first, followed by missing Church behaviors and public query forms.
   Broader search estimates were rejected after losing Church composition.
   The committed dependency is `c1ad560e`. The full 13-operation/19-default coverage
   across engines is still open.
-  See the [current retriage and evidence boundaries](docs/reports/2026-09-09-synthesis-after-contextual-list-acceptance.md).
+  See the [current retriage and evidence boundaries](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md).
 - **Checked conditional providers in canonical Djex.** The
   [conditional-Given implementation](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)
   and [guarded nested-Given increment](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/docs/reports/2026-09-07-djinn-nested-givens.md)
@@ -673,7 +673,7 @@ queries across all three engines, and six independent candidate replays pass.
 That earlier full boundary run passed 619/620 tests; its one existing
 staged-search timeout passed an unchanged focused retry. Both historical
 receipts remain separate from the successful 647-test aggregate.
-The [implementation re-triage](docs/reports/2026-09-09-synthesis-after-contextual-list-acceptance.md)
+The [implementation re-triage](docs/reports/2026-09-12-synthesis-after-contextual-constructor-probes.md)
 tracks that boundary separately from forthcoming recursors, contextual
 dictionaries, and broader Church coverage.
 

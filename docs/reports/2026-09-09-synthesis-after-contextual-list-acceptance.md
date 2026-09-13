@@ -1,5 +1,7 @@
 # Further improvements after contextual list acceptance
 
+> Superseded delivery order: the [contextual-constructor re-triage](2026-09-12-synthesis-after-contextual-constructor-probes.md) records six successful working-tree list probes and six passing method cases. Acceptance and publication of that repair remain pending; the earlier refusal evidence below describes the published implementation.
+
 > Subsequent acceptance: the [native compatibility integration](2026-09-12-contextual-list-native-integration.md) passes all ten fresh gates and promotes Djex `c1ad560e`. The release gate below is complete; the separate Lean contextual list admission and other capability deliveries remain open.
 
 The Haskell contextual list repair is accepted and leaves the implementation queue. The next release gate is native integration of that exact Djex revision. The next capability work should address Lean contextual list source admission and missing Church behaviors in bounded batches. This replaces the delivery order in the [previous assessment](2026-09-09-synthesis-after-native-contextual-integration.md); the original priorities 1–4 and their completion requirements remain active.
