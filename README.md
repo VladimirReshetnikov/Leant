@@ -66,25 +66,27 @@ not a current-revision pass rate or a completeness theorem. Missing indexed
 evidence does not establish that a case was never attempted.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes end-to-end [kinded Haskell source support](docs/reports/2026-09-13-public-kinded-source-frontier.md),
-with engine checking and original-signature replay as the next gate. The
-[ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
+prioritizes releasing the Djinn kinded-source slice, completing Exference, and
+then independent Lean universe support before further extrema experiments.
+The unpublished Djinn prototype now synthesizes the original higher-kinded
+identity and nested callback through both one-shot and named-`where` queries.
+All four emitted implementations pass independent GHC replay at their full
+signatures, with eight true observations and two passing actual-False controls.
+Public vacuous, shadowed and alias-expanded kinds, plus regressions on the final
+integrated source, remain release gates. Exference still has an execution guard;
+the published implementation still refuses these kinded queries at conversion.
+
+The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC
-rendering fixtures plus rejection checks. All ten representative extrema probes
-miss at their original bounds; these attempts are now indexed in the ledger.
-A diagnostic with globally charged evaluation reaches the full search budget,
-so extrema work now targets the missing construction. Lean universe support
-remains an independent milestone.
-The [checked source-kind transport prerequisite](docs/reports/2026-09-13-source-kind-transport-prerequisite.md)
-preserves ground-kind forall annotations through conversion and synonym expansion,
-with 539 foundation and 171 integration tests passing. Public kinded queries still
-fail conversion in the published implementation. An unpublished parser/request
-prototype passes 539 foundation, 187 integration and 38 API tests, but all eight
-public probes reach an explicit execution guard: it adds no synthesis acceptance.
-The delivery plan distinguishes that local progress from the release. Integer indexing,
-Lean Djinn length, contextual evidence and supplied-fold trees remain required.
-The failed reduction variants stay paused until a trace justifies a different
-construction change.
+rendering fixtures plus rejection checks. The [checked source-kind transport
+prerequisite](docs/reports/2026-09-13-source-kind-transport-prerequisite.md)
+preserves annotations through conversion and synonym expansion. These published
+prerequisites and the local execution prototype have separate validation records.
+All ten representative extrema probes miss at their original bounds; the carrier
+experiment also reaches its search budget without a match. Further extrema work
+requires a bounded construction trace. Integer indexing, Lean Djinn length,
+contextual evidence and supplied-fold trees remain required. The failed reduction
+variants stay paused until a trace justifies a different construction change.
 
 ## Contents
 
