@@ -52,8 +52,10 @@ three False controls, and both 350-signature kernel replay corpora pass.
 Established variants precede the bounded `Unit` fallbacks within each universe
 lane, and every candidate still requires Lean verification. The
 [current re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-now prioritizes the 68 cells without indexed acceptance and preservation of
-scoped dictionary selections.
+prioritizes a bounded provider-admission experiment, preservation of scoped
+type/dictionary selections, and reusable accumulator support for reductions
+and extrema. Those two operation families account for 60 of the 68 cells
+without indexed acceptance; shared support still requires per-cell validation.
 The [matching extended-operation batch](docs/reports/2026-09-13-matching-extended-native-six.md)
 adds live acceptance for `fromMaybe`, `maybeToList`, `isLeft`, `either`,
 `numeralSuccessor` and `numeralAdd` in Lean Djinn and Both: twelve exact replays,
