@@ -2,12 +2,12 @@
   "schema": "church-behavior-ledger-v1",
   "scope": "13 extended and 19 supplied-default operations across five language/engine modes",
   "validation": "offline pinned-receipt indexing; no synthesis or compiler replay performed",
-  "catalog_scope": "Selected principal P4 receipts and September 13 selector follow-ups, including the failed native last attempt and its passing working-source renderer follow-up. Not an exhaustive index of all historical experiments. No indexed evidence does not mean never attempted. Collection order is not a timestamp or current-revision validation claim.",
+  "catalog_scope": "Selected principal behavior receipts, including supplied-default selectors, reduction misses, and the accepted path-sensitive head-use milestone. Not an exhaustive archive or a current-revision pass rate. No indexed evidence does not mean never attempted.",
   "current_complete": false,
   "cell_count": 160,
   "historical_counts": {
-    "acceptance_recorded": 92,
-    "attempts_without_recorded_acceptance": 15,
+    "acceptance_recorded": 94,
+    "attempts_without_recorded_acceptance": 13,
     "no_recorded_evidence": 53
   },
   "sources": {
@@ -1042,6 +1042,184 @@
           "recorded_status": "passed"
         }
       ]
+    },
+    "haskell-acyclic-head-extended-2026-09-13": {
+      "source": {
+        "repo": "Leant",
+        "path": "test-church/receipts/acyclic-head-maybe-either-2026-09-13.zip",
+        "sha256": "9b2e6b79b32938a584283a8bdcf66b050a231b338c1b0692bfa5a20e56d7d225",
+        "member": "haskell-full/run/results.json",
+        "member_sha256": "9b54b67025f16566d63ec565cff540e9c402cfaeaf8a8e39d0bcae7aad67745d"
+      },
+      "rows": "/cells",
+      "metadata_pointers": {
+        "settings": "/settings",
+        "runtime": "/executable_hashes",
+        "sources": "/source_hashes",
+        "controls": "/oracle_controls"
+      },
+      "recorded_metadata": {
+        "settings": {
+          "value_sha256": "c45c0ca53e954d6152566c8b0de258a38669b3b667e5e1b490e4b18966fc28b9",
+          "recorded_value": {
+            "djinn": {
+              "window": 65536,
+              "budget": 500000,
+              "djinn_strategy": "interleave",
+              "steps": 100000,
+              "process_timeout": 300,
+              "queue": 8192
+            },
+            "exference": {
+              "window": 256,
+              "budget": 100000,
+              "djinn_strategy": "depth-first",
+              "steps": 100000,
+              "process_timeout": 300,
+              "queue": 8192
+            }
+          }
+        },
+        "runtime": {
+          "value_sha256": "bf43c688a59ac4c88be202b98e679a2f60d7eeb6e7590fb121e05089629ec72f",
+          "recorded_value": {
+            "C:\\Djex-validation\\scoped-source-selections\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\djex-2026.7.17\\x\\djex\\build\\djex\\djex.exe": "a750f64312848ef18efa43a738d09f38a5120d14f3de1c7e38571ed065225b69",
+            "C:\\ghcup\\bin\\ghc.exe": "7c55e201f71860c5babea886007c8fa44b861abf50d1c07e5677eb0bda387a70"
+          }
+        },
+        "sources": {
+          "value_sha256": "7757851f2f9421b68ac9940a8dccb44c63346d2bc0825e01609c28e5092bd2e3"
+        },
+        "controls": {
+          "value_sha256": "d6f7e3eda80423ee794d8dd4279eb547c02d48505895c701dd36bf2557d83ed3"
+        }
+      },
+      "control_rows": [
+        {
+          "pointer": "/cells/13",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/27",
+          "recorded_status": "passed"
+        }
+      ]
+    },
+    "lean-acyclic-head-maybe-either-2026-09-13": {
+      "source": {
+        "repo": "Leant",
+        "path": "test-church/receipts/acyclic-head-maybe-either-2026-09-13.zip",
+        "sha256": "9b2e6b79b32938a584283a8bdcf66b050a231b338c1b0692bfa5a20e56d7d225",
+        "member": "native-focused/run/results.json",
+        "member_sha256": "56b971655f50856c36995046286bfbc54f2d9880eb80cc0d194b42865714b1af"
+      },
+      "rows": "/cells",
+      "metadata_pointers": {
+        "settings": "/settings",
+        "runtime": "/executable_hashes",
+        "sources": "/source_hashes",
+        "controls": "/oracle_controls"
+      },
+      "recorded_metadata": {
+        "settings": {
+          "value_sha256": "bde57e7f51dba0f411512a4d03f9f636a2242c9b8b8a7547e6fbc676d8ab1f0d",
+          "recorded_value": {
+            "window": 65536,
+            "verify": 65536,
+            "shown": 1,
+            "ranking": "balanced",
+            "djinn_strategy": "interleave",
+            "djinn_choice_budget": 500000,
+            "exference_steps": 100000,
+            "command_timeout_seconds": 90,
+            "separate_process_guard_seconds": 900.0
+          }
+        },
+        "runtime": {
+          "value_sha256": "abd006610eb293fbd94be11acded6b089d3629e544f2f3111c7e1d9a4cba1088",
+          "recorded_value": {
+            "C:\\Leant-validation\\constructor-closure\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe": "36b2662eb478e8af0a11d6bef7471ef4bf0e5bd1da57b8ebe0bb672d9295a410",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe": "937918675ff15139816bbe2a4f6168fb8b36ea0e0990664311f4902cbce0f6f2",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe": "cf11cebeea855a47477a2648e2b8c10b11b7364e040e499d9cc5e015bfbaa0a2",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe": "7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a"
+          }
+        },
+        "sources": {
+          "value_sha256": "e97461158f3cbdd6f8ca221a7331cbb7e995919cbcef3df698ea119187a24747"
+        },
+        "controls": {
+          "value_sha256": "71f3abca70976ffaccc78708531b52d867d2f46522c0eced0184d88bd3732573"
+        }
+      },
+      "control_rows": [
+        {
+          "pointer": "/cells/1",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/3",
+          "recorded_status": "passed"
+        },
+        {
+          "pointer": "/cells/5",
+          "recorded_status": "passed"
+        }
+      ]
+    },
+    "lean-acyclic-head-length-2026-09-13": {
+      "source": {
+        "repo": "Leant",
+        "path": "test-church/receipts/acyclic-head-maybe-either-2026-09-13.zip",
+        "sha256": "9b2e6b79b32938a584283a8bdcf66b050a231b338c1b0692bfa5a20e56d7d225",
+        "member": "native-length/run/results.json",
+        "member_sha256": "b13937780b2ae1eddc7f90f823147ebd1aab0bc007eb7e0f7b2e294477b9510b"
+      },
+      "rows": "/cells",
+      "metadata_pointers": {
+        "settings": "/settings",
+        "runtime": "/executable_hashes",
+        "sources": "/source_hashes",
+        "controls": "/oracle_controls"
+      },
+      "recorded_metadata": {
+        "settings": {
+          "value_sha256": "bde57e7f51dba0f411512a4d03f9f636a2242c9b8b8a7547e6fbc676d8ab1f0d",
+          "recorded_value": {
+            "window": 65536,
+            "verify": 65536,
+            "shown": 1,
+            "ranking": "balanced",
+            "djinn_strategy": "interleave",
+            "djinn_choice_budget": 500000,
+            "exference_steps": 100000,
+            "command_timeout_seconds": 90,
+            "separate_process_guard_seconds": 900.0
+          }
+        },
+        "runtime": {
+          "value_sha256": "abd006610eb293fbd94be11acded6b089d3629e544f2f3111c7e1d9a4cba1088",
+          "recorded_value": {
+            "C:\\Leant-validation\\constructor-closure\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe": "36b2662eb478e8af0a11d6bef7471ef4bf0e5bd1da57b8ebe0bb672d9295a410",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lake.exe": "937918675ff15139816bbe2a4f6168fb8b36ea0e0990664311f4902cbce0f6f2",
+            "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\lean_interact\\cache\\augustepoiroux\\repl\\repl_v1.3.18_lean-toolchain-v4.32.0\\.lake\\build\\bin\\repl.exe": "cf11cebeea855a47477a2648e2b8c10b11b7364e040e499d9cc5e015bfbaa0a2",
+            "C:\\Users\\vresh\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe": "7ca24f26d6e3f463419ee4f537ddd3acd312c38fe45e678cce08572f26a8bd1a"
+          }
+        },
+        "sources": {
+          "value_sha256": "4d3b958fda3ab221ca3c6f71c2587d8239141bcc631ee4fbb30f7dbc4c589548"
+        },
+        "controls": {
+          "value_sha256": "763324eaea2b627f8545765d7b62da39425847a336c74518e221e6b511456c6a"
+        }
+      },
+      "control_rows": [
+        {
+          "pointer": "/cells/1",
+          "recorded_status": "passed"
+        }
+      ]
     }
   },
   "cells": [
@@ -1062,6 +1240,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/1/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/0",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/0/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1091,6 +1277,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/0/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/14",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/14/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1175,6 +1369,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/4/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/1",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/1/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1204,6 +1406,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/1/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/15",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/15/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1296,6 +1506,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/native_int_repair_runs/0/cells/0/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/2",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/2/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1325,6 +1543,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/2/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/16",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/16/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1342,6 +1568,14 @@
         {
           "collection": "lean-matching-extended-seven-2026-09-13",
           "pointer": "/cells/2",
+          "recorded_outcome": "failed_unclassified",
+          "recorded_status": "failed",
+          "recorded_classification": null,
+          "replay_pointer": null
+        },
+        {
+          "collection": "lean-acyclic-head-length-2026-09-13",
+          "pointer": "/cells/0",
           "recorded_outcome": "failed_unclassified",
           "recorded_status": "failed",
           "recorded_classification": null,
@@ -1409,6 +1643,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/1/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/3",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/3/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1438,6 +1680,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/3/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/17",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/17/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1522,6 +1772,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/3/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/4",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/4/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1551,6 +1809,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/4/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/18",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/18/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1635,6 +1901,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/2/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/5",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/5/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1664,6 +1938,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/5/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/19",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/19/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1748,6 +2030,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/3/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/6",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/6/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1777,6 +2067,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/6/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/20",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/20/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1861,6 +2159,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/4/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/7",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/7/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1890,6 +2196,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/7/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/21",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/21/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -1974,6 +2288,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/5/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/8",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/8/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2003,6 +2325,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/8/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/22",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/22/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2087,9 +2417,17 @@
           "recorded_status": "failed",
           "recorded_classification": "bounded no-match at ChoicePointLimitReached, with one final compilation error",
           "replay_pointer": null
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/9",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/9/replay"
         }
       ],
-      "historical_status": "attempts_without_recorded_acceptance"
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/maybeEither/haskell/exference",
@@ -2116,6 +2454,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/9/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/23",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/23/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2137,9 +2483,17 @@
           "recorded_status": "failed",
           "recorded_classification": null,
           "replay_pointer": null
+        },
+        {
+          "collection": "lean-acyclic-head-maybe-either-2026-09-13",
+          "pointer": "/cells/0",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/0/replay"
         }
       ],
-      "historical_status": "attempts_without_recorded_acceptance"
+      "historical_status": "acceptance_recorded"
     },
     {
       "id": "extended/maybeEither/lean/exference",
@@ -2158,6 +2512,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/9/replay"
+        },
+        {
+          "collection": "lean-acyclic-head-maybe-either-2026-09-13",
+          "pointer": "/cells/2",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/2/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2179,6 +2541,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/14/replay"
+        },
+        {
+          "collection": "lean-acyclic-head-maybe-either-2026-09-13",
+          "pointer": "/cells/4",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/4/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2200,6 +2570,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/2/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/10",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/10/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2229,6 +2607,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/10/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/24",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/24/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2313,6 +2699,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/0/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/11",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/11/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2342,6 +2736,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/11/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/25",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/25/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2426,6 +2828,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/0/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/12",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/12/replay"
         }
       ],
       "historical_status": "acceptance_recorded"
@@ -2455,6 +2865,14 @@
           "recorded_status": "passed",
           "recorded_classification": null,
           "replay_pointer": "/cells/12/replay"
+        },
+        {
+          "collection": "haskell-acyclic-head-extended-2026-09-13",
+          "pointer": "/cells/26",
+          "recorded_outcome": "historical_accepted",
+          "recorded_status": "passed",
+          "recorded_classification": null,
+          "replay_pointer": "/cells/26/replay"
         }
       ],
       "historical_status": "acceptance_recorded"

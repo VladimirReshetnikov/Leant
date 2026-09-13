@@ -16,7 +16,7 @@ See `behavior-ledger.json` for individual receipt pointers, hashes, limits and r
 | extended | catMaybes | A | A | A | A | A |
 | extended | squashMaybe | A | A | A | A | A |
 | extended | isLeft | A | A | A | A | A |
-| extended | maybeEither | F | A | F | A | A |
+| extended | maybeEither | A | A | A | A | A |
 | extended | either | A | A | A | A | A |
 | extended | numeralSuccessor | A | A | A | A | A |
 | extended | numeralAdd | A | A | A | A | A |

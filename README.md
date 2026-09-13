@@ -36,35 +36,33 @@ There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.github
 — an overview and tutorial, with a detailed tour of `:synth`
 ([LaTeX source](docs/Leant_Overview/Leant_Overview.tex)).
 
-The latest [contextual constructor release](docs/reports/2026-09-13-contextual-constructor-use-acceptance.md)
-combines polymorphic constructors with caller-supplied class methods, including
-the previously failing method/tail and nested-context cases. Its complete
-native matrix passes 21 positives and six actual False controls, all 711 native
-unit tests pass, and both 350-signature corpora pass independent Lean replay.
-Djinn's additional search branch constructs a use of an existing contextual
-helper while retaining the original search, first proof and shared bounds.
-The detailed report records the canonical release checks and source limits.
+The latest [nested Church composition release](docs/reports/2026-09-13-maybe-either-head-use-acceptance.md)
+repairs Djinn's Church-encoded `maybeEither` synthesis in both Haskell and Lean.
+Both Haskell engines pass all 13 extended operations in fresh runs, with exact
+independent GHC execution. Native Djinn, Exference and Both pass `maybeEither`
+with exact Lean replay and actual rejection controls.
 
-Earlier accepted improvements preserve [lexical type and dictionary selections](docs/reports/2026-09-13-exference-native-acceptance.md)
-through rank-N source reconstruction and duplicate comparison, and repair
-[trailing type-witness rendering](docs/reports/2026-09-13-trailing-type-witness-acceptance.md)
-for supplied-default selectors. These have separate compiler/replay receipts.
+Djinn's additional search branch avoids repeating the same function head along
+an application path while allowing independent reuse in sibling arguments.
+It retains the original first proof, complete original search and shared bounds.
+The detailed report records 137 passing Djinn unit tests and the complete
+canonical/native release checks, including 711 native unit tests.
 
-The [Church behavior ledger](test-church/behavior-ledger.md) contains 160
-operation/mode cells: 92 historical acceptances, 15 attempted cells without
-indexed acceptance and 53 without indexed evidence. These are historical
-receipt counts, not a current-revision pass rate; missing indexed evidence does
-not establish that a case was never attempted. Constructor acceptance adds no
-Church behavior cells by association.
+Earlier accepted improvements compose [polymorphic constructors with contextual methods](docs/reports/2026-09-13-contextual-constructor-use-acceptance.md),
+preserve [lexical type and dictionary selections](docs/reports/2026-09-13-exference-native-acceptance.md),
+and repair [trailing type-witness rendering](docs/reports/2026-09-13-trailing-type-witness-acceptance.md).
 
-The [current delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-records a local `maybeEither` candidate passing exact behavior checks in both
-languages, with broader release validation still pending. It next targets
-reduction carrier admission and step construction, Lean Djinn `length`, integer
-indexing and extrema batches. Both the [carrier-only reduction experiment](docs/reports/2026-09-13-reduction-carrier-boundary.md)
-and the later required-assumption extension failed their reduction gates.
-Source-language, universe, contextual-evidence, supplied-fold tree and public-query
-support remain explicit obligations of the practical goal.
+The [Church behavior ledger](test-church/behavior-ledger.md) records 94
+historical acceptances, 13 attempted cells without indexed acceptance and 53
+cells without indexed evidence, out of 160. These are historical receipt counts,
+not a current-revision pass rate or a completeness theorem. Missing indexed
+evidence does not establish that a case was never attempted.
+
+The [delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md) retains
+reductions, Lean Djinn length, integer indexing, extrema and the broader source-language,
+universe, supplied-fold tree and public-query obligations. The earlier
+[carrier-only reduction experiment](docs/reports/2026-09-13-reduction-carrier-boundary.md)
+and the unsuccessful required-use extension remain diagnostic evidence.
 
 ## Contents
 
