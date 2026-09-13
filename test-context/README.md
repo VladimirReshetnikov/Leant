@@ -69,8 +69,23 @@ acceptance of the full matrix. A process exit without the required positive or
 actual predicate rejection is a failed case. Each failed case is retained while
 the driver continues through the remaining selected cases. The
 [complete diagnostic](../docs/reports/2026-09-13-contextual-constructor-frontier.md)
-records 17/21 positive replays and 6/6 False controls; this new matrix is not yet
-accepted. Its plan-ordering experiment was reverted after the run.
+records the historical 17/21 positive replays and 6/6 False controls. The later
+[constructor release](../docs/reports/2026-09-13-contextual-constructor-use-acceptance.md)
+closes all 21 positives; the strict-implicit release repeats the complete matrix
+successfully. The earlier plan-ordering experiment was reverted after its run.
+
+## Strict-implicit contextual binders
+
+`run_strict_implicit.py` reuses the method, argument and nested-context observations
+with strict-implicit type binders. Its nine exact positive replays and six actual
+False controls pass across Djinn, Exference and Both, at the original constructor
+bounds. It additionally checks the displayed strict binder introductions. See the
+[release report](../docs/reports/2026-09-13-strict-implicit-source-acceptance.md)
+and [receipt](receipts/strict-implicit-source-2026-09-13.json).
+
+```powershell
+python -X utf8 -B test-context/run_strict_implicit.py --leant <built-leant.exe> --output dist-newstyle/strict-implicit/run-1
+```
 
 ## Direct renderer component
 

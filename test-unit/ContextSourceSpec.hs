@@ -85,6 +85,10 @@ tests = testGroup "Production lexical Given source metadata"
          detailedCandidateGroupRoute group @?= RouteTypedCandidate
          assertBool "production context renderer did not display its explicit dictionary/type annotation" $
            all ("leant" `isInfixOf`) $ detailedCandidateGroupVariants group
+         if "strict implicit" `isInfixOf` label
+           then assertBool "production context renderer erased strict-implicit binder visibility" $
+             all ("⦃" `isInfixOf`) $ detailedCandidateGroupVariants group
+           else pure ()
          authority <- maybe (fail "candidate lost its source-owned authority") pure $
            detailedCandidateGroupSourceAuthority group
          candidateSourceAuthorityEngine authority @?= engine
@@ -265,7 +269,7 @@ tests = testGroup "Production lexical Given source metadata"
        assertUnsupported parsed
    , testCase "unsupported or malformed contextual packets never become legacy goals" $
        forM_ [ "unsupported \"Prop binder\"", "2 (var \"a\")"
-             , "1 (all strict-implicit \"a\" (var \"a\"))"
+             , "1 (all unknown-visibility \"a\" (var \"a\"))"
              , "1 (given (name \"C\") 1 (args (var \"unbound\")) (var \"unbound\"))"
              ] $ \payload -> do
          parsed <- expectRight $ parseGoalSexp $
@@ -301,10 +305,14 @@ fixtures =
   , ("nested callback", arrow (arrow identityScheme token) token, False)
   , ("exact forwarding", arrow tokenScheme tokenScheme, False)
   , ("forced local Given", all' "a" $ given "a" $ arrow tokenScheme $ arrow (var "a") token, True)
+  , ("strict implicit root", strictAll "a" $ given "a" $ arrow (var "a") (var "a"), False)
+  , ("strict implicit callback", arrow (arrow strictIdentityScheme token) token, False)
   ]
  where
   identityScheme = all' "b" $ given "b" $ arrow (var "b") (var "b")
   tokenScheme = all' "b" $ given "b" $ arrow (var "b") token
+  strictIdentityScheme = strictAll "b" $ given "b" $ arrow (var "b") (var "b")
+  strictAll variable body = "(all strict-implicit " ++ show variable ++ " " ++ body ++ ")"
 
 sourceOf :: String -> String
 sourceOf label = case [source | (name, source, _) <- fixtures, name == label] of

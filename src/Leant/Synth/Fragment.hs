@@ -1466,6 +1466,7 @@ contextSourcePrelude =
   , "  match bi with"
   , "  | .default => some \"explicit\""
   , "  | .implicit => some \"implicit\""
+  , "  | .strictImplicit => some \"strict-implicit\""
   , "  | _ => none"
   , ""
   , "private partial def contextNameParts? : Name → Option (List String)"
@@ -1989,6 +1990,7 @@ parseContextSourceType fuel (TL : TSym tag : rest) = case (tag, rest) of
     visible <- case visibility of
       "explicit" -> Right ContextExplicit
       "implicit" -> Right ContextImplicit
+      "strict-implicit" -> Right ContextStrictImplicit
       _ -> Left "context-source: unsupported type-binder visibility or domain"
     (result, remaining) <- descend body
     finish (ContextForall visible variable result) remaining

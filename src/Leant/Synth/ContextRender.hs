@@ -50,7 +50,7 @@ data LeanBinderDomain
   | LeanKindArrow LeanBinderDomain LeanBinderDomain
   deriving (Eq, Ord, Show)
 
-data LeanVisibility = LeanExplicit | LeanImplicit deriving (Eq, Ord, Show)
+data LeanVisibility = LeanExplicit | LeanImplicit | LeanStrictImplicit deriving (Eq, Ord, Show)
 data LeanBinder = LeanBinder LeanVisibility LeanBinderDomain
   deriving (Eq, Ord, Show)
 
@@ -642,6 +642,7 @@ binderText :: LeanVisibility -> String -> String -> String
 binderText visibility name domain = case visibility of
   LeanExplicit -> "(" ++ name ++ " : " ++ domain ++ ")"
   LeanImplicit -> "{" ++ name ++ " : " ++ domain ++ "}"
+  LeanStrictImplicit -> "⦃" ++ name ++ " : " ++ domain ++ "⦄"
 
 relativeName :: LeanName -> String
 relativeName (LeanName parts) = intercalate "." $ map (\part -> "«" ++ part ++ "»") parts

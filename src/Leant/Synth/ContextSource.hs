@@ -23,13 +23,13 @@ import qualified Language.Haskell.Synthesis.TypeAtom as A
 import qualified Language.Haskell.Synthesis.TypedGenerated as Q
 import Leant.Synth.ContextRender
 
-data ContextSourceVisibility = ContextExplicit | ContextImplicit
+data ContextSourceVisibility = ContextExplicit | ContextImplicit | ContextStrictImplicit
   deriving (Eq, Show)
 
 -- Every type binder and nominal/class parameter in version 1 has the exact
 -- domain Type 0. A nominal/class declaration must itself end in Type 0.
 -- The exact nominal form also retains universe-zero constant instantiations.
--- Higher sorts, Prop domains, strict implicit binders and dependent term
+-- Higher sorts, Prop domains and dependent term
 -- arrows remain refused; constant selections must not be inferred or erased.
 data ContextSourceType
   = ContextVariable String
@@ -232,7 +232,10 @@ prepareContextSource classes nominals goal packet = do
       (private, LeanClassInfo name kinds) : concatMap second projected,
       concatMap third projected)
   binder visibility = LeanBinder
-    (case visibility of ContextExplicit -> LeanExplicit; ContextImplicit -> LeanImplicit)
+    (case visibility of
+       ContextExplicit -> LeanExplicit
+       ContextImplicit -> LeanImplicit
+       ContextStrictImplicit -> LeanStrictImplicit)
     (LeanSortDomain $ LeanLevelSuccessor LeanLevelZero)
   allSpine (ContextForall visibility variable body) =
     let (rest, result) = allSpine body in ((visibility, variable) : rest, result)
