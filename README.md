@@ -1,8 +1,8 @@
-# Leant — a Djex-based synthesis REPL for Lean 4
+# Leant â€” a Djex-based synthesis REPL for Lean 4
 
 Leant brings [Djex](https://github.com/VladimirReshetnikov/Djex)-powered program and proof synthesis to
 Lean 4, wrapped in an interactive read-eval-print loop. The centerpiece
-is `:synth`: give it a type and it constructs terms of that type —
+is `:synth`: give it a type and it constructs terms of that type â€”
 ranked, bound into the session, and every candidate re-elaborated by
 Lean before you see it. It can also prove non-inhabitation in supported
 fragments; bounded searches may instead end inconclusively. Around the
@@ -12,32 +12,32 @@ they enter the session, and a family of `:commands` gives you type
 queries, documentation, search, and interactive tactic proving.
 
 ```text
-λ> 2 + 2
+Î»> 2 + 2
 4
-λ> def double (n : Nat) : Nat := n + n
-λ> double 21
+Î»> def double (n : Nat) : Nat := n + n
+Î»> double 21
 42
-λ> :synth ((A → B → C) → (A → B) → A → C)
+Î»> :synth ((A â†’ B â†’ C) â†’ (A â†’ B) â†’ A â†’ C)
   it1  fun f g x => f x (g x)
-λ> :synth (∀ a b : Type, a → b)
-provably uninhabited — no closed term of this polymorphic type exists
+Î»> :synth (âˆ€ a b : Type, a â†’ b)
+provably uninhabited â€” no closed term of this polymorphic type exists
 ```
 
 Lean 4 is normally driven from an editor, where the language server
 shows goals and diagnostics as you edit a file. Leant complements that
-workflow with a conversational one, aimed at exploration — trying a
-lemma, poking at a definition, asking *is this type even inhabited?* —
+workflow with a conversational one, aimed at exploration â€” trying a
+lemma, poking at a definition, asking *is this type even inhabited?* â€”
 where the unit of work is a line, not a file.
 
 **Leant is experimental and under active development.** Commands change
 shape between commits and output formats are not stable.
 
 There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Overview/Leant_Overview.pdf)**
-— an overview and tutorial, with a detailed tour of `:synth`
+â€” an overview and tutorial, with a detailed tour of `:synth`
 ([LaTeX source](docs/Leant_Overview/Leant_Overview.tex)).
 
 The [strict-implicit Lean binder release](docs/reports/2026-09-13-strict-implicit-source-acceptance.md)
-preserves `⦃α : Type⦄` binders through contextual synthesis, including nested
+preserves `â¦ƒÎ± : Typeâ¦„` binders through contextual synthesis, including nested
 callbacks and selected dictionaries. All 719 native unit tests pass, along with
 nine new exact Lean replays and six rejection controls; the existing contextual
 constructor matrix also passes. General universe and dependent-binder support
@@ -60,18 +60,21 @@ preserve [lexical type and dictionary selections](docs/reports/2026-09-13-exfere
 and repair [trailing type-witness rendering](docs/reports/2026-09-13-trailing-type-witness-acceptance.md).
 
 The [Church behavior ledger](test-church/behavior-ledger.md) records 94
-historical acceptances, 13 attempted cells without indexed acceptance and 53
+historical acceptances, 23 attempted cells without indexed acceptance and 43
 cells without indexed evidence, out of 160. These are historical receipt counts,
 not a current-revision pass rate or a completeness theorem. Missing indexed
 evidence does not establish that a case was never attempted.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
 prioritizes end-to-end [kinded Haskell source support](docs/reports/2026-09-13-public-kinded-source-frontier.md),
-with engine checking and original-signature replay as the next gate. Eight completed
-individual-engine extrema probes missed; two Lean Both-mode cells remain pending.
-A local repair admits the missing carrier, but construction still times out, so
-the next extrema step is a targeted construction trace. Lean universe polymorphism
-remains an independent milestone. These local attempts are not yet indexed in the ledger.
+with engine checking and original-signature replay as the next gate. The
+[ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
+preserves explicit binder kinds in emitted signatures and passes eight GHC
+rendering fixtures plus rejection checks. All ten representative extrema probes
+miss at their original bounds; these attempts are now indexed in the ledger.
+A diagnostic with globally charged evaluation reaches the full search budget,
+so extrema work now targets the missing construction. Lean universe support
+remains an independent milestone.
 The [checked source-kind transport prerequisite](docs/reports/2026-09-13-source-kind-transport-prerequisite.md)
 preserves ground-kind forall annotations through conversion and synonym expansion,
 with 539 foundation and 171 integration tests passing. Public kinded queries still
@@ -87,9 +90,9 @@ construction change.
 
 - [Highlights](#highlights)
 - [Getting started](#getting-started)
-- [Usage](#usage) — command-line options and the command table
-- [Interactive proving — `:prove`](#interactive-proving--prove)
-- [`:synth` — automatic term synthesis](#synth--automatic-term-synthesis)
+- [Usage](#usage) â€” command-line options and the command table
+- [Interactive proving â€” `:prove`](#interactive-proving--prove)
+- [`:synth` â€” automatic term synthesis](#synth--automatic-term-synthesis)
   - [Behavioral examples](#behavioral-examples)
   - [Higher-order plumbing](#higher-order-plumbing)
   - [Programs you already know](#programs-you-already-know)
@@ -107,38 +110,38 @@ construction change.
 
 Companion documents:
 
-- the **[manual](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Overview/Leant_Overview.pdf)** — tutorial and `:synth` tour;
+- the **[manual](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Overview/Leant_Overview.pdf)** â€” tutorial and `:synth` tour;
 - **[Rank-N and Impredicative Synthesis](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.pdf)**
-  — the algorithms, scope and universe rules, and compiler-checked Church
+  â€” the algorithms, scope and universe rules, and compiler-checked Church
   corpus results across Djex and Leant
   ([LaTeX source](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.tex));
-- **[docs/length-ranking.md](docs/length-ranking.md)** — the complete
+- **[docs/length-ranking.md](docs/length-ranking.md)** â€” the complete
   Length counterexample-ranking and replay-authorized filtering reference;
-- **[Candidate quality](docs/candidate-quality.md)** — ranking profiles,
+- **[Candidate quality](docs/candidate-quality.md)** â€” ranking profiles,
   checked simplification, and revision-pinned acceptance results;
 - **[Djinn source-typed evidence](lib/Djex/docs/source-typed-evidence-graph.md)**
-  — exact candidate graphs, quantified source types, ownership, and the
+  â€” exact candidate graphs, quantified source types, ownership, and the
   validation boundary for typed rendering and Length;
-- **[Behavioral assertions](docs/behavioral-synthesis.md)** — the new
+- **[Behavioral assertions](docs/behavioral-synthesis.md)** â€” the new
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
 - **[Current synthesis re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)**
-  — close missing behavior cells and preserve
+  â€” close missing behavior cells and preserve
   scoped dictionary evidence; track constructor search failures separately;
-- **[docs/synth-internals.md](docs/synth-internals.md)** — the design
+- **[docs/synth-internals.md](docs/synth-internals.md)** â€” the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
-  — a beginner's path from "a term has a type" to verified type-directed
+  â€” a beginner's path from "a term has a type" to verified type-directed
   synthesis: reading Lean syntax, propositions as types, dependent
   functions and pairs, universes, definitional equality, inductive types,
   and the Calculus of Constructions; how Lean elaborates surface syntax
   into kernel terms and what the kernel trusts; and then Leant and Djex
-  end to end — the smaller synthesis type world, the fragment
+  end to end â€” the smaller synthesis type world, the fragment
   translation, the two search engines, rendering, verification, negative
   evidence, and worked traces
   ([LaTeX source](docs/Lean_from_First_Principles/Lean_from_First_Principles.tex));
 - **[Z3 from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)**
-  — a beginner's guide to Z3 for this codebase, assuming no logic
+  â€” a beginner's guide to Z3 for this codebase, assuming no logic
   background: what satisfiability, models, and `unsat` mean, SMT-LIB from
   syntax to models, cores, and Horn clauses, why a solver boundary needs
   fingerprints, process ownership, and replay, and then a module-by-module
@@ -146,18 +149,18 @@ Companion documents:
   actually use Z3, plus a reading and troubleshooting guide
   ([LaTeX source](docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.tex));
 - the **[Z3 behavioral synthesis proposal](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
-  — where the behavioral layer goes next: counterexample-guided search,
+  â€” where the behavioral layer goes next: counterexample-guided search,
   typed sketch completion, semantic pruning, and Lean-checked proof
   artifacts ([LaTeX source](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex));
 - the **[codebase walkthrough](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.pdf)**
-  — the maintainer's tour of both repositories against a pinned pair of
+  â€” the maintainer's tour of both repositories against a pinned pair of
   revisions: the build graph, Djex's opaque authority types, Djinn's
   proof-producing search, Exference's typed-hole search and independent
   checker, and Leant's backend protocol, translation, rendering, and
   verification, with end-to-end traces and change recipes
   ([LaTeX source](docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.tex));
 - the **[Lean 4 rewrite analysis](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf)**
-  — a feasibility study of reimplementing Leant and Djex in Lean itself:
+  â€” a feasibility study of reimplementing Leant and Djex in Lean itself:
   which of today's boundaries would survive, what a Lean host makes
   simpler (elaborated goals staying `Expr`, kernel-checked candidates
   without pretty-printed text as authority), and a recommended end state
@@ -166,7 +169,7 @@ Companion documents:
 ## Highlights
 
 - **Verified term synthesis.** `:synth TYPE` constructs programs and
-  proofs — ranked, bound as `it1`, `it2`, …, and every candidate
+  proofs â€” ranked, bound as `it1`, `it2`, â€¦, and every candidate
   re-elaborated by the Lean backend before it is shown. Within supported
   fragments, Djinn can *prove* non-inhabitation; refuted propositional
   goals can also receive classical candidates.
@@ -200,7 +203,7 @@ Companion documents:
   mixed inventories, equal-predicate dictionary selection and superclass
   evidence remain open.
   Canonical Djex's supported-fragment Haskell elaboration completes original
-  priority 1; priorities 2–4 retain their broader requirements.
+  priority 1; priorities 2â€“4 retain their broader requirements.
   [Exact empty-user-environment reuse](docs/reports/2026-09-07-empty-environment-reuse.md)
   now makes native append and length pass their original public queries, bounds,
   actual False controls and independent full-type replay. Four lifecycle sessions
@@ -355,7 +358,7 @@ Companion documents:
 - **A real REPL.** Definitions persist via the backend's environment
   threading; `it` holds the last result; TAB completes `:commands` and
   dotted identifiers; multi-line input opens automatically on
-  syntactically incomplete lines and a blank line submits (`:{` … `:}`
+  syntactically incomplete lines and a blank line submits (`:{` â€¦ `:}`
   delimits an explicit block, as in GHCi).
 - **Crash-proof sessions.** If the backend dies, times out, or is
   interrupted, it restarts and the session (imports + history) replays
@@ -379,7 +382,7 @@ cabal build exe:leant
 ```
 
 The REPL core uses GHC boot libraries only, but `:synth` links the
-vendored [Djex](lib/Djex) synthesis library (a read-only git submodule —
+vendored [Djex](lib/Djex) synthesis library (a read-only git submodule â€”
 if you cloned without `--recurse-submodules`, run
 `git submodule update --init lib/Djex`), which pulls `haskell-src-exts`
 and a few other packages from Hackage. The bundled `cabal.project`
@@ -409,7 +412,7 @@ Run inside a Lake project (auto-detected, or `--project DIR`) to make
 the project's modules and dependencies importable, or `--plain` for a
 bare stdlib session with subsecond startup. Expressions evaluate via
 `#eval` with `#check` fallback; declarations (`def`, `theorem`,
-`inductive`, `open`, …) run verbatim and, on success, advance the
+`inductive`, `open`, â€¦) run verbatim and, on success, advance the
 session environment; `#`-commands pass straight through.
 
 **Length behavioral assessment** is an optional last stage that asks Z3
@@ -421,7 +424,7 @@ and one scalar-or-pair contract. Once active:
   ranking, moving only candidates with a replayed counterexample after the
   rest, never dropping any;
 - `:synth --behavior-mode filter -- TYPE` additionally *omits* candidates that
-  Z3 refuted against the activated contract — and only those: a raw `sat`,
+  Z3 refuted against the activated contract â€” and only those: a raw `sat`,
   `unsat`, or `unknown`, an unassessed input, or a positive bounded-evidence
   receipt never causes a rejection;
 - `--length-contract ABSOLUTE-PATH` swaps in a passive contract for one
@@ -519,10 +522,10 @@ See the
 | `:! CMD` | run a shell command |
 
 Built-ins and keywords that are not constants in the environment
-(`imax`, `Sort`, `fun`, `→`, `∀`, `⟨⟩`, …) get explanatory help from
+(`imax`, `Sort`, `fun`, `â†’`, `âˆ€`, `âŸ¨âŸ©`, â€¦) get explanatory help from
 `:t`/`:info` instead of an unhelpful "Unknown identifier".
 
-## Interactive proving — `:prove`
+## Interactive proving â€” `:prove`
 
 `:prove PROP` opens a tactic loop against the backend's proof-state
 protocol (bare `:prove` resumes the most recent `sorry`). Every line is
@@ -531,12 +534,12 @@ suggestion for the next tactic. The candidate probes are shaped by the
 goal and its hypotheses: an `intro` suggestion names the binders it
 would introduce, a disjunction goal is probed with `left`/`right`, a
 hypothesis whose type a single step can take apart is probed with
-`cases h` or `obtain ⟨x, h1⟩ := h`, and a data-typed variable the goal
+`cases h` or `obtain âŸ¨x, h1âŸ© := h`, and a data-typed variable the goal
 mentions is probed with `induction`. The search prefers a candidate that
 closes the goal outright and annotates the suggestion accordingly
 (`closes the goal`, `splits into 2 goals`); when no single tactic
 closes it, a second phase chains quick finishers onto the best
-progressing candidates (`constructor <;> omega`, `obtain ⟨h, h2⟩ := h1
+progressing candidates (`constructor <;> omega`, `obtain âŸ¨h, h2âŸ© := h1
 <;> exact Exists.intro x h`), so even the opening suggestion is often a
 complete checked proof. The chains also try `simp_all`, unfolding the
 definitions the goal mentions and calling in `omega` on whatever
@@ -554,59 +557,59 @@ and prints the accumulated script instead of submitting a stale identifier
 after the session restarts.
 
 ```text
-λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p
-entering prove mode — type tactics; :help for commands
-⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
+Î»> :prove âˆ€ p q : Prop, p âˆ§ q â†’ q âˆ§ p
+entering prove mode â€” type tactics; :help for commands
+âŠ¢ âˆ€ (p q : Prop), p âˆ§ q â†’ q âˆ§ p
 suggestion: intro p q h <;> exact And.comm.mp h  (closes the goal)
-⊢> intro p q h
+âŠ¢> intro p q h
 p q : Prop
-h : p ∧ q
-⊢ q ∧ p
+h : p âˆ§ q
+âŠ¢ q âˆ§ p
 suggestion: exact And.comm.mp h  (closes the goal)
-⊢> exact And.comm.mp h
-All goals accomplished 🎉
+âŠ¢> exact And.comm.mp h
+All goals accomplished ðŸŽ‰
 finish with :qed [NAME], inspect with :script
-⊢> :qed and_swap
-saved: theorem and_swap : ∀ p q : Prop, p ∧ q → q ∧ p
+âŠ¢> :qed and_swap
+saved: theorem and_swap : âˆ€ p q : Prop, p âˆ§ q â†’ q âˆ§ p
 ```
 
 At its best the suggestion machinery hands you a finished induction:
 here it combines `induction` (the goal mentions a data-typed
 variable), `simp_all` unfolding the function the goal is about, and
-`omega` for the leftover arithmetic — a complete verified proof of a
+`omega` for the leftover arithmetic â€” a complete verified proof of a
 theorem about a function defined two lines earlier:
 
 ```text
-λ> def double : Nat → Nat
-…>   | 0 => 0
-…>   | n + 1 => double n + 2
-…>
-λ> :prove ∀ n : Nat, double n = 2 * n
-entering prove mode — type tactics; :help for commands
-⊢ ∀ (n : Nat), double n = 2 * n
+Î»> def double : Nat â†’ Nat
+â€¦>   | 0 => 0
+â€¦>   | n + 1 => double n + 2
+â€¦>
+Î»> :prove âˆ€ n : Nat, double n = 2 * n
+entering prove mode â€” type tactics; :help for commands
+âŠ¢ âˆ€ (n : Nat), double n = 2 * n
 suggestion: intro n
-⊢> intro n
+âŠ¢> intro n
 n : Nat
-⊢ double n = 2 * n
+âŠ¢ double n = 2 * n
 suggestion: induction n <;> simp_all [double] <;> omega  (closes the goal)
-⊢> induction n <;> simp_all [double] <;> omega
-All goals accomplished 🎉
+âŠ¢> induction n <;> simp_all [double] <;> omega
+All goals accomplished ðŸŽ‰
 finish with :qed [NAME], inspect with :script
-⊢> :qed double_two_mul
-saved: theorem double_two_mul : ∀ n : Nat, double n = 2 * n
+âŠ¢> :qed double_two_mul
+saved: theorem double_two_mul : âˆ€ n : Nat, double n = 2 * n
 ```
 
-## `:synth` — automatic term synthesis
+## `:synth` â€” automatic term synthesis
 
-`:synth TYPE` answers the question *"write me a term of this type"* —
-read through propositions-as-types, *"prove this"* — and sometimes the
+`:synth TYPE` answers the question *"write me a term of this type"* â€”
+read through propositions-as-types, *"prove this"* â€” and sometimes the
 stronger question *"show me that no such term exists."*
 
 **What it can take.** The core fragment is the structural connectives
-`→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque variables. On top of
+`â†’ / Ã— / âˆ§ / âŠ• / âˆ¨ / â†” / Â¬ / âŠ¥ / âŠ¤ / âˆ€` over opaque variables. On top of
 that:
 
-- *Inductive types* whose constructors can be represented structurally —
+- *Inductive types* whose constructors can be represented structurally â€”
   built-ins such as `Option`, `Except`, and `List`, and your own
   `inductive`/`structure` declarations. Non-recursive families get their
   constructors and case analysis; recursive families get their
@@ -622,8 +625,8 @@ that:
 
 The design and its phasing are in
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md); the internal
-boundaries — how the goal is translated, how providers are bound, and
-which dated report pins each invariant — are in
+boundaries â€” how the goal is translated, how providers are bound, and
+which dated report pins each invariant â€” are in
 [docs/synth-internals.md](docs/synth-internals.md).
 
 Three rules run through the design:
@@ -640,7 +643,7 @@ Three rules run through the design:
   weaker is reported as "no term found within bounds," which claims
   nothing.
 
-Transcripts below are lightly abridged: `⋯` marks elided trailing
+Transcripts below are lightly abridged: `â‹¯` marks elided trailing
 candidates (and, where applicable, a truncation note).
 They illustrate checked terms from their recorded runs; structural ranking
 can change the displayed order without changing the requested type. The
@@ -653,7 +656,7 @@ Name the function and state its expected behavior using ordinary Lean
 propositions:
 
 ```text
-:synth f : (∀ α : Type, α → α → α) where f Nat 11 29 = 29 ∧ f Bool true false = false
+:synth f : (âˆ€ Î± : Type, Î± â†’ Î± â†’ Î±) where f Nat 11 29 = 29 âˆ§ f Bool true false = false
 ```
 
 Leant checks every candidate at the requested type, then asks Lean to prove the
@@ -721,7 +724,7 @@ of the original compilation-failure sample when a same-candidate retry times
 out. The [canonical receipt](https://github.com/VladimirReshetnikov/Djex/blob/fcea4779508f10b608f0ad59293d7c7cca121b29/test-integration/receipts/elaboration-timeout-samples.json)
 records all 101 tests passing in 124.17 seconds and the same-deadline recovery
 control. That acceptance does not extend the recorded Lean corpus or
-recursive-case coverage; priorities 2–4 remain open. [Bounded behavioral simplification](docs/reports/2026-09-07-bounded-behavioral-simplification.md)
+recursive-case coverage; priorities 2â€“4 remain open. [Bounded behavioral simplification](docs/reports/2026-09-07-bounded-behavioral-simplification.md)
 now follows both decision attempts. Its 16 isolated method controls, 15 live
 queries across all three engines, and six independent candidate replays pass.
 That earlier full boundary run passed 619/620 tests; its one existing
@@ -761,52 +764,52 @@ associativity; the selected ranking policy can change which valid term is
 shown first:
 
 ```text
-λ> :synth ((a → b → c) → b → a → c)
+Î»> :synth ((a â†’ b â†’ c) â†’ b â†’ a â†’ c)
   it1  fun f x y => f y x
-λ> :synth ((b → c) → (a → b) → a → c)
+Î»> :synth ((b â†’ c) â†’ (a â†’ b) â†’ a â†’ c)
   it1  fun f g x => f (g x)
-λ> :synth ((A → B → C) → A × B → C)
-  it1  fun f ⟨x, y⟩ => f x y
-λ> :synth (((A × B) × C) → A × (B × C))
-  it1  fun ⟨⟨x, y⟩, z⟩ => ⟨x, ⟨y, z⟩⟩
+Î»> :synth ((A â†’ B â†’ C) â†’ A Ã— B â†’ C)
+  it1  fun f âŸ¨x, yâŸ© => f x y
+Î»> :synth (((A Ã— B) Ã— C) â†’ A Ã— (B Ã— C))
+  it1  fun âŸ¨âŸ¨x, yâŸ©, zâŸ© => âŸ¨x, âŸ¨y, zâŸ©âŸ©
 ```
 
 Candidates are ranked smallest-first and *bound into the session* as
-`it1`, `it2`, …, with bare `it` the best one — they are ordinary
+`it1`, `it2`, â€¦, with bare `it` the best one â€” they are ordinary
 definitions, so you can evaluate them immediately:
 
 ```text
-λ> :synth (a → a → a)
+Î»> :synth (a â†’ a â†’ a)
   it1  fun _ x => x
   it2  fun x _ => x
-λ> #eval it2 "left" "right"
+Î»> #eval it2 "left" "right"
 "left"
 ```
 
 Read through propositions-as-types, the same plumbing proves logical
 identities, and the proof terms *are* the plumbing: `Iff` symmetry is
-a swap, `¬(p ∧ q) ↔ (p → ¬q)` is currying, and De Morgan's law packs
+a swap, `Â¬(p âˆ§ q) â†” (p â†’ Â¬q)` is currying, and De Morgan's law packs
 one direction each into an anonymous constructor:
 
 ```text
-λ> :synth (∀ p q : Prop, (p ↔ q) → (q ↔ p))
-  it1  fun _ _ ⟨f, g⟩ => ⟨g, f⟩
-λ> :synth (∀ p q : Prop, ¬(p ∧ q) ↔ (p → ¬q))
-  it1  fun _ _ => ⟨fun k x y => k ⟨x, y⟩, fun k1 ⟨z, w⟩ => k1 z w⟩
-λ> :synth (∀ p q : Prop, ¬(p ∨ q) ↔ ¬p ∧ ¬q)
-  it1  fun _ _ => ⟨fun k => ⟨fun x => k (.inl x), fun y => k (.inr y)⟩, fun ⟨k1, k2⟩ z => match z with | .inl w => k1 w | .inr x1 => k2 x1⟩
+Î»> :synth (âˆ€ p q : Prop, (p â†” q) â†’ (q â†” p))
+  it1  fun _ _ âŸ¨f, gâŸ© => âŸ¨g, fâŸ©
+Î»> :synth (âˆ€ p q : Prop, Â¬(p âˆ§ q) â†” (p â†’ Â¬q))
+  it1  fun _ _ => âŸ¨fun k x y => k âŸ¨x, yâŸ©, fun k1 âŸ¨z, wâŸ© => k1 z wâŸ©
+Î»> :synth (âˆ€ p q : Prop, Â¬(p âˆ¨ q) â†” Â¬p âˆ§ Â¬q)
+  it1  fun _ _ => âŸ¨fun k => âŸ¨fun x => k (.inl x), fun y => k (.inr y)âŸ©, fun âŸ¨k1, k2âŸ© z => match z with | .inl w => k1 w | .inr x1 => k2 x1âŸ©
 ```
 
-It reaches the textbook curiosities too — `(p ↔ ¬p) → False` comes
+It reaches the textbook curiosities too â€” `(p â†” Â¬p) â†’ False` comes
 out by the classic self-application trick:
 
 ```text
-λ> :synth (∀ p : Prop, (p ↔ ¬p) → False)
-  it1  fun _ ⟨k, f⟩ => k (f (fun x => k x x)) (f (fun y => k y y))
+Î»> :synth (âˆ€ p : Prop, (p â†” Â¬p) â†’ False)
+  it1  fun _ âŸ¨k, fâŸ© => k (f (fun x => k x x)) (f (fun y => k y y))
 ```
 
-Binders are named by role — functions `f g h`, values `x y z`,
-negations and continuations `k` — which keeps large candidates
+Binders are named by role â€” functions `f g h`, values `x y z`,
+negations and continuations `k` â€” which keeps large candidates
 readable.
 
 ### Programs you already know
@@ -816,24 +819,24 @@ quicker than remembering which library corner it lives in. The binds
 of the reader and state monads:
 
 ```text
-λ> :synth ((S → A) → (A → S → B) → S → B)
+Î»> :synth ((S â†’ A) â†’ (A â†’ S â†’ B) â†’ S â†’ B)
   it1  fun f g x => g (f x) x
-λ> :synth ((S → A × S) → (A → S → B × S) → S → B × S)
-  it1  fun f g x => match f x with | ⟨y, z⟩ => g y z
-  it2  fun f g x => match f x with | ⟨y, _⟩ => g y x
-  ⋯
+Î»> :synth ((S â†’ A Ã— S) â†’ (A â†’ S â†’ B Ã— S) â†’ S â†’ B Ã— S)
+  it1  fun f g x => match f x with | âŸ¨y, zâŸ© => g y z
+  it2  fun f g x => match f x with | âŸ¨y, _âŸ© => g y x
+  â‹¯
 ```
 
 For the state monad, `it1` threads the state correctly, while `it2`
-is type-correct and runs `g` on the *initial* state — the classic
+is type-correct and runs `g` on the *initial* state â€” the classic
 state-threading bug, which the type admits just as happily. Types alone
 cannot tell these apart, which is why all candidates are shown and each
 is one keystroke from a test run. With inductive expansion (below) the
-same game extends to data — `Option.bind`, with the lazy `.none`
+same game extends to data â€” `Option.bind`, with the lazy `.none`
 candidate ranked first and the real one second:
 
 ```text
-λ> :synth (∀ a b : Type, Option a → (a → Option b) → Option b)
+Î»> :synth (âˆ€ a b : Type, Option a â†’ (a â†’ Option b) â†’ Option b)
   it1  fun _ _ _ _ => .none
   it2  fun _ _ x f => match x with | .none => (.none) | .some y => f y
 ```
@@ -848,7 +851,7 @@ instantiates the identity hypothesis at `Q`; the explicit type argument is
 inferred by Lean:
 
 ```text
-λ> :synth ((∀ p : Prop, p → p) → Q → Q)
+Î»> :synth ((âˆ€ p : Prop, p â†’ p) â†’ Q â†’ Q)
   it1  fun f => f _
   it2  fun _ x => x
 ```
@@ -861,13 +864,13 @@ verification selects the `Type _` universe hint needed by Lean's positional
 `@` syntax:
 
 ```text
-λ> axiom Demo.Token : Type
-λ> :synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
-  it1  fun _ x => @x (∀ (a0_0 : Type _), a0_0 → a0_0)
-λ> :set synth-engine exference
+Î»> axiom Demo.Token : Type
+Î»> :synth ((âˆ€ x : Type, x â†’ x) â†’ ({a : Type 1} â†’ Demo.Token) â†’ Demo.Token)
+  it1  fun _ x => @x (âˆ€ (a0_0 : Type _), a0_0 â†’ a0_0)
+Î»> :set synth-engine exference
 synth engine: exference
-λ> :synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
-  it1  fun f x => f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0))
+Î»> :synth ((âˆ€ x : Type, x â†’ x) â†’ ({a : Type 1} â†’ Demo.Token) â†’ Demo.Token)
+  it1  fun f x => f _ (@x (âˆ€ (a0_0 : Type _), a0_0 â†’ a0_0))
 ```
 
 The search and rendering boundaries are recorded in the
@@ -880,12 +883,12 @@ That exposes the quantified argument to both engines without exposing the
 family's implementation:
 
 ```text
-λ> axiom Wrap : Type 1 → Type
-λ> :synth ((∀ a : Type 1, Wrap a) → Wrap (∀ b : Type, b → b))
+Î»> axiom Wrap : Type 1 â†’ Type
+Î»> :synth ((âˆ€ a : Type 1, Wrap a) â†’ Wrap (âˆ€ b : Type, b â†’ b))
   it1  fun x => x _
-λ> :set synth-engine exference
+Î»> :set synth-engine exference
 synth engine: exference
-λ> :synth (∀ (F : Type 1 → Type), (∀ a : Type 1, F a) → F (∀ b : Type, b → b))
+Î»> :synth (âˆ€ (F : Type 1 â†’ Type), (âˆ€ a : Type 1, F a) â†’ F (âˆ€ b : Type, b â†’ b))
   it1  fun _ x => x _
 ```
 
@@ -903,20 +906,20 @@ when the baseline is inapplicable, ends without a verified term, or soundly
 refutes only the provider-free calculus:
 
 ```text
-λ> inductive Demo.Phantom2 (a b : Type 1) : Type 1 where
-…> | mk : Demo.Phantom2 a b
-…>
-λ> :set synth-engine exference
+Î»> inductive Demo.Phantom2 (a b : Type 1) : Type 1 where
+â€¦> | mk : Demo.Phantom2 a b
+â€¦>
+Î»> :set synth-engine exference
 synth engine: exference
-λ> :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))
+Î»> :synth ((âˆ€ a : Type 1, Option a) â†’ Option (âˆ€ b : Type, b â†’ b))
   it1  fun x => x _
-λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
+Î»> :synth ((âˆ€ a b : Type 1, Demo.Phantom2 a b) â†’ Demo.Phantom2 (âˆ€ x : Type, x â†’ x) (âˆ€ y : Type, y â†’ y))
   it1  fun x => x _ _
-λ> :set synth-engine djinn
+Î»> :set synth-engine djinn
 synth engine: djinn
-λ> :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))
+Î»> :synth ((âˆ€ a : Type 1, Option a) â†’ Option (âˆ€ b : Type, b â†’ b))
   it1  fun x => x _
-λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
+Î»> :synth ((âˆ€ a b : Type 1, Demo.Phantom2 a b) â†’ Demo.Phantom2 (âˆ€ x : Type, x â†’ x) (âˆ€ y : Type, y â†’ y))
   it1  fun x => x _ _
 ```
 
@@ -927,16 +930,16 @@ example), then specialized independently at a closed built-in type, an opaque
 session type, and a rank-N type:
 
 ```text
-λ> def Demo.sealedBox {a : Type u} (value : a) : Demo.SealedBox a :=
-…>   .mk value rfl
-…>
-λ> :set synth-engine djinn
+Î»> def Demo.sealedBox {a : Type u} (value : a) : Demo.SealedBox a :=
+â€¦>   .mk value rfl
+â€¦>
+Î»> :set synth-engine djinn
 synth engine: djinn
-λ> :synth (Nat → Demo.SealedBox Nat)
+Î»> :synth (Nat â†’ Demo.SealedBox Nat)
   it1  Demo.sealedBox
-λ> :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
+Î»> :synth (Demo.Seed â†’ Demo.SealedBox Demo.Seed)
   it1  Demo.sealedBox
-λ> :synth ((∀ x : Type, x → x) → Demo.SealedBox (∀ x : Type, x → x))
+Î»> :synth ((âˆ€ x : Type, x â†’ x) â†’ Demo.SealedBox (âˆ€ x : Type, x â†’ x))
   it1  Demo.sealedBox
 ```
 
@@ -945,12 +948,12 @@ argument lies between the chosen type and the result, so Leant names the type
 binder and leaves dictionary reconstruction to Lean:
 
 ```text
-λ> axiom Demo.Token : Type
-λ> class Demo.C (a : Type) : Prop where witness : True
-λ> instance : Demo.C Nat := ⟨True.intro⟩
-λ> axiom Demo.global {a : Type} [Demo.C a] : Demo.Token
-λ> :synth (Nat → Demo.Token)
-  it1  fun _ => Demo.global («a» := Nat)
+Î»> axiom Demo.Token : Type
+Î»> class Demo.C (a : Type) : Prop where witness : True
+Î»> instance : Demo.C Nat := âŸ¨True.introâŸ©
+Î»> axiom Demo.global {a : Type} [Demo.C a] : Demo.Token
+Î»> :synth (Nat â†’ Demo.Token)
+  it1  fun _ => Demo.global (Â«aÂ» := Nat)
 ```
 
 Closed, context-free quantified choices follow the same path instead of
@@ -959,11 +962,11 @@ gives them stable local names while rendering the provider's own binder
 domain, so the expected universe stays visible in the printed argument:
 
 ```text
-λ> class Demo.PolyC (a : Type 1) : Prop where witness : True
-λ> instance : Demo.PolyC (∀ x : Type, x → x) := ⟨True.intro⟩
-λ> axiom Demo.polyGlobal {a : Type 1} [Demo.PolyC a] : Demo.Token
-λ> :synth ((∀ x : Type, x → x) → Demo.Token)
-  it1  fun _ => Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
+Î»> class Demo.PolyC (a : Type 1) : Prop where witness : True
+Î»> instance : Demo.PolyC (âˆ€ x : Type, x â†’ x) := âŸ¨True.introâŸ©
+Î»> axiom Demo.polyGlobal {a : Type 1} [Demo.PolyC a] : Demo.Token
+Î»> :synth ((âˆ€ x : Type, x â†’ x) â†’ Demo.Token)
+  it1  fun _ => Demo.polyGlobal (Â«aÂ» := (âˆ€ (a0_0 : Type _), a0_0 â†’ a0_0))
 ```
 
 The choice need not occur in the query when Lean's active instance heads prove
@@ -972,22 +975,22 @@ the quantified argument by resolving `Gap.C ?a` against the active instance,
 then both checked Djex runners retain the same explicit application:
 
 ```text
-λ> axiom Gap.Token : Type
-λ> class Gap.C (a : Type 1) : Prop where witness : True
-λ> instance : Gap.C (∀ x : Type, x → x) := ⟨True.intro⟩
-λ> axiom Gap.polyGlobal {a : Type 1} [Gap.C a] : Gap.Token
-λ> :set synth-engine djinn
+Î»> axiom Gap.Token : Type
+Î»> class Gap.C (a : Type 1) : Prop where witness : True
+Î»> instance : Gap.C (âˆ€ x : Type, x â†’ x) := âŸ¨True.introâŸ©
+Î»> axiom Gap.polyGlobal {a : Type 1} [Gap.C a] : Gap.Token
+Î»> :set synth-engine djinn
 synth engine: djinn
-λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
-λ> :set synth-engine exference
+Î»> :synth Gap.Token
+  it1  Gap.polyGlobal (Â«aÂ» := (âˆ€ (a0_0 : Type _), a0_0 â†’ a0_0))
+Î»> :set synth-engine exference
 synth engine: exference
-λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
-λ> :set synth-engine both
+Î»> :synth Gap.Token
+  it1  Gap.polyGlobal (Â«aÂ» := (âˆ€ (a0_0 : Type _), a0_0 â†’ a0_0))
+Î»> :set synth-engine both
 synth engine: both
-λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
+Î»> :synth Gap.Token
+  it1  Gap.polyGlobal (Â«aÂ» := (âˆ€ (a0_0 : Type _), a0_0 â†’ a0_0))
 ```
 
 The instance may determine a higher-kinded binder which never occurs in the
@@ -996,36 +999,36 @@ instead of collapsing it to proper type, so both checked engines preserve this
 constraint-only specialization:
 
 ```text
-λ> namespace Higher
-λ> axiom Wrap : Type → Type
-λ> class VacuousChoice (F : Type → Type) : Prop where witness : True
-λ> instance : VacuousChoice Wrap := ⟨True.intro⟩
-λ> axiom VacuousToken : Type
-λ> axiom vacuous {F : Type → Type} [VacuousChoice F] : VacuousToken
-λ> end Higher
-λ> :set synth-engine djinn
+Î»> namespace Higher
+Î»> axiom Wrap : Type â†’ Type
+Î»> class VacuousChoice (F : Type â†’ Type) : Prop where witness : True
+Î»> instance : VacuousChoice Wrap := âŸ¨True.introâŸ©
+Î»> axiom VacuousToken : Type
+Î»> axiom vacuous {F : Type â†’ Type} [VacuousChoice F] : VacuousToken
+Î»> end Higher
+Î»> :set synth-engine djinn
 synth engine: djinn
-λ> :synth Higher.VacuousToken
-  it1  Higher.vacuous («F» := Higher.Wrap)
-λ> :set synth-engine exference
+Î»> :synth Higher.VacuousToken
+  it1  Higher.vacuous (Â«FÂ» := Higher.Wrap)
+Î»> :set synth-engine exference
 synth engine: exference
-λ> :synth Higher.VacuousToken
-  it1  Higher.vacuous («F» := Higher.Wrap)
+Î»> :synth Higher.VacuousToken
+  it1  Higher.vacuous (Â«FÂ» := Higher.Wrap)
 ```
 
-The provider-assignment machinery behind these transcripts — how many
+The provider-assignment machinery behind these transcripts â€” how many
 heads are inspected, how vectors are bounded and deduplicated, the wire
-formats, and the exact-context (`FExactContext`) rules — is specified in
+formats, and the exact-context (`FExactContext`) rules â€” is specified in
 [docs/synth-internals.md](docs/synth-internals.md#provider-instantiation-evidence).
 
-And a Church-encoded pair converts into a real conjunction — the
+And a Church-encoded pair converts into a real conjunction â€” the
 quantified hypothesis is instantiated once at `p` and once at `q`, fed
 the matching projection each time:
 
 ```text
-λ> :synth (∀ p q : Prop, (∀ r : Prop, (p → q → r) → r) → p ∧ q)
-  it1  fun _ _ f => ⟨f _ (fun x _ => x), f _ (fun _ y => y)⟩
-  ⋯
+Î»> :synth (âˆ€ p q : Prop, (âˆ€ r : Prop, (p â†’ q â†’ r) â†’ r) â†’ p âˆ§ q)
+  it1  fun _ _ f => âŸ¨f _ (fun x _ => x), f _ (fun _ y => y)âŸ©
+  â‹¯
 ```
 
 Djinn now keeps three instantiation families distinct. The historical local
@@ -1040,12 +1043,12 @@ That distinction makes the following provider-free Lean goal reachable without
 pretending that <code>Mono</code> is a type variable:
 
 ~~~text
-λ> axiom QueryClosed.Mono : Type
-λ> axiom QueryClosed.Token : Type
-λ> axiom QueryClosed.Indexed : Type → Type
-λ> :synth ((∀ a : Type, (a → QueryClosed.Token) → a →
-…>     QueryClosed.Indexed a) → (QueryClosed.Mono → QueryClosed.Token) →
-…>     QueryClosed.Mono → QueryClosed.Indexed QueryClosed.Mono)
+Î»> axiom QueryClosed.Mono : Type
+Î»> axiom QueryClosed.Token : Type
+Î»> axiom QueryClosed.Indexed : Type â†’ Type
+Î»> :synth ((âˆ€ a : Type, (a â†’ QueryClosed.Token) â†’ a â†’
+â€¦>     QueryClosed.Indexed a) â†’ (QueryClosed.Mono â†’ QueryClosed.Token) â†’
+â€¦>     QueryClosed.Mono â†’ QueryClosed.Indexed QueryClosed.Mono)
   it1  fun f => f _
   it2  fun f g x => f _ (fun _ => g x) x
 ~~~
@@ -1077,12 +1080,12 @@ all six inferred type arguments, and Lean 4.31 verifies a non-lexical
 source-order application of an abstract six-argument constructor:
 
 ```text
-λ> axiom SixBinder.Six : Type → Type → Type → Type → Type → Type → Type
-λ> :synth (∀ A B C D E F : Type, (∀ a b c d e f : Type, SixBinder.Six a b c d e f) → SixBinder.Six F E D C B A)
+Î»> axiom SixBinder.Six : Type â†’ Type â†’ Type â†’ Type â†’ Type â†’ Type â†’ Type
+Î»> :synth (âˆ€ A B C D E F : Type, (âˆ€ a b c d e f : Type, SixBinder.Six a b c d e f) â†’ SixBinder.Six F E D C B A)
   it1  fun _ _ _ _ _ _ x => x _ _ _ _ _ _
 ```
 
-Explicit `∀` binders — leading, nested, trailing, or interleaved — are
+Explicit `âˆ€` binders â€” leading, nested, trailing, or interleaved â€” are
 woven into the candidate's lambda automatically, and uses of quantified
 hypotheses get placeholder type arguments wherever Lean needs them
 (`f _ x`). When inference needs a quantified argument's shape, the renderer
@@ -1139,7 +1142,7 @@ one-candidate cutoff, and all three paired nil improvements and three
 projection-diversity proofs pass under unchanged allowances. The
 [quality guide](docs/candidate-quality.md) and
 [acceptance receipts](test-church/README.md#current-quality-policy-acceptance)
-pin these results to Leant `5629936` and executable `e0b9…`, distinguish live
+pin these results to Leant `5629936` and executable `e0b9â€¦`, distinguish live
 kernel checks from reviewed offline golden comparison, and retain earlier
 results separately. E0's remaining 26 ordinary fixtures also completed; after
 20 reviewed golden updates, all 30 fixture captures matched offline, covering
@@ -1151,7 +1154,7 @@ The subsequent verification repair suppresses only exact spellings already
 accepted in the current batch. Failed spellings remain retryable, the first
 accepted candidate keeps its own evidence, and skipped duplicates do not
 refill the bounded input. Production revision `043a6a3d` passed **all 578
-tests serially in 533.23 seconds** and built executable `42c0c9c0…`
+tests serially in 533.23 seconds** and built executable `42c0c9c0â€¦`
 successfully. Its fresh full **30-fixture/265-command live run** preserved
 all prior successes and first results, with only the intended duplicate-line
 removal. The two retained terms in that query passed fresh kernel replay;
@@ -1175,7 +1178,7 @@ instance. Uses of a constrained rank-N hypothesis leave its nested instance
 argument implicit, so Lean reconstructs the evidence during verification:
 
 ```text
-λ> :synth (∀ (A R : Type) [Demo.C A], (∀ (a : Type) [Demo.C a], a → R) → A → R)
+Î»> :synth (âˆ€ (A R : Type) [Demo.C A], (âˆ€ (a : Type) [Demo.C a], a â†’ R) â†’ A â†’ R)
   it1  fun _ _ _ f => f _
 ```
 
@@ -1187,11 +1190,11 @@ The live regression runs this goal under Djinn, Exference, and `both` in
 ### Impossibility, proved
 
 When Djinn's complete search exhausts a fully translated goal, failure
-is a theorem — an answer no failing tactic gives you:
+is a theorem â€” an answer no failing tactic gives you:
 
 ```text
-λ> :synth (∀ a b : Type, Option a → b)
-provably uninhabited — no closed term of this polymorphic type exists
+Î»> :synth (âˆ€ a b : Type, Option a â†’ b)
+provably uninhabited â€” no closed term of this polymorphic type exists
 ```
 
 The wording is careful: the verdict is about *closed terms of the
@@ -1223,8 +1226,8 @@ rank-N assignment, and retention of refutation for an unusable provider.
 After those constructive provider lanes fail, refuted `Prop` goals get a
 classical attempt
 (disable with `:set synth-classical off`): first with an
-excluded-middle case split per atomic subformula, then—after either no
-verification or complete behavioral all-rejection—via the Glivenko double-
+excluded-middle case split per atomic subformula, thenâ€”after either no
+verification or complete behavioral all-rejectionâ€”via the Glivenko double-
 negation translation wrapped in `Classical.byContradiction`. Excluded middle
 remains one six-group batch. A filter-mode double-negation run may consume its
 ordinary 12+12 or 24+24 frontier, while rank and disabled modes consume one
@@ -1233,36 +1236,36 @@ context and are finalized together. Filtering also keeps the command's
 original absolute deadline through both routes; rank and disabled commands
 allocate a fresh configured-duration deadline separately at each route they
 actually reach.
-Peirce's law has no constructive inhabitant — `:synth` proves that,
+Peirce's law has no constructive inhabitant â€” `:synth` proves that,
 then answers the classical question with a term whose spelling shows
 exactly what was used:
 
 ```text
-λ> :synth (∀ p q : Prop, ((p → q) → p) → p)
+Î»> :synth (âˆ€ p q : Prop, ((p â†’ q) â†’ p) â†’ p)
   it1  fun _ _ f => match Classical.em _ with | .inl x => x | .inr k => f (fun y => absurd y k)
-  ⋯
-λ> :set synth-classical off
+  â‹¯
+Î»> :set synth-classical off
 synth classical: off
-λ> :synth (∀ p : Prop, p ∨ ¬ p)
-provably uninhabited — no closed term of this polymorphic type exists
-(constructively — a classical proof may still exist; this is not a disproof of the proposition)
+Î»> :synth (âˆ€ p : Prop, p âˆ¨ Â¬ p)
+provably uninhabited â€” no closed term of this polymorphic type exists
+(constructively â€” a classical proof may still exist; this is not a disproof of the proposition)
 ```
 
 The hard direction of De Morgan needs excluded middle twice, once per
 disjunct, and the candidate reads as exactly that case analysis:
 
 ```text
-λ> :set synth-classical on
+Î»> :set synth-classical on
 synth classical: on
-λ> :synth (∀ p q : Prop, ¬(¬p ∧ ¬q) → p ∨ q)
-  it1  fun _ _ k => match Classical.em _ with | .inl x => .inl x | .inr k1 => (match Classical.em _ with | .inl y => .inr y | .inr k2 => absurd ⟨k1, k2⟩ k)
+Î»> :synth (âˆ€ p q : Prop, Â¬(Â¬p âˆ§ Â¬q) â†’ p âˆ¨ q)
+  it1  fun _ _ k => match Classical.em _ with | .inl x => .inl x | .inr k1 => (match Classical.em _ with | .inl y => .inr y | .inr k2 => absurd âŸ¨k1, k2âŸ© k)
 ```
 
 ### Inductive types
 
-A non-recursive, non-indexed inductive or structure — built-in
-(`Bool`, `Option`, `Ordering`, `Except`, `Decidable`, …) or
-session-declared — expands into a generalized sum of products:
+A non-recursive, non-indexed inductive or structure â€” built-in
+(`Bool`, `Option`, `Ordering`, `Except`, `Decidable`, â€¦) or
+session-declared â€” expands into a generalized sum of products:
 constructors become introduction rules, case analysis the elimination
 rule, and candidates render with the real constructor names. When all applied
 parameters are proper types, Leant also retains the exact family head and
@@ -1272,33 +1275,33 @@ between nominal identity and useful constructor structure.
 `Except.map`, synthesized rather than remembered:
 
 ```text
-λ> :synth (∀ e a b : Type, Except e a → (a → b) → Except e b)
+Î»> :synth (âˆ€ e a b : Type, Except e a â†’ (a â†’ b) â†’ Except e b)
   it1  fun _ _ _ x f => match x with | .error y => .error y | .ok z => .ok (f z)
 ```
 
 It extends to `Type`-valued classes-as-data like `Decidable`, where the
-instance combinators write themselves — decidability of implication,
+instance combinators write themselves â€” decidability of implication,
 by case analysis on both instance arguments:
 
 ```text
-λ> :synth (∀ p q : Prop, Decidable p → Decidable q → Decidable (p → q))
+Î»> :synth (âˆ€ p q : Prop, Decidable p â†’ Decidable q â†’ Decidable (p â†’ q))
   it1  fun _ _ x y => match x with | .isFalse k => .isTrue (fun z => absurd z k) | .isTrue w => (match y with | .isFalse k1 => .isFalse (fun f => k1 (f w)) | .isTrue x1 => .isTrue (fun _ => x1))
 note: search truncated: candidate limit reached (60)
 ```
 
 Session-declared types participate the moment you declare them, and
-refutations over expanded inductives stay sound — the engine saw the
+refutations over expanded inductives stay sound â€” the engine saw the
 complete constructor list:
 
 ```text
-λ> structure Pair (A B : Type) where
-…>   fst : A
-…>   snd : B
-…>
-λ> :synth (∀ a b : Type, a → b → Pair a b)
-  it1  fun _ _ x y => ⟨x, y⟩
-λ> :synth (∀ a b : Type, Pair a b → Empty)
-provably uninhabited — no closed term of this polymorphic type exists
+Î»> structure Pair (A B : Type) where
+â€¦>   fst : A
+â€¦>   snd : B
+â€¦>
+Î»> :synth (âˆ€ a b : Type, a â†’ b â†’ Pair a b)
+  it1  fun _ _ x y => âŸ¨x, yâŸ©
+Î»> :synth (âˆ€ a b : Type, Pair a b â†’ Empty)
+provably uninhabited â€” no closed term of this polymorphic type exists
 ```
 
 Fixed constructor fields are not mistaken for family parameters. Here
@@ -1307,11 +1310,11 @@ the varying `a` remains the parameter of `Demo.Guard`; both engines can still
 transport the whole family at an impredicative argument:
 
 ```text
-λ> axiom Demo.Secret : Type
-λ> inductive Demo.Guard (a : Type 1) : Type 1 where
-…> | mk : Demo.Secret → a → Demo.Guard a
-…>
-λ> :synth ((∀ a : Type 1, Demo.Guard a) → Demo.Guard (∀ b : Type, b → b))
+Î»> axiom Demo.Secret : Type
+Î»> inductive Demo.Guard (a : Type 1) : Type 1 where
+â€¦> | mk : Demo.Secret â†’ a â†’ Demo.Guard a
+â€¦>
+Î»> :synth ((âˆ€ a : Type 1, Demo.Guard a) â†’ Demo.Guard (âˆ€ b : Type, b â†’ b))
   it1  fun x => x _
 ```
 
@@ -1320,8 +1323,8 @@ of an exact head in the goal, caller premises, and usable live providers
 must agree on arity and on one generic constructor schema. Repeated or
 otherwise ambiguous parameter vectors may borrow a template from a later,
 unambiguous occurrence only when specialization reproduces every inventory.
-If no unique compatible template exists—or the same head also arrived through
-an opaque nominal fallback—the whole head becomes one shared abstract family.
+If no unique compatible template existsâ€”or the same head also arrived through
+an opaque nominal fallbackâ€”the whole head becomes one shared abstract family.
 Transport can still succeed, but constructors and cases are withheld, and
 Djinn cannot turn search exhaustion into a refutation. Unsafe atoms in caller
 premises likewise forfeit negative evidence. Exference never makes negative
@@ -1332,9 +1335,9 @@ rather than abstracted or conflated.
 Recursive proper-type applications now receive the same query-wide exact-head
 identity discipline, with a recursive-specific schema check. This lets both
 engines transport a quantified family value directly to a supplied
-impredicative parameter—for example, the verified answers to a base-less
+impredicative parameterâ€”for example, the verified answers to a base-less
 `RecBox` query include `fun x => x _`; standalone Exference now also verifies
-the constructor-shaped `fun x => ⟨fun _ y => y, x _⟩`. Recursive self fields
+the constructor-shaped `fun x => âŸ¨fun _ y => y, x _âŸ©`. Recursive self fields
 are normalized to the generic applied family before schemas are compared, so
 `List a` and `List b` can validate one recursive knot even though Lean
 serialized different display keys.
@@ -1371,35 +1374,35 @@ have to: for the everyday recursive types, the library already wrote
 the recursion. A goal that mentions `List` or `Nat` brings a rated
 inventory of library functions with it (`List.map`, `List.foldr`,
 `List.append`, `List.flatten`, `List.length`, `List.replicate`,
-`Nat.add`, …), instantiated at the goal's own types and handed to the
-engine as extra premises — the phase-3 promise of *recursion via
+`Nat.add`, â€¦), instantiated at the goal's own types and handed to the
+engine as extra premises â€” the phase-3 promise of *recursion via
 library reuse*, in miniature. The enumeration prefers proofs that use
 the goal's own arguments, generally putting the direct library answer
 first while retaining distinct choices between same-typed arguments:
 
 ```text
-λ> :synth ((a → b) → List a → List b)
+Î»> :synth ((a â†’ b) â†’ List a â†’ List b)
   it1  fun f x => List.map f x
   it2  fun f x => List.reverse (List.map f x)
-  ⋯
-λ> :synth (List (List a) → List a)
+  â‹¯
+Î»> :synth (List (List a) â†’ List a)
   it1  fun x => List.flatten x
   it2  fun x => List.reverse (List.flatten x)
-  ⋯
-λ> :synth (List a → Nat)
+  â‹¯
+Î»> :synth (List a â†’ Nat)
   it1  fun x => List.length x
   it2  fun x => Nat.add (List.length x) (List.length x)
-  ⋯
-λ> :synth (Nat → a → List a)
+  â‹¯
+Î»> :synth (Nat â†’ a â†’ List a)
   it1  fun x y => List.replicate x y
-  ⋯
-λ> :synth (List a → List b → List (a × b))
+  â‹¯
+Î»> :synth (List a â†’ List b â†’ List (a Ã— b))
   it1  fun x y => List.zip x y
-  ⋯
-λ> :synth ((a → b → c) → List a → List b → List c)
+  â‹¯
+Î»> :synth ((a â†’ b â†’ c) â†’ List a â†’ List b â†’ List c)
   it1  fun f x y => List.zipWith f x y
-  ⋯
-λ> :synth (List a → List a → List a)
+  â‹¯
+Î»> :synth (List a â†’ List a â†’ List a)
   it1  fun x _ => x
   it2  fun _ x => x
   it3  fun x _ => List.reverse x
@@ -1407,14 +1410,14 @@ first while retaining distinct choices between same-typed arguments:
   it5  fun x y => List.append y x
 ```
 
-The inventory is a ratings list in Djex's `*.ratings` format — lower
-is better, 100 or more disables — and a project file `leant.ratings`
+The inventory is a ratings list in Djex's `*.ratings` format â€” lower
+is better, 100 or more disables â€” and a project file `leant.ratings`
 (lines of `Name Rating`, `#` comments) merges over the defaults at
 startup, so re-ranking, disabling, or growing the inventory is
 editing a list, not writing code.
 
 The library search runs beside the plain constructor search, and its
-candidates come first — they are found in a mode where the recursive
+candidates come first â€” they are found in a mode where the recursive
 occurrences are sealed atoms, so every candidate must route through
 the goal's own arguments and the offered functions rather than
 through constructor junk (`List.nil` inhabits every `List` goal; a
@@ -1428,19 +1431,19 @@ negative verdict at all.
 
 ### Dependent formulas as cargo
 
-Dependent subformulas (`∀ n : Nat, P n`) are carried as opaque atoms,
-compared up to α-equivalence: transportable, never analyzed.
+Dependent subformulas (`âˆ€ n : Nat, P n`) are carried as opaque atoms,
+compared up to Î±-equivalence: transportable, never analyzed.
 
 ```text
-λ> opaque P : Nat → Prop
-λ> opaque Q : Prop
-λ> :synth ((∀ n : Nat, P n) ∧ Q → Q ∧ (∀ n : Nat, P n))
-  it1  fun ⟨x, y⟩ => ⟨y, x⟩
+Î»> opaque P : Nat â†’ Prop
+Î»> opaque Q : Prop
+Î»> :synth ((âˆ€ n : Nat, P n) âˆ§ Q â†’ Q âˆ§ (âˆ€ n : Nat, P n))
+  it1  fun âŸ¨x, yâŸ© => âŸ¨y, xâŸ©
 ```
 
-The engine never looked inside `∀ n, P n`; it swapped a sealed box. A
-goal that would require opening the box — an induction, a rewrite, a
-case split on an index — is refused with a reason; that work belongs to
+The engine never looked inside `âˆ€ n, P n`; it swapped a sealed box. A
+goal that would require opening the box â€” an induction, a rewrite, a
+case split on an index â€” is refused with a reason; that work belongs to
 `:prove`.
 
 ### Synthesis inside a proof
@@ -1450,56 +1453,56 @@ hypotheses as premises*, and `itN` splices the candidate applied to
 those hypotheses, so `exact it1` closes the goal:
 
 ```text
-λ> :prove ∀ p q : Prop, (p → q) → p → q ∧ p
-entering prove mode — type tactics; :help for commands
-⊢ ∀ (p q : Prop), (p → q) → p → q ∧ p
-suggestion: exact fun p q a a_1 => ⟨a a_1, a_1⟩  (closes the goal)
-⊢> intro p q h hp
+Î»> :prove âˆ€ p q : Prop, (p â†’ q) â†’ p â†’ q âˆ§ p
+entering prove mode â€” type tactics; :help for commands
+âŠ¢ âˆ€ (p q : Prop), (p â†’ q) â†’ p â†’ q âˆ§ p
+suggestion: exact fun p q a a_1 => âŸ¨a a_1, a_1âŸ©  (closes the goal)
+âŠ¢> intro p q h hp
 p q : Prop
-h : p → q
+h : p â†’ q
 hp : p
-⊢ q ∧ p
-suggestion: exact ⟨h hp, hp⟩  (closes the goal)
-⊢> :synth
+âŠ¢ q âˆ§ p
+suggestion: exact âŸ¨h hp, hpâŸ©  (closes the goal)
+âŠ¢> :synth
 (synthesizing with hypotheses p q h hp as premises)
-  it1  fun _ _ f x => ⟨f x, x⟩
-⊢> exact it1
-All goals accomplished 🎉
+  it1  fun _ _ f x => âŸ¨f x, xâŸ©
+âŠ¢> exact it1
+All goals accomplished ðŸŽ‰
 finish with :qed [NAME], inspect with :script
-⊢> :qed mp_and
-saved: theorem mp_and : ∀ p q : Prop, (p → q) → p → q ∧ p
+âŠ¢> :qed mp_and
+saved: theorem mp_and : âˆ€ p q : Prop, (p â†’ q) â†’ p â†’ q âˆ§ p
 ```
 
 Unlike `exact?`, which finds an *existing* lemma, this composes a new
-term from the goal's own material — a constructive complement to the
+term from the goal's own material â€” a constructive complement to the
 finisher tactics, needing no premise database and no imports. Bare
 `:synth` outside prove mode targets the last `sorry`.
 
 The classical fallback follows you into prove mode: double-negation
 elimination has no constructive proof, so `:synth` offers the
-excluded-middle case split, and `:qed` turns it into a theorem —
+excluded-middle case split, and `:qed` turns it into a theorem â€”
 proved, verified, and named without writing a single tactic beyond
 `exact`:
 
 ```text
-λ> :prove ∀ p : Prop, ¬¬p → p
-entering prove mode — type tactics; :help for commands
-⊢ ∀ (p : Prop), ¬¬p → p
+Î»> :prove âˆ€ p : Prop, Â¬Â¬p â†’ p
+entering prove mode â€” type tactics; :help for commands
+âŠ¢ âˆ€ (p : Prop), Â¬Â¬p â†’ p
 suggestion: exact fun p a => Classical.byContradiction a  (closes the goal)
-⊢> :synth
+âŠ¢> :synth
   it1  fun _ k => match Classical.em _ with | .inl x => x | .inr k1 => absurd k1 k
-⊢> exact it1
-All goals accomplished 🎉
+âŠ¢> exact it1
+All goals accomplished ðŸŽ‰
 finish with :qed [NAME], inspect with :script
-⊢> :qed not_not_elim
-saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
+âŠ¢> :qed not_not_elim
+saved: theorem not_not_elim : âˆ€ p : Prop, Â¬Â¬p â†’ p
 ```
 
 ### Engines, budgets, and the fine print
 
 - Library premises are on by default (`:set synth-library on|off`);
   the rated inventory (defaults merged with `leant.ratings`) only ever
-  *offers* premises — the driver filters them against the goal's own
+  *offers* premises â€” the driver filters them against the goal's own
   types and the backend verifies every candidate, so a useless entry
   costs search time, never soundness. The ratings file is read at
   startup; edits take effect next session.
@@ -1509,7 +1512,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   runs the two together. Standalone lanes send at most 12 fresh candidate
   groups to Lean (`:set synth-verify N`); a combined lane gets twice that
   and preserves both standalone frontiers. Writing `D` and `E` for fresh
-  Djinn and Exference groups, its order is `D1–D4, E1–E12, D5–D12`, followed
+  Djinn and Exference groups, its order is `D1â€“D4, E1â€“E12, D5â€“D12`, followed
   by alternating tails: the Djinn head is one short of `synth-shown` and each
   front runs to `synth-verify`, so retuning either setting reshapes the
   interleave accordingly.
@@ -1621,7 +1624,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   bypass that spelling heuristic. Exference assigns increasing positive
   penalties in this order, while Djinn receives the sparse-prefix schedule
   above. Thus a
-  target such as `(α → β) → List α → List β` can reuse
+  target such as `(Î± â†’ Î²) â†’ List Î± â†’ List Î²` can reuse
   `List.map` instead of rebuilding recursion from scratch.
 - The goal serializer also supplies a canonical provider query: the
   target's sorted, deduplicated root namespaces and its final result
@@ -1629,14 +1632,14 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   query rather than by raw goal text. Successful empty inventories are
   cached too; discovery failures are not. Any operation that can change
   imported or session declarations advances the generation and clears
-  the cache, while generated `it1`, `it2`, … bindings are excluded from
+  the cache, while generated `it1`, `it2`, â€¦ bindings are excluded from
   provider discovery and deliberately preserve it.
 - Providers receive collision-free private names inside Djex. Rendering
   maps those names back to the exact fully-qualified Lean globals before the
   backend verifies the candidate. Live discovery also retains the source names
   of leading type binders. When Djex makes a vacuous specialization
   visible, Leant renders a named argument such as
-  `Demo.global («a» := Nat)`; intervening instance binders stay implicit and
+  `Demo.global (Â«aÂ» := Nat)`; intervening instance binders stay implicit and
   Lean reconstructs their dictionaries. Historical caller-owned inventories
   without binder metadata retain the positional `@` fallback. Inventory
   extraction is deliberately best-effort: if it cannot be produced, each
@@ -1654,20 +1657,20 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   provider applications, and poison complete negative evidence. This keeps
   dictionary reconstruction with Lean without shifting later synthesized
   term arguments.
-- Applications of type constructors — bound variables, opaque Lean
+- Applications of type constructors â€” bound variables, opaque Lean
   constants, and qualifying inductive families such as `Option`, `Except`,
-  and user declarations — keep their arguments and, for families, share one
+  and user declarations â€” keep their arguments and, for families, share one
   parameterized declaration across the whole goal; the plan rules and the
   refutation-safety consequences are specified in
   [docs/synth-internals.md](docs/synth-internals.md#proper-type-applications-and-family-plans).
 - Where a term's shape is ambiguous in Lean (a quantified hypothesis
   may be transported whole or instantiated), the renderer offers the
   alternatives and verification picks the one that elaborates.
-- Auto-bound goal variables default to `Sort`; when Type-level `×`/`⊕`
+- Auto-bound goal variables default to `Sort`; when Type-level `Ã—`/`âŠ•`
   over arrows leaves Lean's universe unifier stuck, `:synth` retries
   with the unresolved variables bound at `Type` (noted in the output).
-  Names that resolve in the session — including through an opened
-  namespace — are never shadowed.
+  Names that resolve in the session â€” including through an opened
+  namespace â€” are never shadowed.
 - The pure searches answer in microseconds; the cost center is backend
   verification, a few hundred milliseconds per candidate. A wall-clock
   guard (default 20 s; `:set synth-timeout N` changes it for the session,
@@ -1682,7 +1685,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   verdict.
 - `:set synth-debug on` (or `LEANT_SYNTH_DEBUG=1` at startup) prints the
   translated fragment, discovered providers, rendered variants, and stable
-  `code=count` verification metrics — the fastest way to see why a candidate
+  `code=count` verification metrics â€” the fastest way to see why a candidate
   was dropped and how much Lean work the lane performed.
 
 ### Session settings
@@ -1714,8 +1717,8 @@ behavior described in the [quality guide](docs/candidate-quality.md).
 
 ## How it works
 
-The design below — a Haskell REPL and synthesis engine driving a Lean
-worker over a text protocol — is examined at length in the
+The design below â€” a Haskell REPL and synthesis engine driving a Lean
+worker over a text protocol â€” is examined at length in the
 [Lean 4 rewrite analysis](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf),
 which asks which of these boundaries would survive reimplementing both
 projects in Lean itself.
@@ -1835,7 +1838,7 @@ queries and process startup; its separate 80 ms route still verifies expiry.
 The former 700 ms success budget left little room for native Windows process
 creation. Treat failures as regressions rather than accepting that timing
 failure as an exception. A set of
-characterization tests read production source text and assert on it —
+characterization tests read production source text and assert on it â€”
 currently thirty-one read sites, fourteen of them on
 [src/Main.hs](src/Main.hs) and the rest across `Backend.hs`,
 `Backend/Isolated.hs`, `Synth/Engine.hs`, `Synth/BehavioralSelection.hs`, and

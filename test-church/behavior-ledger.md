@@ -28,8 +28,8 @@ See `behavior-ledger.json` for individual receipt pointers, hashes, limits and r
 | supplied_default | fromJust | A | A | A | A | A |
 | supplied_default | fromLeft | A | A | A | A | A |
 | supplied_default | fromRight | A | A | A | A | A |
-| supplied_default | maximumBy | ? | ? | ? | ? | ? |
-| supplied_default | maximumOn | ? | ? | ? | ? | ? |
+| supplied_default | maximumBy | F | F | F | F | F |
+| supplied_default | maximumOn | F | F | F | F | F |
 | supplied_default | minimumBy | ? | ? | ? | ? | ? |
 | supplied_default | minimumOn | ? | ? | ? | ? | ? |
 | supplied_default | minMaxBy | ? | ? | ? | ? | ? |
