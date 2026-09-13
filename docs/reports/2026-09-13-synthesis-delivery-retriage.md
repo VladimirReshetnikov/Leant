@@ -6,7 +6,7 @@ The [trailing-type renderer release](2026-09-13-trailing-type-witness-acceptance
 
 ## Current evidence and release boundary
 
-- The [Church behavior ledger](../../test-church/behavior-ledger.md) enumerates exactly 160 cells. Its selected receipts record **92 historical acceptances, six attempted cells without indexed acceptance, and 62 cells without indexed evidence**. These are not a current-revision pass rate, and missing indexed evidence does not mean never attempted.
+- The [Church behavior ledger](../../test-church/behavior-ledger.md) enumerates exactly 160 cells. Its selected receipts record **92 historical acceptances, 15 attempted cells without indexed acceptance, and 53 cells without indexed evidence**. These are not a current-revision pass rate, and missing indexed evidence does not mean never attempted.
 - The six supplied-default selectors `head`, `last`, `fromJust`, `fromLeft`, `fromRight`, and `atKey` have recorded acceptance across both Haskell engines and Lean Djinn, Exference, and Both. The new Lean Djinn `last` renderer change now has a separate complete isolated release receipt; the earlier working-source receipt alone was insufficient. See the [selector report](2026-09-13-native-supplied-default-selectors.md) and [last/atKey report](2026-09-13-trailing-type-witness-frontier.md).
 - The isolated renderer checkout uses committed Leant `d2e5473e1cbabfc36094cd84c651a9793e4fbc68` and clean Djex `c1ad560e106f59df07d1a32c3b51158ef749fc99`, with only the renderer delta and two new tests. The first attempt passed its strict build but only **705/707 unit tests** and stopped before later gates. After the ordering repair and justified rendering-contract updates, the second attempt passes **707/707**, all six live behavior cells and three False controls, and both 350-signature replay corpora.
 - The two failures concern a newly added `Unit` variant in the provider-result rendering list and an existing three-lane, 36-variant expectation. The repair preserves established variants ahead of fallbacks within each lane and checks the existing 32-variant cap. An independent kernel check additionally rejects the invalid new provider proposal at its original target. The first failed attempt remains archived separately.
@@ -14,6 +14,8 @@ The [trailing-type renderer release](2026-09-13-trailing-type-witness-acceptance
 - The previous production integration remains revision-specific: [705 native unit tests and both 350-signature replays](2026-09-12-contextual-list-native-integration.md). It does not validate the dirty constructor sources; the renderer has its own new isolated receipt.
 
 The isolated failure evidence is local at `C:/Leant-validation/trailing-type-witness/dist-newstyle/trailing-type-witness-isolated-v1/results.json` and `unit/unit.stdout.txt`. The unfiltered suite completed in 284.04 seconds. The controller records unchanged inputs. The new isolated acceptance archive includes this unsuccessful attempt and a separate complete passing run. Indexing its six behavior cells preserves the ledger counts because those cells already had working-source acceptance.
+
+The [native reduction baseline](2026-09-13-native-reductions-baseline.md) now records nine misses across `foldl1`, `foldr1`, and `reduce` in all three Lean modes. Every query reached its original deadline; all three oracle preflights and three actual False controls passed. This narrows the evidence gap without adding acceptance. Diagnose carrier admission and candidate derivations before changing search policy.
 
 ## Delivery order and concrete exit criteria
 
@@ -39,7 +41,7 @@ There are **68 cells without indexed acceptance**, divided as follows:
 | --- | ---: | --- |
 | Lean Djinn `length` and `maybeEither` | 2 | `length` times out before provider discovery; test admission of the complete capped inventory under the original deadline. `maybeEither` reaches the choice-point limit with verification/graph failures requiring separate attribution. Both mode has actual acceptance for both. |
 | Haskell Djinn `maybeEither` | 1 | Retain its recorded failed attempt; attribute the search/evidence boundary before choosing a repair. |
-| Supplied-default `foldl1`, `foldr1`, and `reduce`, all five modes | 15 | Next new operation family. Exercise empty/default behavior and nonempty accumulator behavior. |
+| Supplied-default `foldl1`, `foldr1`, and `reduce`, all five modes | 15 | All nine Lean baseline cells now have recorded deadline misses. Inspect their carrier/derivation traces and assess the six Haskell cells separately; preserve empty/default behavior and nonempty accumulator behavior. |
 | Nine extrema operations, all five modes | 45 | Group comparator-based, projection-based, and paired results by actual dependencies. Exercise singleton, ties, order, and supplied defaults; record each operation/mode separately. |
 | Supplied-default native-`Int` `at`, all five modes | 5 | Keep distinct from accepted `atKey`. Preserve the declared integer primitive, negative/out-of-range behavior, and full type. Both Haskell modes already have attempts without indexed acceptance. |
 

@@ -38,7 +38,7 @@ There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.github
 
 The [Church behavior ledger](test-church/behavior-ledger.md) now enumerates all
 160 operation/mode cells. Its selected pinned receipts record 92 historical
-acceptances, six cells with attempts but no indexed acceptance, and 62 cells
+acceptances, 15 cells with attempts but no indexed acceptance, and 53 cells
 without indexed evidence. These counts do not establish current-revision
 acceptance or prove that an unindexed cell was never attempted.
 The [supplied-default selector acceptance](docs/reports/2026-09-13-native-supplied-default-selectors.md)
@@ -58,6 +58,10 @@ accumulator support for reductions and extrema. The
 admitted both numeric providers but did not fix Djinn `length`; its scheduling
 patch remains unaccepted. Those two operation families account for 60 of the 68 cells
 without indexed acceptance; shared support still requires per-cell validation.
+The [native reduction baseline](docs/reports/2026-09-13-native-reductions-baseline.md)
+now records all nine Lean `foldl1`/`foldr1`/`reduce` misses at the original
+deadlines, with passing oracle and False controls. No reduction acceptance
+is claimed.
 The [matching extended-operation batch](docs/reports/2026-09-13-matching-extended-native-six.md)
 adds live acceptance for `fromMaybe`, `maybeToList`, `isLeft`, `either`,
 `numeralSuccessor` and `numeralAdd` in Lean Djinn and Both: twelve exact replays,

@@ -1,0 +1,178 @@
+{
+  "schema": "native-reductions-baseline-v1",
+  "status": "completed_without_acceptance",
+  "source_commit": "8087a1dca171daabae79b8b8bc174938de3ea257",
+  "dependency_commit": "c1ad560e106f59df07d1a32c3b51158ef749fc99",
+  "counts": {
+    "behavior_cells": 9,
+    "accepted_behavior_cells": 0,
+    "actual_false_controls": 3,
+    "positive_oracle_controls": 3,
+    "fully_typed_wrong_controls": 9,
+    "owned_query_and_kernel_processes": 15
+  },
+  "diagnoses": [
+    {
+      "engine": "djinn",
+      "operation": "foldl1",
+      "observations": {
+        "passed": 0,
+        "falsified": 1283,
+        "inconclusive": 0
+      },
+      "capture_member": "run/partial_djinn_foldl1.stdout.txt",
+      "capture_sha256": "ac13b5dddb454797e06b70ed074b46fada67f3abe3d458a876e6e5bc89c5abfb",
+      "classification": "original_command_deadline_without_accepted_implementation",
+      "finite_observation_count": 36
+    },
+    {
+      "engine": "djinn",
+      "operation": "foldr1",
+      "observations": {
+        "passed": 0,
+        "falsified": 1602,
+        "inconclusive": 0
+      },
+      "capture_member": "run/partial_djinn_foldr1.stdout.txt",
+      "capture_sha256": "7c711e945ed4239aa8070dff7fcc753abd16e1d44f73af4b8532eb6b355cdef4",
+      "classification": "original_command_deadline_without_accepted_implementation",
+      "finite_observation_count": 36
+    },
+    {
+      "engine": "djinn",
+      "operation": "reduce",
+      "observations": {
+        "passed": 0,
+        "falsified": 1710,
+        "inconclusive": 0
+      },
+      "capture_member": "run/partial_djinn_reduce.stdout.txt",
+      "capture_sha256": "dc983291a218f910ae86b8c2fafe86b263ace628daabc89c3329b3f3b103d218",
+      "classification": "original_command_deadline_without_accepted_implementation",
+      "finite_observation_count": 36
+    },
+    {
+      "engine": "exference",
+      "operation": "foldl1",
+      "observations": {
+        "passed": 0,
+        "falsified": 2998,
+        "inconclusive": 0
+      },
+      "capture_member": "run/partial_exference_foldl1.stdout.txt",
+      "capture_sha256": "d94c464440f5cb599adc6215a19ffb18bbad4b1af1c133c910f1a42600543d81",
+      "classification": "original_command_deadline_without_accepted_implementation",
+      "finite_observation_count": 36
+    },
+    {
+      "engine": "exference",
+      "operation": "foldr1",
+      "observations": {
+        "passed": 0,
+        "falsified": 3507,
+        "inconclusive": 0
+      },
+      "capture_member": "run/partial_exference_foldr1.stdout.txt",
+      "capture_sha256": "07fa1344d6d018266ae11c4831a308a26e671333b2a0fba24231f7eba84f3079",
+      "classification": "original_command_deadline_without_accepted_implementation",
+      "finite_observation_count": 36
+    },
+    {
+      "engine": "exference",
+      "operation": "reduce",
+      "observations": {
+        "passed": 0,
+        "falsified": 3256,
+        "inconclusive": 0
+      },
+      "capture_member": "run/partial_exference_reduce.stdout.txt",
+      "capture_sha256": "de73235130e48b006c20820a65f99c2c732dfb188be4481bdb664ac2bd7ce458",
+      "classification": "original_command_deadline_without_accepted_implementation",
+      "finite_observation_count": 36
+    },
+    {
+      "engine": "both",
+      "operation": "foldl1",
+      "observations": {
+        "passed": 0,
+        "falsified": 1555,
+        "inconclusive": 0
+      },
+      "capture_member": "run/partial_both_foldl1.stdout.txt",
+      "capture_sha256": "bf8deae932e3b519e6b8a6ee0b915a42e04086fffb5ee641263e678a7b922c7d",
+      "classification": "original_command_deadline_without_accepted_implementation",
+      "finite_observation_count": 36
+    },
+    {
+      "engine": "both",
+      "operation": "foldr1",
+      "observations": {
+        "passed": 0,
+        "falsified": 1505,
+        "inconclusive": 0
+      },
+      "capture_member": "run/partial_both_foldr1.stdout.txt",
+      "capture_sha256": "6c74528fdba05a1af40413ce9d1f3932a510a1d63ca4ca56612c59060934b9dd",
+      "classification": "original_command_deadline_without_accepted_implementation",
+      "finite_observation_count": 36
+    },
+    {
+      "engine": "both",
+      "operation": "reduce",
+      "observations": {
+        "passed": 0,
+        "falsified": 2134,
+        "inconclusive": 0
+      },
+      "capture_member": "run/partial_both_reduce.stdout.txt",
+      "capture_sha256": "a723c39e207646eaa2788c07483e62c8df3d3a93505def9fc97f1434cecfed0c",
+      "classification": "original_command_deadline_without_accepted_implementation",
+      "finite_observation_count": 36
+    }
+  ],
+  "false_controls": {
+    "djinn": {
+      "passed": 0,
+      "falsified": 623,
+      "inconclusive": 0
+    },
+    "exference": {
+      "passed": 0,
+      "falsified": 299,
+      "inconclusive": 0
+    },
+    "both": {
+      "passed": 0,
+      "falsified": 915,
+      "inconclusive": 0
+    }
+  },
+  "settings": {
+    "window": 65536,
+    "verify": 65536,
+    "shown": 1,
+    "ranking": "balanced",
+    "djinn_strategy": "interleave",
+    "djinn_choice_budget": 500000,
+    "exference_steps": 100000,
+    "command_timeout_seconds": 90,
+    "separate_process_guard_seconds": 900.0
+  },
+  "strict_build_exit_code": 0,
+  "sources_runtimes_controller_unchanged": true,
+  "archive": {
+    "path": "native-reductions-baseline-2026-09-13.zip",
+    "sha256": "f839fd4e3d3009fd5dd4e244bf6f3a02c8f2dbc77374a2714d1b005735a547a2",
+    "bytes": 3302282,
+    "artifact_count": 504,
+    "all_members_rehashed": true
+  },
+  "raw_receipt_member": "run/results.json",
+  "boundaries": [
+    "No synthesized implementation or exact candidate replay was accepted.",
+    "Oracle controls and False controls passed separately; they are not synthesis acceptances.",
+    "The original supplied defaults, full types, no-provider inventories, and 90-second command deadlines were preserved.",
+    "All nine synthesis cells ended at the command deadline. This is a bounded miss, not impossibility.",
+    "Scoped-source and contextual-constructor experiments were absent from the frozen published source."
+  ]
+}

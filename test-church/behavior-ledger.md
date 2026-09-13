@@ -23,8 +23,8 @@ See `behavior-ledger.json` for individual receipt pointers, hashes, limits and r
 | supplied_default | head | A | A | A | A | A |
 | supplied_default | last | A | A | A | A | A |
 | supplied_default | at | F | F | ? | ? | ? |
-| supplied_default | foldl1 | ? | F | ? | ? | ? |
-| supplied_default | foldr1 | ? | ? | ? | ? | ? |
+| supplied_default | foldl1 | ? | F | F | F | F |
+| supplied_default | foldr1 | ? | ? | F | F | F |
 | supplied_default | fromJust | A | A | A | A | A |
 | supplied_default | fromLeft | A | A | A | A | A |
 | supplied_default | fromRight | A | A | A | A | A |
@@ -35,7 +35,7 @@ See `behavior-ledger.json` for individual receipt pointers, hashes, limits and r
 | supplied_default | minMaxBy | ? | ? | ? | ? | ? |
 | supplied_default | minmaxElement | ? | ? | ? | ? | ? |
 | supplied_default | atKey | A | A | A | A | A |
-| supplied_default | reduce | ? | ? | ? | ? | ? |
+| supplied_default | reduce | ? | ? | F | F | F |
 | supplied_default | maximum | ? | ? | ? | ? | ? |
 | supplied_default | minimum | ? | ? | ? | ? | ? |
 | supplied_default | minMax | ? | ? | ? | ? | ? |
