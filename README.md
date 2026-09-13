@@ -67,9 +67,11 @@ evidence does not establish that a case was never attempted.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
 prioritizes end-to-end [kinded Haskell source support](docs/reports/2026-09-13-public-kinded-source-frontier.md),
-with engine checking and original-signature replay as the next gate. A ten-cell
-extrema baseline runs at the next integration checkpoint, followed by a separate
-Lean universe-polymorphism milestone.
+with engine checking and original-signature replay as the next gate. Eight completed
+individual-engine extrema probes missed; two Lean Both-mode cells remain pending.
+A local repair admits the missing carrier, but construction still times out, so
+the next extrema step is a targeted construction trace. Lean universe polymorphism
+remains an independent milestone. These local attempts are not yet indexed in the ledger.
 The [checked source-kind transport prerequisite](docs/reports/2026-09-13-source-kind-transport-prerequisite.md)
 preserves ground-kind forall annotations through conversion and synonym expansion,
 with 539 foundation and 171 integration tests passing. Public kinded queries still
