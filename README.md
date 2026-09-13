@@ -52,18 +52,20 @@ three False controls, and both 350-signature kernel replay corpora pass.
 Established variants precede the bounded `Unit` fallbacks within each universe
 lane, and every candidate still requires Lean verification. The
 [current re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes native integration of the
-[new Exference lexical-selection repair](docs/reports/2026-09-13-exference-scoped-selections.md),
-then a bounded constructor-integration pass and reusable reduction carriers. Checked type and
+starts with one bounded constructor-integration pass, then reduction construction
+and separately validated extrema. The
+[Exference lexical-selection repair](docs/reports/2026-09-13-exference-scoped-selections.md)
+and its native integration are delivered. Checked type and
 dictionary selections now survive source lowering and occurrence-sensitive
 duplicate comparison. Public batch/stream replay covers global providers and
 local rank-N callbacks. The Exference increment passes all 97 private engine,
 515 Exference, and 156 integration tests. Both engines also pass all 350 Church
 signature checks and 50 scope probes each.
-The new native run passes all 12 selection positives, all six actual False
-controls, and all 707 unit tests. Every positive has independent exact Lean
-replay, including the formerly failing Exference cases. Dependency promotion
-awaits completion of the native signature replay gates.
+The [complete native acceptance](docs/reports/2026-09-13-exference-native-acceptance.md)
+passes all 12 selection positives, all six actual False controls, all 707 unit
+tests, and both 350-signature kernel replay corpora, with unchanged inputs.
+Every positive has independent exact Lean replay, including the formerly
+failing Exference cases. Leant now pins the accepted Djex commit `ebadbefd`.
 Reductions and extrema
 account for 60 of the 68 cells without indexed acceptance; shared support still
 requires per-cell behavioral validation. The
@@ -324,11 +326,11 @@ Companion documents:
   open; an ineffective ordering experiment was reverted. Full regression
   acceptance remains required before publication. The latest captured-core
   experiments still miss the required tail behavior at the original bound. The
-  revised order starts with the 160-cell coverage ledger and missing Church
-  behaviors, with bounded constructor acceptance and scoped dictionary-selection
-  repair tracked separately.
+  revised order starts with bounded constructor acceptance, then reduction
+  construction and extrema. The ledger and scoped dictionary-selection repair
+  are delivered; broader source obligations remain tracked separately.
   Broader search estimates were rejected after losing Church composition.
-  The committed dependency is `c1ad560e`. The full 13-operation/19-default coverage
+  The current dependency is `ebadbefd`, with complete native selection acceptance. The full 13-operation/19-default coverage
   across engines is still open.
   See the [current retriage and evidence boundaries](docs/reports/2026-09-13-synthesis-delivery-retriage.md).
 - **Checked conditional providers in canonical Djex.** The

@@ -1,6 +1,6 @@
 # Exference preserves explicit lexical type selections
 
-Exference now explores multiple legal lexical instantiations of a constrained provider and preserves the selected class arguments through independent checking. The canonical Haskell validation passes, including exact GHC execution of both choices for global providers and local rank-N callbacks. The new native Lean run also passes all 12 selection cases, all six actual False controls, and all 707 unit tests; its signature replay gates are still running. Leant's production dependency has not yet been promoted.
+Exference now explores multiple legal lexical instantiations of a constrained provider and preserves the selected class arguments through independent checking. The canonical Haskell validation passes, including exact GHC execution of both choices for global providers and local rank-N callbacks. The [complete native Lean acceptance](2026-09-13-exference-native-acceptance.md) also passes all 12 selection cases, all six actual False controls, all 707 unit tests and both 350-signature kernel replays. Leant now pins the accepted Djex commit `ebadbefd`.
 
 This closes the construction/reconstruction gap isolated by the [native diagnostic](2026-09-13-native-selection-diagnostic.md). It complements the earlier [Djinn source-selection repair](2026-09-13-scoped-source-selections.md). The [delivery re-triage](2026-09-13-synthesis-delivery-retriage.md) retains the pending constructor integration, reduction/extrema coverage, and exact bounded-search failures as separate work.
 
