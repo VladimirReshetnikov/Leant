@@ -37,8 +37,8 @@ There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.github
 ([LaTeX source](docs/Leant_Overview/Leant_Overview.tex)).
 
 The [Church behavior ledger](test-church/behavior-ledger.md) now enumerates all
-160 operation/mode cells. Its selected pinned receipts record 68 historical
-acceptances, four cells with attempts but no indexed acceptance, and 88 cells
+160 operation/mode cells. Its selected pinned receipts record 80 historical
+acceptances, four cells with attempts but no indexed acceptance, and 76 cells
 without indexed evidence. These counts do not establish current-revision
 acceptance or prove that an unindexed cell was never attempted.
 The [supplied-default selector acceptance](docs/reports/2026-09-13-native-supplied-default-selectors.md)
@@ -52,8 +52,14 @@ three False controls, and both 350-signature kernel replay corpora pass.
 Established variants precede the bounded `Unit` fallbacks within each universe
 lane, and every candidate still requires Lean verification. The
 [current re-triage](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-now prioritizes the 92 cells without indexed acceptance and preservation of
+now prioritizes the 80 cells without indexed acceptance and preservation of
 scoped dictionary selections.
+The [matching extended-operation batch](docs/reports/2026-09-13-matching-extended-native-six.md)
+adds live acceptance for `fromMaybe`, `maybeToList`, `isLeft`, `either`,
+`numeralSuccessor` and `numeralAdd` in Lean Djinn and Both: twelve exact replays,
+280 finite observations and two actual False controls, with empty candidate
+axiom inventories. The remaining seven extended operations in these two modes
+are the next behavior batch.
 
 ## Contents
 
