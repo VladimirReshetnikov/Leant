@@ -1,0 +1,367 @@
+{
+  "scope": "Triage snapshot only; implementation uncommitted. This does not replace a complete source and replay acceptance archive.",
+  "runs": [
+    {
+      "receipt": "C:\\Leant\\dist-newstyle\\context-nominal-universes-v1\\results.json",
+      "receipt_sha256": "f116fb0b89d1da78be45b9829af805c3c448a99eccc5e1438169b253d3733742",
+      "status": "passed",
+      "sources_unchanged": true,
+      "runtimes_unchanged": true,
+      "gates": [
+        {
+          "label": "strict-build",
+          "exit_code": 0
+        },
+        {
+          "label": "focused-units",
+          "exit_code": 0,
+          "tests": 87
+        },
+        {
+          "label": "check-prelude",
+          "exit_code": 0,
+          "source_sha256": "07c9d4c6976b816388c3df67fa512bb9e7c5ad71d4557abda6db32067c871214"
+        }
+      ],
+      "results": []
+    },
+    {
+      "receipt": "C:\\Leant\\dist-newstyle\\context-nominal-public-v2\\results.json",
+      "receipt_sha256": "aef11665d054d25b478341594935ed579f8d40653a4083deed8c5ec96967bb9d",
+      "status": "failed",
+      "sources_unchanged": true,
+      "runtimes_unchanged": true,
+      "results": [
+        {
+          "label": "nominal_universe_fixed_higher_box_djinn_ordinary",
+          "engine": "djinn",
+          "mode": "ordinary",
+          "status": "failed",
+          "failure": "ValueError('accepted origin lost its own closed source graph or exact compatibility association')"
+        },
+        {
+          "label": "nominal_universe_fixed_higher_box_djinn_where",
+          "engine": "djinn",
+          "mode": "where",
+          "status": "failed",
+          "failure": "ValueError('accepted origin lost its own closed source graph or exact compatibility association')"
+        },
+        {
+          "label": "nominal_universe_fixed_higher_box_djinn_false",
+          "engine": "djinn",
+          "mode": "false",
+          "status": "passed"
+        },
+        {
+          "label": "nominal_universe_selected_higher_box_djinn_ordinary",
+          "engine": "djinn",
+          "mode": "ordinary",
+          "status": "failed",
+          "failure": "ValueError('accepted origin lost its own closed source graph or exact compatibility association')"
+        },
+        {
+          "label": "nominal_universe_selected_higher_box_djinn_where",
+          "engine": "djinn",
+          "mode": "where",
+          "status": "failed",
+          "failure": "ValueError('accepted origin lost its own closed source graph or exact compatibility association')"
+        },
+        {
+          "label": "nominal_universe_selected_higher_box_djinn_false",
+          "engine": "djinn",
+          "mode": "false",
+          "status": "passed"
+        },
+        {
+          "label": "nominal_universe_two_box_selections_djinn_ordinary",
+          "engine": "djinn",
+          "mode": "ordinary",
+          "status": "failed",
+          "failure": "ValueError('expected exactly one verified displayed output')"
+        },
+        {
+          "label": "nominal_universe_two_box_selections_djinn_where",
+          "engine": "djinn",
+          "mode": "where",
+          "status": "failed",
+          "failure": "ValueError('expected exactly one verified displayed output')"
+        },
+        {
+          "label": "nominal_universe_two_box_selections_djinn_false",
+          "engine": "djinn",
+          "mode": "false",
+          "status": "failed",
+          "failure": "ValueError('where False did not establish actual predicate rejection')"
+        },
+        {
+          "label": "nominal_universe_boxed_polymorphic_payload_djinn_ordinary",
+          "engine": "djinn",
+          "mode": "ordinary",
+          "status": "failed",
+          "failure": "ValueError('expected exactly one verified displayed output')"
+        },
+        {
+          "label": "nominal_universe_boxed_polymorphic_payload_djinn_where",
+          "engine": "djinn",
+          "mode": "where",
+          "status": "failed",
+          "failure": "ValueError('expected exactly one verified displayed output')"
+        },
+        {
+          "label": "nominal_universe_boxed_polymorphic_payload_djinn_false",
+          "engine": "djinn",
+          "mode": "false",
+          "status": "failed",
+          "failure": "ValueError('where False did not establish actual predicate rejection')"
+        }
+      ]
+    },
+    {
+      "receipt": "C:\\Leant\\dist-newstyle\\context-nominal-public-v3\\results.json",
+      "receipt_sha256": "4d6e4aa93af879d07f98ccd53926538f1a88df2f471c66e005eada23bbde33eb",
+      "status": "passed",
+      "sources_unchanged": true,
+      "runtimes_unchanged": true,
+      "results": [
+        {
+          "label": "nominal_universe_fixed_higher_box_djinn_ordinary",
+          "engine": "djinn",
+          "mode": "ordinary",
+          "status": "passed",
+          "replay": {
+            "path": "C:\\Leant\\dist-newstyle\\context-nominal-public-v3\\nominal_universe_fixed_higher_box_djinn_ordinary-replay.lean",
+            "sha256": "533374b4a6251bc9251a367a00130e7a00362cc710eba7438df80609c4eb456a",
+            "declarations": [
+              "ProductReplay.accepted",
+              "ProductReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "ProductReplay.accepted": [],
+              "ProductReplay.passes": []
+            }
+          }
+        },
+        {
+          "label": "nominal_universe_fixed_higher_box_djinn_where",
+          "engine": "djinn",
+          "mode": "where",
+          "status": "passed",
+          "replay": {
+            "path": "C:\\Leant\\dist-newstyle\\context-nominal-public-v3\\nominal_universe_fixed_higher_box_djinn_where-replay.lean",
+            "sha256": "533374b4a6251bc9251a367a00130e7a00362cc710eba7438df80609c4eb456a",
+            "declarations": [
+              "ProductReplay.accepted",
+              "ProductReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "ProductReplay.accepted": [],
+              "ProductReplay.passes": []
+            }
+          }
+        },
+        {
+          "label": "nominal_universe_fixed_higher_box_djinn_false",
+          "engine": "djinn",
+          "mode": "false",
+          "status": "passed"
+        },
+        {
+          "label": "nominal_universe_selected_higher_box_djinn_ordinary",
+          "engine": "djinn",
+          "mode": "ordinary",
+          "status": "passed",
+          "replay": {
+            "path": "C:\\Leant\\dist-newstyle\\context-nominal-public-v3\\nominal_universe_selected_higher_box_djinn_ordinary-replay.lean",
+            "sha256": "474d78499c543e6e2c46b8f366a05e5beff022af17e1d726fd7b8866f2f4d783",
+            "declarations": [
+              "ProductReplay.accepted",
+              "ProductReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "ProductReplay.accepted": [],
+              "ProductReplay.passes": []
+            }
+          }
+        },
+        {
+          "label": "nominal_universe_selected_higher_box_djinn_where",
+          "engine": "djinn",
+          "mode": "where",
+          "status": "passed",
+          "replay": {
+            "path": "C:\\Leant\\dist-newstyle\\context-nominal-public-v3\\nominal_universe_selected_higher_box_djinn_where-replay.lean",
+            "sha256": "474d78499c543e6e2c46b8f366a05e5beff022af17e1d726fd7b8866f2f4d783",
+            "declarations": [
+              "ProductReplay.accepted",
+              "ProductReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "ProductReplay.accepted": [],
+              "ProductReplay.passes": []
+            }
+          }
+        },
+        {
+          "label": "nominal_universe_selected_higher_box_djinn_false",
+          "engine": "djinn",
+          "mode": "false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "receipt": "C:\\Leant\\dist-newstyle\\context-nominal-public-v4\\results.json",
+      "receipt_sha256": "71376e60c9995c07d17c7c091b07d111026ea68a2546d22226592bd4d2e509e6",
+      "status": "failed",
+      "sources_unchanged": true,
+      "runtimes_unchanged": true,
+      "results": [
+        {
+          "label": "nominal_universe_fixed_higher_box_exference_ordinary",
+          "engine": "exference",
+          "mode": "ordinary",
+          "status": "passed",
+          "replay": {
+            "path": "C:\\Leant\\dist-newstyle\\context-nominal-public-v4\\nominal_universe_fixed_higher_box_exference_ordinary-replay.lean",
+            "sha256": "b3dfdcc5f991d6760e1da5c7ea7622bb0851f2727766bcb5df0713fd53457dd3",
+            "declarations": [
+              "ProductReplay.accepted",
+              "ProductReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "ProductReplay.accepted": [],
+              "ProductReplay.passes": []
+            }
+          }
+        },
+        {
+          "label": "nominal_universe_fixed_higher_box_exference_where",
+          "engine": "exference",
+          "mode": "where",
+          "status": "passed",
+          "replay": {
+            "path": "C:\\Leant\\dist-newstyle\\context-nominal-public-v4\\nominal_universe_fixed_higher_box_exference_where-replay.lean",
+            "sha256": "b3dfdcc5f991d6760e1da5c7ea7622bb0851f2727766bcb5df0713fd53457dd3",
+            "declarations": [
+              "ProductReplay.accepted",
+              "ProductReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "ProductReplay.accepted": [],
+              "ProductReplay.passes": []
+            }
+          }
+        },
+        {
+          "label": "nominal_universe_fixed_higher_box_exference_false",
+          "engine": "exference",
+          "mode": "false",
+          "status": "passed"
+        },
+        {
+          "label": "nominal_universe_selected_higher_box_exference_ordinary",
+          "engine": "exference",
+          "mode": "ordinary",
+          "status": "passed",
+          "replay": {
+            "path": "C:\\Leant\\dist-newstyle\\context-nominal-public-v4\\nominal_universe_selected_higher_box_exference_ordinary-replay.lean",
+            "sha256": "14fea6751e33217990bcc5bf5cf1fe116ce937568e3d87c2a47ac331cf518b8a",
+            "declarations": [
+              "ProductReplay.accepted",
+              "ProductReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "ProductReplay.accepted": [],
+              "ProductReplay.passes": []
+            }
+          }
+        },
+        {
+          "label": "nominal_universe_selected_higher_box_exference_where",
+          "engine": "exference",
+          "mode": "where",
+          "status": "passed",
+          "replay": {
+            "path": "C:\\Leant\\dist-newstyle\\context-nominal-public-v4\\nominal_universe_selected_higher_box_exference_where-replay.lean",
+            "sha256": "14fea6751e33217990bcc5bf5cf1fe116ce937568e3d87c2a47ac331cf518b8a",
+            "declarations": [
+              "ProductReplay.accepted",
+              "ProductReplay.passes"
+            ],
+            "status": "passed",
+            "source_unchanged": true,
+            "kernel_path": "C:\\Users\\vresh\\.elan\\toolchains\\leanprover--lean4---v4.32.0\\bin\\lean.exe",
+            "kernel_sha256": "10c6a27583eb65ff6a7e92b9718ff01d851ad594e6d70bb283fa5a10092fd810",
+            "kernel_unchanged": true,
+            "axiom_inventories": {
+              "ProductReplay.accepted": [],
+              "ProductReplay.passes": []
+            }
+          }
+        },
+        {
+          "label": "nominal_universe_selected_higher_box_exference_false",
+          "engine": "exference",
+          "mode": "false",
+          "status": "passed"
+        },
+        {
+          "label": "nominal_universe_two_box_selections_exference_ordinary",
+          "engine": "exference",
+          "mode": "ordinary",
+          "status": "failed",
+          "failure": "ValueError('expected exactly one verified displayed output')"
+        },
+        {
+          "label": "nominal_universe_two_box_selections_exference_where",
+          "engine": "exference",
+          "mode": "where",
+          "status": "failed",
+          "failure": "ValueError('expected exactly one verified displayed output')"
+        },
+        {
+          "label": "nominal_universe_two_box_selections_exference_false",
+          "engine": "exference",
+          "mode": "false",
+          "status": "failed",
+          "failure": "ValueError('where False did not establish actual predicate rejection')"
+        }
+      ]
+    }
+  ]
+}

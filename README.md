@@ -110,14 +110,15 @@ exact Lean replay and False controls. Leant integrates the tested source and pin
 Djex `66b3212b`. Higher-universe classes/providers and selected polymorphic types
 remain separate capabilities.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-now advance to exact nominal universe signatures and contextual
-polymorphic type selection, followed by staged class/provider universe support. The
-[bounded `length` comparison](docs/reports/2026-09-14-selected-polytype-frontier.md)
-misses in both direct and wrapped cases, so it does not isolate the proposed defect.
-A boxed polymorphic-value baseline now identifies the source prerequisite. Explicit
-Haskell kinds in Exference and integer indexing remain independent obligations.
-Extrema implementation requires a causal witness trace; failed reduction variants
-stay paused. Each milestone requires its original public query and exact replay.
+put contextual polymorphic type selection and nominal-universe acceptance first,
+followed by Exference's explicit Haskell kinds and integer indexing. Uncommitted
+Leant nominal changes pass 87 focused tests and 12 public higher-universe box cells
+across Djinn and Exference; selected polymorphic payloads and simultaneous distinct
+universe selections remain unresolved. These working-tree results are not a release
+claim. Broader class/provider universes follow unless a concrete dependency promotes
+a smaller part. The [bounded `length` comparison](docs/reports/2026-09-14-selected-polytype-frontier.md)
+did not isolate the proposed defect; further length, reduction and extrema changes
+require a causal trace. Each milestone needs its original public query and exact replay.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC
