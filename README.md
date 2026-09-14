@@ -110,8 +110,11 @@ exact Lean replay and False controls. Leant integrates the tested source and pin
 Djex `66b3212b`. Higher-universe classes/providers and selected polymorphic types
 remain separate capabilities.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-now start with one bounded Lean Djinn `length` diagnostic, followed by contextual
-polymorphic type selection and staged class/provider universe support. Explicit
+now advance to exact nominal universe signatures and contextual
+polymorphic type selection, followed by staged class/provider universe support. The
+[bounded `length` comparison](docs/reports/2026-09-14-selected-polytype-frontier.md)
+misses in both direct and wrapped cases, so it does not isolate the proposed defect.
+A boxed polymorphic-value baseline now identifies the source prerequisite. Explicit
 Haskell kinds in Exference and integer indexing remain independent obligations.
 Extrema implementation requires a causal witness trace; failed reduction variants
 stay paused. Each milestone requires its original public query and exact replay.
