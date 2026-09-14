@@ -1,0 +1,66 @@
+{
+  "kind": "triage checkpoint; not an implementation release or portable acceptance archive",
+  "checked_utc": "2026-09-14T11:31:47.853315+00:00",
+  "published_heads_at_review": {
+    "Djex": "9a2d59d958a60ff3b6899697a60b6985a5cf73a3",
+    "Leant": "e8829ad34899055cb08f5156c507ec5c12e6cf01"
+  },
+  "working_native_dependency": "9a2d59d958a60ff3b6899697a60b6985a5cf73a3",
+  "native_implementation_and_gitlink": "uncommitted; documentation-only checkpoint",
+  "strict": {
+    "local_receipt": "C:\\Leant\\dist-newstyle\\context-dictionary-selection-v4\\results.json",
+    "receipt_sha256": "84eed2a1435f06e2e9991938b38188e934a7421e2c73a4a628103f48ff8b6b85",
+    "status": "passed",
+    "focused_tests": 98,
+    "current_source_hashes_verified": true,
+    "current_runtime_hashes_verified": true
+  },
+  "public_gates": [
+    {
+      "local_receipt": "C:\\Leant\\dist-newstyle\\context-dictionary-integration-v1\\dictionary-selection\\results.json",
+      "receipt_sha256": "388e5b332afd0e64fa29dc5ca3a996c14670698709881005c25e2505fab0e7d6",
+      "status": "passed",
+      "cells": 18,
+      "exact_empty_axiom_replays": 12
+    },
+    {
+      "local_receipt": "C:\\Leant\\dist-newstyle\\context-dictionary-integration-v2\\production-regressions\\results.json",
+      "receipt_sha256": "c2b41a5a0e71ac1f217fb8d3734881944594d2da448f8b50cf2913caaccfd376",
+      "status": "passed",
+      "cells": 27,
+      "exact_empty_axiom_replays": 18
+    },
+    {
+      "local_receipt": "C:\\Leant\\dist-newstyle\\context-dictionary-djinn-regressions-v2\\public\\results.json",
+      "receipt_sha256": "b9032d99f4ef6cae483fe637fb3170dc279864d36faf553189f21e6353a602b7",
+      "status": "passed",
+      "cells": 24,
+      "exact_empty_axiom_replays": 16
+    }
+  ],
+  "combined_public_counts": {
+    "cells": 69,
+    "exact_empty_axiom_replays": 46,
+    "actual_false_controls": 17,
+    "class_universe_refusal_controls": 6
+  },
+  "harness_maintenance_bridge": {
+    "local_receipt": "C:\\Leant\\dist-newstyle\\dictionary-harness-maintenance-v1.json",
+    "receipt_sha256": "3febfafea5ca62b46b87f6de6bd10a0c555addb298c83c34dfdf1ee7fdbfe880",
+    "status": "passed",
+    "scope": "Only the unused standalone matrix/main and refusal constants changed. Every source consumed by the accepted dictionary fixture is unchanged, or its active module definitions are AST-identical; all recorded runtimes are unchanged."
+  },
+  "retained_failed_attempt": {
+    "local_receipt": "C:\\Leant\\dist-newstyle\\context-dictionary-integration-v1\\results.json",
+    "receipt_sha256": "bb85cc79a0eb6d481e8cfb0ba62b8a8d57c873d65a13fcb4c08daf913a030fc5",
+    "status": "failed",
+    "reason": "obsolete 39-cell refusal expectations; retain as failed; corrected lexical gate has 27 cells"
+  },
+  "pending": [
+    "766-test native suite on the integrated dependency",
+    "complete native source/runtime/replay archive and implementation publication",
+    "default unbounded Haskell Djinn qualified-polytype timeout"
+  ],
+  "behavior_ledger": "unchanged: 94 historical accepted, 23 attempted without indexed acceptance, 43 without indexed evidence",
+  "evidence_limit": "Receipt paths reference this workspace. This compact index verifies local evidence but does not package its dependencies. Earlier acceptance archives retain their own source snapshots."
+}

@@ -122,15 +122,18 @@ adds scoped quantified choices to Djinn's contextual specialization. It passes
 eight exact GHC replays and four actual-False controls. Djinn's public acceptance
 uses 4,096 choices; the retained default unbounded-search timeout remains open.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-first integrate this core revision with the local Leant dictionary repair,
-which separately passes 98 focused and 766 native tests plus Exference/Both
-public examples on its previous Djex pin. Native acceptance of the new combined
-revision is pending. Exference's explicit Haskell kinds and integer indexing
-follow. The original query using two distinct
-nominal universe selections remains unresolved and requires a causal search trace.
-Broader class/provider universes follow unless a concrete dependency promotes a
-smaller part. Further length, reduction and extrema changes likewise require a
-new causal trace. This release does not establish arbitrary synthesis completeness.
+now treat dictionary selection as release work: the local Leant implementation
+with Djex `9a2d59d9` passes 98 focused tests and 69 affected public checks
+(46 exact Lean replays, 17 actual-False controls and six class-universe refusals).
+The full 766-test native suite on this dependency and implementation publication
+remain pending; the earlier 766-test pass used the previous pin. These local
+results have a [triage index](test-church/receipts/dictionary-integration-retriage-2026-09-14.json),
+not yet a complete native release archive.
+Next feature priorities are Exference's explicit Haskell kinds, integer `at`,
+and the original query combining two distinct nominal universe selections.
+The default Djinn timeout gets a bounded diagnosis; broader class/provider
+universes and further length, reduction and extrema changes require their own
+discriminating evidence. This does not establish arbitrary synthesis completeness.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC
