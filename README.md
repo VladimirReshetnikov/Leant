@@ -73,12 +73,12 @@ and 10 named-`where` outputs compile and execute at their original signatures;
 all 11 actual-False controls pass. All **1,276 tests in seven suites pass**, including the completed 138-test CLI
 rerun on unchanged source and runtime hashes; its separate receipt is linked
 from the milestone report.
-The isolated mixed-product follow-up now passes the original `(7,9)` named
-query, exact GHC replay, its False control and all 146 Djinn tests; see the
-[current validation status](docs/reports/2026-09-13-synthesis-delivery-retriage.md).
-Broader regression checks, production integration and native Leant validation
-remain pending. Exference kinded execution is still guarded, and Leant's
-dependency pin is unchanged.
+The [general product-construction release](docs/reports/2026-09-13-product-alternatives-acceptance.md)
+now closes the `(7,9)` named-query miss. Its complete 11-case kinded-source matrix
+passes 22 exact GHC replays and 11 actual-False controls; all **383 selected
+regression tests** pass (146 Djinn, 187 integration, 38 API and 12 focused CLI).
+The checked source is integrated into Djex. Native Leant dependency validation
+remains pending; its pin is unchanged. Exference kinded execution remains guarded.
 
 The [public Lean universe baseline](docs/reports/2026-09-13-public-universe-baseline.md)
 passes all 24 cells for identity and nested callbacks at `Type 1` and named
@@ -88,7 +88,7 @@ dictionary universes and universe-bearing global providers remain separate
 implementation requirements; the native dependency pin is unchanged.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes finishing product regression checks and native integration, then
+prioritizes native integration of the checked product release, then
 contextual Lean universe transport and Exference kind checking. Integer indexing and the
 distinct Lean Djinn length diagnosis move ahead of further broad extrema
 experiments. Contextual evidence and supplied-fold trees remain required;
