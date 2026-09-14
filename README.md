@@ -60,9 +60,10 @@ earlier reports retain their own source/runtime snapshots and validation counts.
 The [current priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
 are original integer `at`, then simultaneous two-universe composition. Leant pins
 Djex `e237e866`, including the accepted kind integration and proof-prefix repairs.
-Provider admission is repaired, but the original integer query still has no
-accepted implementation. Lean Djinn `length`, broader class/provider universes,
-reductions and extrema remain further work.
+The [indexing diagnostics](docs/reports/2026-09-14-indexing-composition-diagnostics.md)
+reach function-valued folds and the integer-case step separately; composing them
+within the original search limits remains open. Lean Djinn `length`, broader
+class/provider universes, reductions and extrema remain further work.
 
 The [Church behavior ledger](test-church/behavior-ledger.md) records 94 historical
 acceptances, 23 attempted cells without indexed acceptance and 43 without indexed
