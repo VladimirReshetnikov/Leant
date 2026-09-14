@@ -143,9 +143,13 @@ original query combining two nominal universe selections. The new
 preserves kind ownership through forall opening and substitution and rejects
 wrong-kind expressions in independent checking. Its strict build, 120 private
 engine tests and all 515 ordinary Exference tests pass. Public kinded search
-remains guarded. A focused Lean Djinn `length` diagnosis now precedes broader class/provider
-universe work and reductions/extrema. The plan gives each item an acceptance gate
-and keeps native dependency adoption separate from Haskell root acceptance.
+remains guarded. The next gate is one complete public kinded query with exact GHC
+replay, including consistent kind transport and preservation of candidate evidence;
+later unvalidated local edits do not inherit the published test results. Integer
+`at` remains an independent next baseline. A focused Lean Djinn `length` diagnosis
+precedes broader class/provider universe work and reductions/extrema. The plan
+gives each item an acceptance gate and keeps native dependency adoption separate
+from Haskell root acceptance.
 These scoped releases do not establish arbitrary synthesis completeness.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
