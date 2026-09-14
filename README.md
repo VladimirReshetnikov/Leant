@@ -88,8 +88,11 @@ dictionary universes and universe-bearing global providers remain separate
 implementation requirements; the native dependency pin is unchanged.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes native integration of the checked product release, then
-contextual Lean universe transport and Exference kind checking. Integer indexing and the
+prioritizes the native sort-value repair needed by the checked product release,
+then contextual Lean universe transport and Exference kind checking. The isolated
+repair passes nine Djinn public cells (six exact kernel replays and three False
+controls), but the latest provider-only sort test fails; the repair and native
+dependency update remain unreleased. Integer indexing and the
 distinct Lean Djinn length diagnosis move ahead of further broad extrema
 experiments. Contextual evidence and supplied-fold trees remain required;
 unsuccessful reduction variants remain paused. Each implementation milestone
