@@ -110,13 +110,18 @@ exact Lean replay and False controls. Leant integrates the tested source and pin
 Djex `66b3212b`. Higher-universe classes/providers and selected polymorphic types
 remain separate capabilities.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-put contextual polymorphic type selection and nominal-universe acceptance first,
-followed by Exference's explicit Haskell kinds and integer indexing. Uncommitted
-Leant nominal changes pass 87 focused tests and 12 public higher-universe box cells
-across Djinn and Exference; selected polymorphic payloads and simultaneous distinct
-universe selections remain unresolved. These working-tree results are not a release
-claim. Broader class/provider universes follow unless a concrete dependency promotes
-a smaller part. The [bounded `length` comparison](docs/reports/2026-09-14-selected-polytype-frontier.md)
+put publication of the scoped polymorphic-selection repair first, followed by a
+focused dictionary-application investigation, Exference's explicit Haskell kinds,
+and integer indexing. Uncommitted
+Leant changes now pass 95 focused checks, all 763 native tests, and 18 public checks
+for chained type selections and dictionary-qualified polymorphic payloads across
+Djinn, Exference and Both. Broader current-source public and regression gates remain
+pending, so these working-tree results are not a release claim. The original query
+using two distinct nominal universe selections remains unresolved and needs a
+causal search trace; it is no longer a blanket prerequisite for publishing the
+passing increment or addressing the explicit-kind guard. Broader
+class/provider universes follow unless a concrete dependency promotes a smaller
+part. The [bounded `length` comparison](docs/reports/2026-09-14-selected-polytype-frontier.md)
 did not isolate the proposed defect; further length, reduction and extrema changes
 require a causal trace. Each milestone needs its original public query and exact replay.
 

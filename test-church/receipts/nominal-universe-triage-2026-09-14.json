@@ -363,5 +363,562 @@
         }
       ]
     }
-  ]
+  ],
+  "current_checkpoint": {
+    "scope": "Uncommitted implementation; current-source release gates incomplete. Full receipts remain in local validation directories pending acceptance archive.",
+    "runs": [
+      {
+        "receipt": "C:\\Leant\\dist-newstyle\\context-selected-polytypes-v3\\results.json",
+        "receipt_sha256": "01252277c89c3e6310578af9eec051e0a0c604e047161713cf1cc3911e1f6577",
+        "status": "passed",
+        "gates": [
+          {
+            "label": "strict-build",
+            "exit_code": 0
+          },
+          {
+            "label": "focused-units",
+            "exit_code": 0,
+            "tests": 95
+          },
+          {
+            "label": "check-prelude",
+            "exit_code": 0,
+            "source_sha256": "07c9d4c6976b816388c3df67fa512bb9e7c5ad71d4557abda6db32067c871214"
+          }
+        ],
+        "sources_unchanged": true,
+        "runtimes_unchanged": true
+      },
+      {
+        "receipt": "C:\\Leant\\dist-newstyle\\context-selected-polytypes-public-v2\\results.json",
+        "receipt_sha256": "e1225e2fe75a65548e10a92a6bf41134c8afbe5d88d0e365651d10e05af96edb",
+        "status": "passed",
+        "sources_unchanged": true,
+        "runtimes_unchanged": true,
+        "cells": [
+          {
+            "label": "nominal_universe_fixed_higher_box_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_fixed_higher_box_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_fixed_higher_box_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_fixed_higher_box_exference_ordinary",
+            "engine": "exference",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_fixed_higher_box_exference_where",
+            "engine": "exference",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_fixed_higher_box_exference_false",
+            "engine": "exference",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_fixed_higher_box_both_ordinary",
+            "engine": "both",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_fixed_higher_box_both_where",
+            "engine": "both",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_fixed_higher_box_both_false",
+            "engine": "both",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_selected_higher_box_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_selected_higher_box_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_selected_higher_box_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_selected_higher_box_exference_ordinary",
+            "engine": "exference",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_selected_higher_box_exference_where",
+            "engine": "exference",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_selected_higher_box_exference_false",
+            "engine": "exference",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_selected_higher_box_both_ordinary",
+            "engine": "both",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_selected_higher_box_both_where",
+            "engine": "both",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_selected_higher_box_both_false",
+            "engine": "both",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_polymorphic_payload_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_polymorphic_payload_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_polymorphic_payload_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_polymorphic_payload_exference_ordinary",
+            "engine": "exference",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_polymorphic_payload_exference_where",
+            "engine": "exference",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_polymorphic_payload_exference_false",
+            "engine": "exference",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_polymorphic_payload_both_ordinary",
+            "engine": "both",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_polymorphic_payload_both_where",
+            "engine": "both",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_polymorphic_payload_both_false",
+            "engine": "both",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_type_one_quantifier_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_type_one_quantifier_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_type_one_quantifier_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_type_one_quantifier_exference_ordinary",
+            "engine": "exference",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_type_one_quantifier_exference_where",
+            "engine": "exference",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_type_one_quantifier_exference_false",
+            "engine": "exference",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_type_one_quantifier_both_ordinary",
+            "engine": "both",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_type_one_quantifier_both_where",
+            "engine": "both",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_type_one_quantifier_both_false",
+            "engine": "both",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_named_quantifier_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_named_quantifier_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_named_quantifier_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_named_quantifier_exference_ordinary",
+            "engine": "exference",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_named_quantifier_exference_where",
+            "engine": "exference",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_named_quantifier_exference_false",
+            "engine": "exference",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_named_quantifier_both_ordinary",
+            "engine": "both",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_named_quantifier_both_where",
+            "engine": "both",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_named_quantifier_both_false",
+            "engine": "both",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_strict_quantifier_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_strict_quantifier_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_strict_quantifier_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_strict_quantifier_exference_ordinary",
+            "engine": "exference",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_strict_quantifier_exference_where",
+            "engine": "exference",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_strict_quantifier_exference_false",
+            "engine": "exference",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_strict_quantifier_both_ordinary",
+            "engine": "both",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_strict_quantifier_both_where",
+            "engine": "both",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_strict_quantifier_both_false",
+            "engine": "both",
+            "mode": "false",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "receipt": "C:\\Leant\\dist-newstyle\\context-selected-polytypes-chained-v1\\results.json",
+        "receipt_sha256": "1201715238c34c795b849b8e5493b41d8ca36e13139e5e26ea910f9b15dad7aa",
+        "status": "failed",
+        "sources_unchanged": true,
+        "runtimes_unchanged": true,
+        "cells": [
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "failed",
+            "failure": "ValueError('Leant reported a command or backend error: synthesis engine error: context-source: unsupported unanchored graph construction')"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "failed",
+            "failure": "ValueError('Leant reported a command or backend error: synthesis engine error: context-source: unsupported unanchored graph construction')"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "failed",
+            "failure": "ValueError('Leant reported a command or backend error: synthesis engine error: context-source: unsupported unanchored graph construction')"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "receipt": "C:\\Leant\\dist-newstyle\\context-selected-polytypes-chained-v2\\results.json",
+        "receipt_sha256": "6458dcb01e3d6046e6306160b210d042720dddf80783a0142c00e75f4e916a65",
+        "status": "passed",
+        "sources_unchanged": true,
+        "runtimes_unchanged": true,
+        "cells": [
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_exference_ordinary",
+            "engine": "exference",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_exference_where",
+            "engine": "exference",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_exference_false",
+            "engine": "exference",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_both_ordinary",
+            "engine": "both",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_both_where",
+            "engine": "both",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_polymorphic_first_of_two_selections_both_false",
+            "engine": "both",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_djinn_ordinary",
+            "engine": "djinn",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_djinn_where",
+            "engine": "djinn",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_djinn_false",
+            "engine": "djinn",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_exference_ordinary",
+            "engine": "exference",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_exference_where",
+            "engine": "exference",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_exference_false",
+            "engine": "exference",
+            "mode": "false",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_both_ordinary",
+            "engine": "both",
+            "mode": "ordinary",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_both_where",
+            "engine": "both",
+            "mode": "where",
+            "status": "passed"
+          },
+          {
+            "label": "nominal_universe_boxed_qualified_polymorphic_payload_both_false",
+            "engine": "both",
+            "mode": "false",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "receipt": "C:\\Leant\\dist-newstyle\\context-selected-polytypes-native-v3\\results.json",
+        "receipt_sha256": "540fa4f46d5f65b0044e71b1d09d280212d760843bd00d62310454ce525935cf",
+        "status": "failed",
+        "test_count": 763,
+        "failure": "AssertionError('full native failure')",
+        "sources_and_runtimes_unchanged": true
+      },
+      {
+        "receipt": "C:\\Leant\\dist-newstyle\\context-selected-polytypes-native-v4\\results.json",
+        "receipt_sha256": "39f15cd30663e62d42e3230a49ec26fb305c1e4d960ba9570ad125885d80a556",
+        "status": "passed",
+        "test_count": 763,
+        "sources_and_runtimes_unchanged": true,
+        "fake_solver_path": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\djex-2026.7.17\\x\\djex-fake-z3\\build\\djex-fake-z3\\djex-fake-z3.exe"
+      }
+    ]
+  },
+  "retriage_decision": {
+    "scope": "Planning decision; no new acceptance or release implied",
+    "execution_order": [
+      "Finish existing scoped release gates and publish",
+      "One discriminating selection-across-dictionary-application investigation; repair only if demonstrated",
+      "Exference explicit Haskell kind execution",
+      "Integer at behavior",
+      "Original two-nominal-universe query: causal diagnostic, repair conditional",
+      "Higher-universe classes/providers, unless a demonstrated earlier dependency",
+      "Length/reductions/extrema only with a new causal trace"
+    ],
+    "two_selection_release_dependency": false,
+    "dictionary_boundary_evidence": "Source inspection: TypedContextApplication infers its function without forwarding expected-result hints. Public failure not yet established.",
+    "exference_boundary_evidence": "Checked source kinds are retained and validated, then execution is explicitly rejected with DJEX_EXF_SOURCE_KINDS."
+  }
 }
