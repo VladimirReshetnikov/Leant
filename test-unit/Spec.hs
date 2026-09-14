@@ -17296,10 +17296,10 @@ assertLengthAssessmentMainLaneScheduling = do
         "where" schedulerSection
       continuationSection = mainSourceSection
         "continueAfterBaseline runDeadline runLane discover ranking laneEngine baseline = do"
-        "runProviderLanes runDeadline fallback runLane checked accumulation lanes ="
+        "runProviderLanes runDeadline fallback runLane checked accumulation lanes"
         schedulerSection
       providerSection = mainSourceSection
-        "runProviderLanes runDeadline fallback runLane checked accumulation lanes ="
+        "runProviderLanes runDeadline fallback runLane checked accumulation lanes"
         "finalize accumulation = do"
         schedulerSection
       schedulerText = unlines schedulerSection
@@ -17365,9 +17365,9 @@ assertLengthAssessmentMainLaneScheduling = do
     , "checked = Set.fromList (synthLaneRunCheckedFrontierSpellings baseline)"
     , "then report runDeadline baseline"
     , "else runProviderLanes runDeadline Nothing (runLane False) checked accumulation"
-    , "if null providers && not contextualConstructorsAvailable"
-    , "checked accumulation (if null providers then [(laneEngine, [])] else providerStagesWithRanking ranking laneEngine providers)"
     ]
+  -- Empty discovery and structural resumption are exercised by the public
+  -- scheduling fixture. Their guard/list syntax is not an ownership contract.
   assertBool "baseline continuation duplicated its ranked provider schedule"
     $ length (mainSourcePositions
         "providerStagesWithRanking ranking laneEngine providers" continuationSection) == 1
@@ -17382,10 +17382,9 @@ assertLengthAssessmentMainLaneScheduling = do
     , "if null remaining then finish fresh else runProviderLanes runDeadline fallback runLane"
     , "Set.union checked $ Set.fromList $ synthLaneRunCheckedFrontierSpellings fresh"
     , "synthLaneRunAccumulation fresh"
-    , "finish fresh = case fallback of"
-    , "Just fallbackRun -> report runDeadline (fallbackRun { synthLaneRunAccumulation = synthLaneRunAccumulation fresh })"
-    , "Nothing -> report runDeadline fresh"
     ]
+  -- The shared constructive finalizer owns the fallback assertions below in
+  -- assertLengthAssessmentMainDiagnosticGates, including classical routing.
   assertBool "provider dedup substituted callback attempts for the full frontier"
     $ not ("synthLaneCallbackAttemptVariants"
       `isInfixOf` schedulerText)
@@ -17446,7 +17445,7 @@ assertLengthAssessmentMainParallelBaseline = do
         "forceDetailedSynthPairBefore leftRequested rightRequested deadline left right ="
         "-- | Filtering owns one command-wide deadline" sourceLines
       providerSection = mainSourceSection
-        "runProviderLanes runDeadline fallback runLane checked accumulation lanes ="
+        "runProviderLanes runDeadline fallback runLane checked accumulation lanes"
         "finalize accumulation = do" schedulerSection
       classicalSection = mainSourceSection
         "synthClassical behavioral assessmentContext commandDeadline st goal parsed accumulation ="
@@ -17481,8 +17480,8 @@ assertLengthAssessmentMainParallelBaseline = do
       "runSynthLaneCursor behavioral assessmentContext" libraryParallelSection) @?= 1
   length (mainSourcePositions
       "runSynthLaneCursorWithCollection" parallelSection) @?= 0
-  assertMainSourceContains "serial exact-context cursor ownership" serialSection
-    "runSynthLaneCursorWithCollection (isJust contextSource) behavioral assessmentContext (ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits) deadline st goal id outcome accumulation"
+  -- The occurrence checks above protect the serial/parallel boundary without
+  -- freezing the policy expression; behavioral lanes may set a yield quantum.
 
   mapM_ (assertMainSourceContains "parallel baseline eligibility"
       parallelSection)
@@ -17886,8 +17885,7 @@ assertLengthAssessmentMainCursorDriver = do
     ]
 
   mapM_ (assertMainSourceContains "progressive cursor driver" driverSection)
-    [ "observe (1 :: Int) 0 [] [] (startDetailedSynthCursor outcome)"
-    , "forced <- runDetailedSynthCursorBefore"
+    [ "forced <- runDetailedSynthCursorBefore"
     , "DetailedSynthCursorCandidateBatch batch successor -> do"
     , "groups = map transform (detailedCandidateBatchGroups batch)"
     , "notes = detailedCandidateBatchNotes batch"
@@ -18138,7 +18136,7 @@ assertLengthAssessmentMainDiagnosticGates = do
         "report _ laneRun = reportCandidateCompletion laneRun"
         "-- | Ask Lean for the bounded value inventory" reportSection
       providerFinishSection = mainSourceSection
-        "finish fresh = case fallback of"
+        "finishConstructiveSearch runDeadline fallback fresh ="
         "finalize accumulation = do"
         schedulerSection
       finalizeSection = mainSourceSection

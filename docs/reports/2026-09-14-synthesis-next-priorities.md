@@ -1,38 +1,38 @@
 # Further synthesis improvements: revised priorities
 
-**Close the native integration gate, then finish integer indexing and the original simultaneous two-universe query.** The [provider-kind and polymorphic-field integration gates](2026-09-14-provider-kind-integration.md) exposed two concrete Haskell failures; both are now repaired and independently replayed. The proposed Leant dependency builds strictly, but its fresh native suite passes 764 of 768 tests: four source-text scheduling guards still expect the earlier implementation layout. Native adoption remains open. Dictionary-qualified polymorphic selection is accepted. Provider scheduling and deadline admission have a [validated focused repair](2026-09-14-provider-scheduling.md); they need updated integration coverage, not another speculative scheduler change. They do not close integer indexing.
+**Finish original integer indexing, then the original simultaneous two-universe query.**
+The [native kind-adoption gate](2026-09-14-native-kind-adoption.md) now passes:
+strict build, all 768 native tests and 84 affected public cells. Leant adopts the
+accepted Exference kind/provider/pattern-field repairs and Djinn proof-prefix
+repair together. Dictionary-qualified selection remains accepted. The four stale
+scheduling guards are repaired, and the initial failed run is preserved. These
+integration results do not close integer indexing or the simultaneous query.
 
 This is the current execution plan for the original priorities 1–4. It supersedes the ordering in the [previous delivery plan](2026-09-13-synthesis-delivery-retriage.md). The practical rank-N/impredicative goal remains active. All original acceptance queries and limits remain binding.
 
 ## What the latest evidence changes
 
-### Immediate release prerequisite
+### Native adoption accepted
 
-The adoption attempt used Djex `e237e8667190aff38faaa590ce5b12afbffac452`
-against Leant `b7694335d0e819035873332d96d18e1c573ceb68`. The strict native
-build passed; the full test process terminated with four failures. The
-[retained failed-run evidence](../../test-church/receipts/native-adoption-retriage-2026-09-14.json)
-records the run and its source/runtime hashes. This is a failed gate, even though
-the reported failures concern source-text guards. The committed Leant dependency
-remains `9a2d59d958a60ff3b6899697a60b6985a5cf73a3`.
+Leant's [native adoption](2026-09-14-native-kind-adoption.md) of Djex
+`e237e8667190aff38faaa590ce5b12afbffac452` passes its strict build, all 768 native
+tests, the focused 25-test integration group and all 84 affected public cells.
+The gate also independently compiles the emitted serializer prelude and checks
+source/runtime integrity. It replaces the previously committed dependency
+`9a2d59d958a60ff3b6899697a60b6985a5cf73a3`.
 
-The failures concern provider continuation, serial cursor ownership, progressive
-cursor initialization and structural fallback. The implementation now computes a
-provider lane list, resumes a cursor with retained counts, and routes fallback
-through `finishConstructiveSearch`; the tests expect the previous expressions or
-search the previous source section. Update the affected guards around their
-behavioral obligations: continuation after an unsuccessful lane, one retained
-cursor and allowance, and correct classical/fallback ordering. Avoid replacing
-large old implementation strings with equally brittle new ones. Retain targeted
-structural checks only where they protect an ownership boundary that public
-behavior cannot establish. The existing scheduling public gate disables
-classical search, so it cannot substitute for classical-route coverage.
+The initial run passed 764 tests and failed four source-text guards tied to the
+previous scheduling layout. Its [failed-run evidence](../../test-church/receipts/native-adoption-retriage-2026-09-14.json)
+remains available. The test update removes redundant expression-layout matches
+and points fallback checks at the shared constructive finalizer. Cursor/deadline
+and classical-route checks remain; public scheduling independently checks
+continuation and per-lane allowances. No production-source repair was required.
 
-Then run the corrected native suite and affected public dictionary, contextual,
-nominal-selection and scheduling checks on the actual proposed pin. The prepared
-84-cell public matrix has **not run**; it must first consume a successful fresh
-parent receipt. Preserve this failed run, use fresh output directories, and do not
-count prepared gates as acceptance. Publish the dependency only after that gate.
+The [accepted archive](../../test-church/receipts/native-kind-adoption-2026-09-14.json)
+records the actual completed public matrix: dictionary 18, lexical context 27,
+accepted nominal/polymorphic Djinn cases 24, and scheduling 15. These scoped
+regressions do not include the unresolved original two-universe query and add no
+Church behavior-ledger acceptance.
 
 | Finding | Consequence for the next work |
 | --- | --- |
@@ -52,7 +52,7 @@ The numbers below preserve the original commitments. Supporting repairs can be p
 | Priority | Status and next action | Acceptance required |
 | --- | --- | --- |
 | **1. Dictionary-qualified polymorphic selection** | Accepted; regression maintenance. The [native release](2026-09-14-dictionary-selection-acceptance.md) closes the demonstrated reconstruction and candidate-vocabulary failures. The separate [Djinn proof-prefix repair](2026-09-14-contextual-proof-cutoff-acceptance.md) closes the observed default Haskell timeout. | Retain the original dictionary and transfer examples. Repeat affected checks when integrating the newer dependency; do not restart passing investigations. |
-| **2. Exference explicit Haskell kinds** | The original public corpus and [provider-kind/deconstructor integration follow-up](2026-09-14-provider-kind-integration.md) are accepted in Haskell. Next adopt the tested Djex dependency in Leant, including the accepted Djinn prefix repair. | An explicitly kinded query must retain the caller-supplied higher kind of a vacuous provider binder and its selected argument/certificate. Exercise independently reused providers, capture avoidance and later substitutions. Require independent checking plus affected native regressions on the proposed pin. |
+| **2. Exference explicit Haskell kinds** | The original public corpus and [provider-kind/deconstructor integration follow-up](2026-09-14-provider-kind-integration.md) are accepted in Haskell. The [native adoption](2026-09-14-native-kind-adoption.md) also passes, including the accepted Djinn prefix repair. Retain these gates during later engine changes. | An explicitly kinded query must retain the caller-supplied higher kind of a vacuous provider binder and its selected argument/certificate. Exercise independently reused providers, capture avoidance and later substitutions. Require independent checking plus affected native regressions on the proposed pin. |
 | **3. Original integer `at`** | Provider identity, cooperative scheduling and deadline admission are repaired. Next trace the first missing construction step at the original type: the Church fold needs a function carrier `Int → A`. Separately establish whether the generic primitive is selected and applied. | Source `Int`, supplied default, original binder order and all 168 observations, covering negative, zero, in-range and out-of-range indices. Both Haskell engines and all three native modes must synthesize matching implementations with independent exact replay and real False controls at the original limits. |
 | **4. Two nominal universe selections in one result** | Still open. Diagnose the original simultaneous `GenericBox.{0} Nat` / `GenericBox.{1} (ULift.{1} Nat)` query, with distinguishable payloads 37 and 53. Locate the first lost selection, rejected application, missing product construction or pruning step. | Djinn, Exference and Both; original window 60, verify 12, steps 4,096, queue 1,024, budget off, Djinn depth-first, timeout 20, library/providers/classical off. Require the exact original result, independent replay and actual-False controls. Single, chained and generic-payload comparisons do not close this query. |
 | **5. Lean Djinn `length`** | Next bounded investigation after commitments 2–4. Compare the accepted Exference witness with Djinn's construction rules and pruning. | Find the first absent, rejected or unaffordable step before changing search. Require the original public behavior, exact Lean replay and False control. Earlier unsuccessful direct/wrapped experiments remain failed hypotheses. |
@@ -61,7 +61,7 @@ The numbers below preserve the original commitments. Supporting repairs can be p
 
 ### Next bounded experiments
 
-1. **Finish native integration before another engine change.** Repair the four stale scheduling guards described above, rerun the failed native gate, then run the affected public gates. The candidate dependency `e237e8667190aff38faaa590ce5b12afbffac452` includes the Haskell kind milestone, provider-kind and pattern-field repairs, and accepted Djinn proof-prefix repair. Its strict native build already passes; the full native gate does not. Haskell acceptance is not native acceptance.
+1. **Continue with original indexing.** Native adoption is accepted. Run the original Haskell Exference integer query on the checked executable, then compare its construction and verification evidence with the retained native miss before changing search.
 2. **Preserve the now-passing transport regressions.** The adapter previously discarded validated provider kinds, and pattern matching omitted kind ownership for nested field binders. The follow-up passes single/repeated provider selections with retained certificates, single/multiple constructor patterns, alpha-renamed field queries and eight new exact GHC replays. Its full 1,664-test gate and unchanged 11-case public Exference matrix pass. Broaden transport work only when another discriminating case demonstrates a gap.
 3. **For indexing, inspect construction before increasing search.** Compare a current Haskell Exference original-query run with the final native miss. Trace availability and use of `Int → A` as the fold carrier, then the integer-case step. A changed binder order or smaller predicate may isolate the cause, but cannot replace acceptance of the original signature and observations. Keep the independent primitive-only witness out of the provider inventory.
 4. **Measure verification only with valid equivalent programs.** The failed shared-predicate experiment shows a missing decidability boundary, not a speedup. A corrected comparison must check the exact predicate, candidate and rejection theorem with empty axiom inventories on both sides. If it passes, measure the actual command path before implementing a cache. Preserve the shared deadline and charge setup work.
@@ -72,7 +72,7 @@ Use one heavy build/runtime owner. Scheduling is cooperative at checked candidat
 
 | Idea | Revised disposition and trigger |
 | --- | --- |
-| **Tests of scheduling behavior and ownership** | Promote now: four stale source-layout assertions prevent a clean native adoption gate. Maintain continuation, cursor/deadline accounting and classical/fallback obligations with less dependence on private expression spelling. Keep this repair bounded to the affected guards; defer a wholesale test-framework rewrite. |
+| **Tests of scheduling behavior and ownership** | The four demonstrated stale source-layout guards are repaired and the native/public gates pass. Retain continuation, cursor/deadline accounting and classical/fallback coverage. Broader test-framework work remains deferred until another concrete maintenance failure warrants it. |
 | **Type/kind/evidence transport consistency** | The demonstrated provider and pattern-field losses now have an accepted focused repair. Preserve its alpha-renaming, repeated-use, substitution and independent-checker regressions during native adoption. Promote another transport change only from a discriminating failure. |
 | **Small differential and metamorphic regressions** | Promote on changed paths: rename binders, reuse a provider in sibling branches, or add an irrelevant declaration to a comfortably bounded fixture. Compare acceptance and exact replay, not identical ordering. Defer broad fuzzing. |
 | **Actionable failure diagnostics** | Promote within active investigations. Distinguish unsupported source, bounded search exhaustion, missing selection/evidence, reconstruction failure, behavioral mismatch, verifier timeout and no remaining callback allowance. Inspect the three actual indexing timeouts. Defer a general tracing framework or dashboard. |
@@ -103,4 +103,4 @@ Every new source gate must force the selection being tested. Use ordinary and na
 
 For each implementation, establish the discriminating query, repair the first demonstrated loss, run affected checks, then push a stable milestone to both repositories with current README status. A bounded miss is inconclusive, not proof of non-inhabitation. Stop an unsuccessful hypothesis when its discriminating experiment fails; require new evidence before repeating it with a larger budget.
 
-The later [provider-kind integration gate](2026-09-14-provider-kind-integration.md) has its own final 1,664-test snapshot, eight new exact integration replays and unchanged 11-case public Exference corpus. Its Haskell transport repairs are accepted. The subsequent native attempt passed the strict build and 764 tests, failed four source-text guards, and did not run the prepared public matrix. These results leave native adoption open; they do not revise historical acceptance counts.
+The later [provider-kind integration gate](2026-09-14-provider-kind-integration.md) has its own final 1,664-test snapshot, eight new exact integration replays and unchanged 11-case public Exference corpus. Its Haskell transport repairs are accepted. The initial native attempt failed four source-text guards and remains archived. After their focused repair, native adoption passes all 768 tests and the 84-cell public matrix. These scoped integration results do not revise historical Church acceptance counts.

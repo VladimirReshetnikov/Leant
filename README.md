@@ -45,26 +45,24 @@ binders within the documented supported fragment.
 
 | Capability | Current scope and detailed evidence |
 | --- | --- |
-| Explicit Haskell ground kinds, both engines | The [11-case public corpus](docs/reports/2026-09-14-exference-kinded-source-acceptance.md) passes for Djinn and Exference, including vacuous/shadowed binders, higher-kinded callbacks, aliases and impredicative pairs. The [provider-kind and polymorphic-field follow-up](docs/reports/2026-09-14-provider-kind-integration.md) closes two integration failures; native adoption remains a further gate. |
+| Explicit Haskell ground kinds, both engines | The [11-case public corpus](docs/reports/2026-09-14-exference-kinded-source-acceptance.md) passes for Djinn and Exference, including vacuous/shadowed binders, higher-kinded callbacks, aliases and impredicative pairs. The [provider-kind and polymorphic-field follow-up](docs/reports/2026-09-14-provider-kind-integration.md) closes two integration failures; [native adoption](docs/reports/2026-09-14-native-kind-adoption.md) also passes its separate gates. |
 | Selected polymorphic types and dictionaries in Lean | [Nominal and chained selections](docs/reports/2026-09-14-selected-polymorphic-types-acceptance.md), [dictionary-qualified selection](docs/reports/2026-09-14-dictionary-selection-acceptance.md), [contextual universes](docs/reports/2026-09-14-contextual-universe-acceptance.md) and [strict-implicit binders](docs/reports/2026-09-13-strict-implicit-source-acceptance.md) have scoped acceptance. The original simultaneous two-universe query remains open. |
 | Church composition and product construction | Accepted [nested Church composition](docs/reports/2026-09-13-maybe-either-head-use-acceptance.md), [intrinsic-unit construction](docs/reports/2026-09-14-intrinsic-unit-construction-acceptance.md) and [native sort/product construction](docs/reports/2026-09-13-native-sort-products-acceptance.md) retain exact replay and rejection controls. |
 | Search responsiveness and provider discovery | The [Haskell Djinn proof-prefix repair](docs/reports/2026-09-14-contextual-proof-cutoff-acceptance.md) resolves the observed default timeout. Lean [qualified provider identity](docs/reports/2026-09-14-session-provider-identity.md) and [cooperative scheduling](docs/reports/2026-09-14-provider-scheduling.md) preserve session names, structural continuation and existing limits. |
 
-The native scheduling release passed a strict executable build and 18 public
-cells: 11 exact Lean replays and seven actual-False controls. A subsequent
-dependency-adoption run passed its strict build and 764 of 768 native tests;
-four source-text scheduling guards still expect the previous implementation
-layout. The [current integration gate](docs/reports/2026-09-14-synthesis-next-priorities.md#immediate-release-prerequisite)
-remains open, and its prepared public matrix has not run. Earlier reports
-retain their own source/runtime snapshots and validation counts.
+The [native dependency adoption](docs/reports/2026-09-14-native-kind-adoption.md)
+passes a strict build, all 768 native tests and 84 affected public cells covering
+dictionary-qualified selection, lexical contexts, accepted nominal/polymorphic
+selections and scheduling. The serializer prelude compiles independently in Lean.
+The initial failed run and its four repaired source-text guards remain documented;
+earlier reports retain their own source/runtime snapshots and validation counts.
 
 The [current priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-are closing the native integration gate, original integer
-`at`, then simultaneous two-universe composition. Leant currently pins Djex
-`9a2d59d9`; the later Haskell kind and proof-prefix milestones await native
-integration. Provider admission is repaired, but the original integer query
-still has no accepted implementation. Lean Djinn `length`, broader class/provider
-universes, reductions and extrema remain further work.
+are original integer `at`, then simultaneous two-universe composition. Leant pins
+Djex `e237e866`, including the accepted kind integration and proof-prefix repairs.
+Provider admission is repaired, but the original integer query still has no
+accepted implementation. Lean Djinn `length`, broader class/provider universes,
+reductions and extrema remain further work.
 
 The [Church behavior ledger](test-church/behavior-ledger.md) records 94 historical
 acceptances, 23 attempted cells without indexed acceptance and 43 without indexed
