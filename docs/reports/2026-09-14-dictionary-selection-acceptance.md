@@ -2,7 +2,7 @@
 
 Leant now preserves source evidence when a polymorphic type selection is followed by a dictionary application. Together with Djex's [scoped quantified-choice repair](2026-09-14-contextual-polytype-acceptance.md), this lets a qualified local consumer accept a supplied polymorphic payload, including one inside a nominal wrapper, through Djinn, Exference and Both.
 
-This milestone integrates Djex `9a2d59d958a60ff3b6899697a60b6985a5cf73a3`. The default unbounded Haskell timeout, Exference explicit Haskell kinds, integer indexing and the original simultaneous two-universe construction query remain separate obligations.
+This milestone integrates Djex `9a2d59d958a60ff3b6899697a60b6985a5cf73a3`. Exference explicit Haskell kinds, integer indexing and the original simultaneous two-universe construction query remain separate obligations. The subsequent [Haskell proof-prefix repair](2026-09-14-contextual-proof-cutoff-acceptance.md) resolves the observed default timeout; it is a separate backend milestone, not part of this native dependency snapshot.
 
 ## Failure and repair
 

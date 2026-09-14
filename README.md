@@ -120,7 +120,8 @@ The [qualified-consumer repair](docs/reports/2026-09-14-contextual-polytype-acce
 adds scoped quantified choices to Djinn's contextual specialization. It passes
 147 Djinn tests and both Haskell engines' direct/wrapped public examples, with
 eight exact GHC replays and four actual-False controls. Djinn's public acceptance
-uses 4,096 choices; the retained default unbounded-search timeout remains open.
+uses 4,096 choices; the subsequent prefix-checking repair below also validates
+the default unbounded-query setting.
 The [native dictionary-selection release](docs/reports/2026-09-14-dictionary-selection-acceptance.md)
 preserves source evidence across dictionary application and integrates Djex
 `9a2d59d9`. Its strict build, emitted Lean serializer, 98 focused tests and all
@@ -128,13 +129,18 @@ preserves source evidence across dictionary application and integrates Djex
 replays, 17 actual-False controls and six explicit class-universe refusals.
 The report records the corrected lexical harness, retained failed attempt and
 complete source/runtime/replay archive.
+The [contextual proof-prefix repair](docs/reports/2026-09-14-contextual-proof-cutoff-acceptance.md)
+now resolves the observed default Haskell Djinn timeout: contextual batch search
+checks the requested raw proof prefix before conversion. All 148 Djinn and 187
+adapter integration tests pass, along with eight exact GHC replays and six
+rejection controls across default and finite-budget public runs. Search defaults
+and limits are unchanged; Leant retains its separately accepted native pin above.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-move dictionary selection out of feature implementation. Next are Exference's
-explicit Haskell kinds, integer `at`, and the original query combining two
-nominal universe selections. The default Djinn timeout gets a bounded diagnosis;
-broader class/provider universes and further length, reduction and extrema
-changes require their own discriminating evidence. This scoped release does
-not establish arbitrary synthesis completeness.
+move dictionary selection and this timeout repair out of feature implementation.
+Next are Exference's explicit Haskell kinds, integer `at`, and the original query
+combining two nominal universe selections. Broader class/provider universes and
+further length, reduction and extrema changes require their own discriminating
+evidence. These scoped releases do not establish arbitrary synthesis completeness.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC
