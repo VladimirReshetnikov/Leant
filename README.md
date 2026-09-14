@@ -137,10 +137,13 @@ rejection controls across default and finite-budget public runs. Search defaults
 and limits are unchanged; Leant retains its separately accepted native pin above.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
 move dictionary selection and this timeout repair out of feature implementation.
-Next are Exference's explicit Haskell kinds, integer `at`, and the original query
-combining two nominal universe selections. Broader class/provider universes and
-further length, reduction and extrema changes require their own discriminating
-evidence. These scoped releases do not establish arbitrary synthesis completeness.
+Next are a checked public Exference kind-support increment, integer `at`, and the
+original query combining two nominal universe selections. Exference's pending
+forall-opening evidence is a tested internal prerequisite; its public kind guard
+remains. A focused Lean Djinn `length` diagnosis now precedes broader class/provider
+universe work and reductions/extrema. The plan gives each item an acceptance gate
+and keeps native dependency adoption separate from Haskell root acceptance.
+These scoped releases do not establish arbitrary synthesis completeness.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC
