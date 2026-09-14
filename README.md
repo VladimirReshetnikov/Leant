@@ -65,23 +65,31 @@ cells without indexed evidence, out of 160. These are historical receipt counts,
 not a current-revision pass rate or a completeness theorem. Missing indexed
 evidence does not establish that a case was never attempted.
 
+The [Djinn public ground-kind milestone](docs/reports/2026-09-13-djinn-kinded-source-acceptance.md)
+preserves explicit kinds through rank-N source checking and generated Haskell,
+including vacuous and shadowed binders, polymorphic aliases, constrained callbacks
+and impredicative pairs. On the final Djex root snapshot, all 11 one-shot outputs
+and 10 named-`where` outputs compile and execute at their original signatures;
+all 11 actual-False controls pass. All 1,138 tests in six completed suites pass;
+full CLI validation remains open after its 30-minute controller guard.
+The adjacent-input behavioral case remains open: it requires `(7,9)` but the
+four observed candidates all fail the predicate. Exference kinded execution is
+still guarded. Leant's dependency pin and native acceptance are unchanged.
+
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes releasing the Djinn kinded-source slice, completing Exference, and
-then independent Lean universe support before further extrema experiments.
-The unpublished Djinn prototype now synthesizes the original higher-kinded
-identity and nested callback through both one-shot and named-`where` queries.
-All four emitted implementations pass independent GHC replay at their full
-signatures, with eight true observations and two passing actual-False controls.
-Public vacuous, shadowed and alias-expanded kinds, plus regressions on the final
-integrated source, remain release gates. Exference still has an execution guard;
-the published implementation still refuses these kinded queries at conversion.
+prioritizes Exference's own kind-checking path and an independent Lean universe
+milestone. The reproduced loss of mixed-product alternatives now justifies one
+bounded construction repair before general search changes. Extrema, integer indexing, Lean Djinn length, contextual
+evidence and supplied-fold trees remain required; unsuccessful reduction
+variants remain paused.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC
 rendering fixtures plus rejection checks. The [checked source-kind transport
 prerequisite](docs/reports/2026-09-13-source-kind-transport-prerequisite.md)
-preserves annotations through conversion and synonym expansion. These published
-prerequisites and the local execution prototype have separate validation records.
+preserves annotations through conversion and synonym expansion. The new Djinn
+execution checkpoint has its own root validation and public replay records
+beyond those prerequisites.
 All ten representative extrema probes miss at their original bounds; the carrier
 experiment also reaches its search budget without a match. Further extrema work
 requires a bounded construction trace. Integer indexing, Lean Djinn length,
