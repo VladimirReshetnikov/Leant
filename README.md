@@ -138,9 +138,12 @@ and limits are unchanged; Leant retains its separately accepted native pin above
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
 move dictionary selection and this timeout repair out of feature implementation.
 Next are a checked public Exference kind-support increment, integer `at`, and the
-original query combining two nominal universe selections. Exference's pending
-forall-opening evidence is a tested internal prerequisite; its public kind guard
-remains. A focused Lean Djinn `length` diagnosis now precedes broader class/provider
+original query combining two nominal universe selections. The new
+[Exference lexical-kind checker prerequisite](docs/reports/2026-09-14-exference-kind-scope-prerequisite.md)
+preserves kind ownership through forall opening and substitution and rejects
+wrong-kind expressions in independent checking. Its strict build, 120 private
+engine tests and all 515 ordinary Exference tests pass. Public kinded search
+remains guarded. A focused Lean Djinn `length` diagnosis now precedes broader class/provider
 universe work and reductions/extrema. The plan gives each item an acceptance gate
 and keeps native dependency adoption separate from Haskell root acceptance.
 These scoped releases do not establish arbitrary synthesis completeness.

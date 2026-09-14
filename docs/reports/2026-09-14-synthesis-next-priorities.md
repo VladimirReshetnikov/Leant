@@ -27,7 +27,7 @@ Earlier [nominal/polymorphic acceptance](2026-09-14-selected-polymorphic-types-a
 
 The original priorities 1–4 remain the delivery commitments. Their next actions change as evidence arrives.
 
-The current uncommitted Exference prerequisite retains each opened forall layer and its exact source-slot-to-fresh-variable bindings, including vacuous binders and constraint-only layers. Its recorded strict private-engine build and 102 tests pass; the two implementation/test file hashes still match that receipt at this review. This is allocation evidence only. The public adapter still returns `DJEX_EXF_SOURCE_KINDS`, and neither search nor independent expression checking yet consumes a checked kind scope. Do not count this prerequisite as public kind support or put it into Leant's dependency pin before integration acceptance.
+The [Exference lexical-kind checker prerequisite](2026-09-14-exference-kind-scope-prerequisite.md) now retains exact forall-opening evidence, transports checked kinds through fresh identities and capture-avoiding substitutions, and connects that scope to an independent expression-checker entrance. Its final strict build, 120 private engine tests and all 515 ordinary Exference tests pass. The checker rejects wrong-kind expressions accepted by its kind-erased counterpart, including nested vacuous kinds during shallow subsumption. Public search, global-provider freshening and emitted-candidate kind evidence still require integration; the adapter continues to return `DJEX_EXF_SOURCE_KINDS`. This is not public kinded-synthesis acceptance, and Leant's native dependency pin remains unchanged.
 
 | Order | Improvement and practical value | Next action and completion criterion |
 | --- | --- | --- |
