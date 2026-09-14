@@ -116,12 +116,16 @@ It passes 95 focused checks, all 763 native tests, 72 distinct public checks acr
 Djinn, Exference and Both, and all 105 existing contextual regression checks.
 One environment-preparation timeout passed a focused retry at unchanged source,
 runtime identities and limits; the original failed attempt remains in the archive.
+The [qualified-consumer repair](docs/reports/2026-09-14-contextual-polytype-acceptance.md)
+adds scoped quantified choices to Djinn's contextual specialization. It passes
+147 Djinn tests and both Haskell engines' direct/wrapped public examples, with
+eight exact GHC replays and four actual-False controls. Djinn's public acceptance
+uses 4,096 choices; the retained default unbounded-search timeout remains open.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-first finish dictionary selection: a local Leant repair passes 98 focused and
-766 native tests plus the Exference and Both public examples. That follow-up is
-not yet released; Djinn still fails the new example, and its contextual type
-choices omit a needed supplied forall. The proposed core repair still needs
-isolated validation. Exference's explicit Haskell kinds and integer indexing
+first integrate this core revision with the local Leant dictionary repair,
+which separately passes 98 focused and 766 native tests plus Exference/Both
+public examples on its previous Djex pin. Native acceptance of the new combined
+revision is pending. Exference's explicit Haskell kinds and integer indexing
 follow. The original query using two distinct
 nominal universe selections remains unresolved and requires a causal search trace.
 Broader class/provider universes follow unless a concrete dependency promotes a

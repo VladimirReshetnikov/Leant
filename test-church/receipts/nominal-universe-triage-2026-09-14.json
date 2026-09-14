@@ -982,5 +982,18 @@
       "djinn": "3 public cells failed"
     },
     "direct_djinn_baseline": "not executed: new test failed strict compilation on name shadowing"
+  },
+  "bounded_djex_contextual_followup": {
+    "report": "2026-09-14-contextual-polytype-acceptance.md",
+    "manifest": "contextual-polytype-acceptance-2026-09-14.json",
+    "status": "backend acceptance; native integration pending",
+    "direct_regression": "corrected baseline failed; repair passes eight variants",
+    "djinn_unit_tests": 147,
+    "haskell_exact_replays": 8,
+    "actual_false_controls": 4,
+    "invalid_kind_controls": 2,
+    "djinn_choice_budget": 4096,
+    "default_unbounded_timeout": "retained and unresolved",
+    "next": "Integrate the tested Djex revision with the local Leant reconstruction repair and run combined-source acceptance."
   }
 }
