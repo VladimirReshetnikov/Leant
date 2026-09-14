@@ -285,6 +285,8 @@ contextSourceFragment = convert . contextSourceType
     ContextArrow domain result -> FArr (convert domain) (convert result)
     ContextForall visibility variable body ->
       FAll (visibility == ContextExplicit) variable $ convert body
+    ContextForallAt visibility variable _ body ->
+      FAll (visibility == ContextExplicit) variable $ convert body
     ContextGiven parts _ arguments body -> FExactContext (contextSourceName parts)
       [ExactContextFragmentArgument 0 (convert argument) | argument <- arguments] $ convert body
 
@@ -1565,13 +1567,17 @@ contextSourcePrelude =
   , "        let some result ← contextSourceType? fuel depth scope body | return none"
   , "        pure (some (\"(given \" ++ name ++ \" \" ++ toString arity"
   , "          ++ \" (args\" ++ argumentsText ++ \") \" ++ result ++ \")\"))"
-  , "      else if contextTypeZero domain then do"
+  , "      else if domain.isSort then do"
+  , "        let .sort level := domain | return none"
+  , "        let some domainText := sortLevel? 128 level | return none"
   , "        let some visibility := contextVisibility? bi | return none"
   , "        let identity := \"contextType\" ++ toString depth"
   , "        withLocalDeclD (Name.mkSimple identity) domain fun localValue => do"
   , "          let some result ← contextSourceType? fuel (depth + 1)"
   , "            ((localValue.fvarId!, identity) :: scope) (body.instantiate1 localValue) | return none"
-  , "          pure (some (\"(all \" ++ visibility ++ \" \" ++ esc identity ++ \" \" ++ result ++ \")\"))"
+  , "          let sourceHead := if contextTypeZero domain then \"(all \" else \"(all-at \""
+  , "          let domainSuffix := if contextTypeZero domain then \"\" else domainText ++ \" \""
+  , "          pure (some (sourceHead ++ visibility ++ \" \" ++ esc identity ++ \" \" ++ domainSuffix ++ result ++ \")\"))"
   , "      else if bi.isExplicit && !body.hasLooseBVars then do"
   , "        let some parameter ← contextSourceType? fuel depth scope domain | return none"
   , "        let some result ← contextSourceType? fuel depth scope body | return none"
@@ -2006,13 +2012,14 @@ parseContextSourceType fuel _ | fuel <= 0 = Left "context-source: source nesting
 parseContextSourceType fuel (TL : TSym tag : rest) = case (tag, rest) of
   ("var", TStr variable : TR : remaining) -> Right (ContextVariable variable, remaining)
   ("all", TSym visibility : TStr variable : body) -> do
-    visible <- case visibility of
-      "explicit" -> Right ContextExplicit
-      "implicit" -> Right ContextImplicit
-      "strict-implicit" -> Right ContextStrictImplicit
-      _ -> Left "context-source: unsupported type-binder visibility or domain"
+    visible <- binderVisibility visibility
     (result, remaining) <- descend body
     finish (ContextForall visible variable result) remaining
+  ("all-at", TSym visibility : TStr variable : body) -> do
+    visible <- binderVisibility visibility
+    (level, afterLevel) <- parseSortLevel 128 body
+    (result, remaining) <- descend afterLevel
+    finish (ContextForallAt visible variable level result) remaining
   ("arrow", body) -> do
     (domain, afterDomain) <- descend body
     (result, remaining) <- descend afterDomain
@@ -2023,6 +2030,11 @@ parseContextSourceType fuel (TL : TSym tag : rest) = case (tag, rest) of
   _ -> Left "context-source: unsupported source type form"
  where
   descend = parseContextSourceType (fuel - 1)
+  binderVisibility visibility = case visibility of
+    "explicit" -> Right ContextExplicit
+    "implicit" -> Right ContextImplicit
+    "strict-implicit" -> Right ContextStrictImplicit
+    _ -> Left "context-source: unsupported type-binder visibility or domain"
   finish value (TR : remaining) = Right (value, remaining)
   finish _ _ = Left "context-source: missing source-type delimiter"
   named given exactLevels body = do

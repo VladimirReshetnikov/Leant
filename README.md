@@ -85,7 +85,7 @@ retains exact sort levels and supplies canonical type witnesses, including sorts
 needed only by providers. It also repairs eta-reduced premise reconstruction.
 All **726 native tests** pass, together with **90 public checks: 63 exact Lean
 kernel replays and 27 False controls**. Leant now pins the tested Djex product
-implementation. Contextual universe transport remains the next source milestone.
+implementation. Exact contextual binder universes are covered by the subsequent release below.
 
 The [public Lean universe baseline](docs/reports/2026-09-13-public-universe-baseline.md)
 passes all 24 cells for identity and nested callbacks at `Type 1` and named
@@ -102,12 +102,15 @@ built-in unit constructor is already present. All **13 extended Haskell operatio
 replay and False controls for the public unit cases. This closes the prototype's
 `maybeEither` regression at the original 256-candidate limit.
 
+The [contextual binder-universe release](docs/reports/2026-09-14-contextual-universe-acceptance.md)
+preserves exact `Type` binder domains, named universes, shadowing and selected
+callback universes through contextual synthesis. All **63 public universe cases,
+746 native tests, and 42 constructor/strict-binder regression cases pass**, with
+exact Lean replay and False controls. Leant integrates the tested source and pins
+Djex `66b3212b`. Higher-universe classes/providers and selected polymorphic types
+remain separate capabilities.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-put final native contextual integration first: the final source now passes all
-63 public universe cells and all 746 native tests; affected constructor and
-strict-binder regressions remain the publication gate. The published Leant pin
-stays at its accepted native revision until that gate closes.
-Next comes one bounded Lean Djinn `length` diagnostic, followed by contextual
+now start with one bounded Lean Djinn `length` diagnostic, followed by contextual
 polymorphic type selection and staged class/provider universe support. Explicit
 Haskell kinds in Exference and integer indexing remain independent obligations.
 Extrema implementation requires a causal witness trace; failed reduction variants

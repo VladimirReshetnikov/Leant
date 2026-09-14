@@ -20,11 +20,13 @@ from run_corpus import reported_axioms
 CANDIDATES = [
     "contextChooseFirst", "contextChooseSecond", "contextChooseOuter",
     "contextRankN", "contextNested", "contextProvider", "contextAlias",
+    "contextUnit", "contextPair", "contextTriple",
 ]
 OBSERVATIONS = [
     "contextFirstPayload", "contextSecondPayload", "contextOuterPayload",
     "contextRankNPayload", "contextNestedPayload", "contextProviderPayload",
     "contextAliasPayload", "contextFirstWrong", "contextSecondWrong",
+    "contextUnitPayload", "contextPairPayload", "contextTriplePayload",
 ]
 
 
@@ -58,8 +60,8 @@ def main():
     digest = runtime.sha256(executable)
     report = dict(status="running", scope="isolated checked-graph renderer; no live synthesis routing",
                   source_hashes_before=before, executable=str(executable), executable_sha256=digest,
-                  expected_unit_count=21, expected_candidate_count=7,
-                  expected_payload_observations=7, expected_wrong_result_controls=2)
+                  expected_unit_count=22, expected_candidate_count=10,
+                  expected_payload_observations=10, expected_wrong_result_controls=2)
     # Retain exact input bytes, including uncommitted source, for review.
     for path in sources:
         saved = output / "source" / path.relative_to(ROOT)
@@ -74,9 +76,9 @@ def main():
             "/direct Lean lexical context rendering/"], cwd=ROOT, env=environment)
         summaries = re.findall(r"^All (\d+) tests passed \(([0-9.]+)s\)\s*$",
                                unit.stdout + "\n" + unit.stderr, re.MULTILINE)
-        if unit.returncode or len(summaries) != 1 or summaries[0][0] != "21":
-            raise ValueError("the complete 21-test renderer group did not pass")
-        report.update(unit_count=21, unit_seconds=float(summaries[0][1]))
+        if unit.returncode or len(summaries) != 1 or summaries[0][0] != "22":
+            raise ValueError("the complete 22-test renderer group did not pass")
+        report.update(unit_count=22, unit_seconds=float(summaries[0][1]))
         emitted = processes.run("emit-lean", [executable, "--emit-context-replay"],
                                 cwd=ROOT, env=environment)
         if emitted.returncode or not emitted.stdout.startswith("set_option autoImplicit false"):
@@ -94,7 +96,7 @@ def main():
                                        for name, value in inventories.items()}
         if replay.returncode or any(value != set() for value in inventories.values()):
             raise ValueError("independent Lean replay failed or lacked an empty axiom inventory")
-        report.update(status="passed", candidate_count=7, payload_observations=7,
+        report.update(status="passed", candidate_count=10, payload_observations=10,
                       wrong_result_controls=2, axiom_inventory_count=len(inventories))
     except BaseException as failure:
         report.update(status="failed", failure=type(failure).__name__ + ": " + str(failure))

@@ -19,7 +19,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Language.Haskell.Synthesis.Collection (observedListLength)
 import Language.Haskell.Synthesis.Constraint (Constraint (..))
-import Language.Haskell.Synthesis.Name (Boxity, Name)
+import Language.Haskell.Synthesis.Name (Boxity (..), Name)
 import qualified Language.Haskell.Synthesis.Type as T
 import qualified Language.Haskell.Synthesis.TypeAtom as A
 import qualified Language.Haskell.Synthesis.TypedGenerated as Q
@@ -242,6 +242,14 @@ renderLeanContextGraph environment graph = do
         checked $ requireProjection key residual result
         bodyText <- render scope nested givens body
         pure $ "(fun " ++ unwords parameters ++ " => " ++ bodyText ++ ")"
+      Q.TypedTuple elements -> case metadata of
+        LeanTuple Boxed fields | length fields == length elements && length fields /= 1 -> do
+          checked $ sequence_ [projection element >>= requireProjection key field
+                              | (element, field) <- zip elements fields]
+          values <- traverse (render scope locals givens) elements
+          pure $ if null values then "@_root_.Unit.unit"
+            else "⟨" ++ intercalate ", " values ++ "⟩"
+        _ -> checked $ Left $ ContextWitnessMetadataMismatch key
       Q.TypedLet pattern value body -> case Q.typedPatternNode pattern of
         Q.TypedBind variable -> do
           valueType <- checked $ projection value
@@ -318,7 +326,6 @@ renderLeanContextGraph environment graph = do
             arguments <- checked $ mapM (chosenGiven givens) $ zip constraints evidence
             applyHead scope locals givens key function functionType arguments
           _ -> checked $ Left $ ContextWitnessMetadataMismatch key
-      Q.TypedTuple{} -> checked $ Left $ UnsupportedContextNode key
       Q.TypedCase{} -> checked $ Left $ UnsupportedContextNode key
       Q.TypedHole{} -> checked $ Left $ UnsupportedContextNode key
     checked $ boundedText rendered
@@ -551,6 +558,10 @@ typeText environment = go (0 :: Int)
       left <- proper depth scope domain
       right <- proper depth scope result
       pure (parens $ left ++ " → " ++ right, 0)
+    LeanTuple Boxed [] -> pure ("@_root_.Unit", 0)
+    LeanTuple Boxed fields@(_ : _ : _) -> do
+      values <- traverse (proper depth scope) fields
+      pure (foldr1 (\a b -> "(_root_.Prod " ++ parens a ++ " " ++ parens b ++ ")") values, 0)
     LeanTuple{} -> Left UnsupportedBinderDomain
     LeanForall binders constraints body -> do
       let occupied = Set.fromList $ map fst $ Map.elems scope

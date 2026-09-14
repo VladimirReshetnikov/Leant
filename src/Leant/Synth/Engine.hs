@@ -132,11 +132,12 @@ module Leant.Synth.Engine
   , leanNonStrictConstructorArities
   ) where
 
-import Control.Monad (unless, when, void)
+import Control.Monad (unless, when)
 import Leant.Synth.ContextRender (LeanLevel (..), renderLeanSortValue)
 import Data.Foldable (toList)
 import Data.List (intercalate, isPrefixOf, nub, nubBy, sortOn)
 import Data.Bifunctor (first, second)
+import Data.Either (lefts, rights)
 import Data.Maybe (catMaybes, isJust, isNothing, mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -291,6 +292,8 @@ import Leant.Synth.ContextSource
   ( ContextSource, PreparedContextSource, prepareContextSource, prepareContextSourceProviders
   , contextSourceName, contextSourceConstructors
   , renderPreparedContextGraph
+  , ContextCandidateRejection, ContextProjectionFailure (..)
+  , renderContextCandidateRejection, checkPreparedContextGraph
   )
 import Leant.Synth.Render
   ( CtorInfo (..)
@@ -820,6 +823,19 @@ renderOriginTermGraph localName origin graph = case semanticOriginContextSource 
   contextNode TypedContextApplication{} = True
   contextNode _ = False
 
+-- Only typed candidate-admissibility failures can continue past this boundary.
+-- Missing source ownership and graph/projection corruption remain fatal.
+checkOriginContextGraph
+  :: (Ord variable, Ord local)
+  => PreparedSemanticOrigin -> TermGraph (Type variable) local
+  -> Either String (Either ContextCandidateRejection ())
+checkOriginContextGraph origin graph = case semanticOriginContextSource origin of
+  Nothing -> Left "context-source: checked lexical-Given graph has no exact source metadata"
+  Just source -> case checkPreparedContextGraph source graph of
+    Left (ContextProjectionIntegrityFailure failure) -> Left failure
+    Left (ContextProjectionCandidateRejected reason) -> Right $ Left reason
+    Right _ -> Right $ Right ()
+
 indexDetailedCandidateVariants :: [String] -> [DetailedCandidateVariant]
 indexDetailedCandidateVariants = zipWith
   (\ordinal text -> DetailedCandidateVariant ordinal text Nothing)
@@ -922,42 +938,52 @@ streamDetailedQueryResultsWithEvidence window render finish =
     in StreamObserved group observedNotes $
       candidates (remaining - 1) seen' observedNotes rest progress evidence results
 
--- The exact contextual lane must report a missing graph or unsupported
--- metadata projection at its observed position. Its raw window is charged
--- before duplicate filtering, and no unobserved continuation is preflighted.
+-- Missing graphs or corrupt metadata fail at their observed position. A
+-- selected type outside the exact source domain consumes its raw slot and
+-- permits later candidates; it never supplies negative evidence. No unobserved
+-- continuation is preflighted, and duplicates also retain their raw charge.
 streamContextualQueryResults
   :: Int
-  -> (candidate -> Either String DetailedCandidateGroup)
+  -> (candidate -> Either String (Either ContextCandidateRejection DetailedCandidateGroup))
   -> (QueryEvidence -> [String] -> DetailedSynthOutcome)
   -> [Either String (QueryResult metadata candidate)]
   -> DetailedSynthOutcome
 streamContextualQueryResults window render finish =
-  DetailedSynthStreaming . batches (max 0 window) Set.empty []
+  DetailedSynthStreaming . batches (max 0 window) Set.empty Set.empty []
  where
   capped notes = nub $ notes ++
     ["search truncated: candidate limit reached (" ++ show window ++ ")"]
-  batches 0 _ notes _ = StreamFinished $ capped notes
-  batches _ _ notes [] = StreamFinished notes
-  batches _ _ _ (Left failure : _) = StreamFailed failure
-  batches remaining seen _ (Right result : rest) =
+  batches 0 _ _ notes _ = StreamFinished $ capped notes
+  batches _ _ _ notes [] = StreamFinished notes
+  batches _ _ _ _ (Left failure : _) = StreamFailed failure
+  batches remaining seen rejected _ (Right result : rest) =
     let batch = resultSearch result
         progress = batchProgress batch
-        notes = progressNotesWith window progress
-    in candidates remaining seen notes (batchCandidates batch) progress
+        notes = progressNotesWith window progress ++ map contextRejectionNote (Set.toList rejected)
+    in candidates remaining seen rejected notes (batchCandidates batch) progress
       (resultEvidence result) rest
-  candidates 0 _ notes _ _ _ _ = StreamFinished $ capped notes
-  candidates remaining seen notes [] progress evidence results = case progress of
-    Continuing -> batches remaining seen notes results
-    Completed _ -> outcomeStream $ finish evidence notes
-  candidates remaining seen notes (candidate : rest) progress evidence results =
+  candidates 0 _ _ notes _ _ _ _ = StreamFinished $ capped notes
+  candidates remaining seen rejected notes [] progress evidence results = case progress of
+    Continuing -> batches remaining seen rejected notes results
+    Completed _ -> outcomeStream $ if Set.null rejected then finish evidence notes
+      else DetailedSynthNoTerm notes
+  candidates remaining seen rejected notes (candidate : rest) progress evidence results =
     case render candidate of
       Left failure -> StreamFailed failure
-      Right rendered ->
+      Right (Left reason) ->
+        let observedNotes = nub $ notes ++ [contextRejectionNote reason]
+            chargedNotes = if remaining == 1 then capped observedNotes else observedNotes
+        in StreamObserved Nothing chargedNotes $
+          candidates (remaining - 1) seen (Set.insert reason rejected) chargedNotes rest progress evidence results
+      Right (Right rendered) ->
         let key = detailedCandidateGroupVariants rendered
             group = if Set.member key seen then Nothing else Just rendered
             observedNotes = if remaining == 1 then capped notes else notes
         in StreamObserved group observedNotes $
-          candidates (remaining - 1) (Set.insert key seen) observedNotes rest progress evidence results
+          candidates (remaining - 1) (Set.insert key seen) rejected observedNotes rest progress evidence results
+
+contextRejectionNote :: ContextCandidateRejection -> String
+contextRejectionNote reason = "candidate rejected: " ++ renderContextCandidateRejection reason
 
 outcomeStream :: DetailedSynthOutcome -> DetailedCandidateStream
 outcomeStream outcome = case outcome of
@@ -1923,9 +1949,10 @@ djinnRun streaming limits laneBounds@(cutoff, budget) prepared = do
       checkedContextCandidate candidate = do
         graph <- either (Left . ("context-source: missing Djinn graph: " ++) . show) Right $
           typedCandidateTermGraph candidate
-        _ <- renderOriginTermGraph id origin graph
-        maybe (Left "context-source: checked Djinn projection lost its source group") (Right . snd) $
-          renderCandidate candidate
+        admissible <- checkOriginContextGraph origin graph
+        traverse (\() ->
+          maybe (Left "context-source: checked Djinn projection lost its source group") (Right . snd) $
+            renderCandidate candidate) admissible
   if streaming
     then do
       results <- viaDiagnostic
@@ -1940,10 +1967,12 @@ djinnRun streaming limits laneBounds@(cutoff, budget) prepared = do
       result <- viaDiagnostic
         (runDjinnTypedQueryWithKindedInstantiationAssignments
           session instantiations request)
-      when (semanticOriginContextSource origin /= Nothing) $
-        mapM_ (void . checkedContextCandidate) $ take cutoff $ batchCandidates $ resultSearch result
+      checkedContexts <- if semanticOriginContextSource origin /= Nothing
+        then traverse checkedContextCandidate $ take cutoff $ batchCandidates $ resultSearch result
+        else pure []
       let batch = resultSearch result
-          notes = progressNotesWith window (batchProgress batch)
+          rejected = lefts checkedContexts
+          notes = nub $ progressNotesWith window (batchProgress batch) ++ map contextRejectionNote rejected
           rendered = mapMaybe renderCandidate $ take cutoff $ batchCandidates batch
           -- Ordinary synthesis retains its historical size tie-break. Named
           -- queries instead check the next encountered candidate immediately;
@@ -1953,7 +1982,8 @@ djinnRun streaming limits laneBounds@(cutoff, budget) prepared = do
             StructuralCandidateRanking _ -> rendered
       pure $ case resultEvidence result of
         ValidatedCandidates -> DetailedSynthCandidates terms notes
-        evidence -> terminal evidence notes
+        evidence | null rejected -> terminal evidence notes
+                 | otherwise -> DetailedSynthNoTerm notes
 
 -- | The ranked heuristic search: the same shared environment and goal,
 -- converted to Exference's integer variable domain.  Candidates keep
@@ -2105,20 +2135,22 @@ exferenceRun streaming behavioral limits multiConstructorPatterns steps prepared
             checkedContextGroup candidate = do
               graph <- either (Left . ("context-source: missing Exference graph: " ++) . show) Right $
                 typedCandidateTermGraph candidate
-              _ <- renderGraph graph
-              maybe (Left "context-source: checked Exference projection lost its source group") Right $
-                renderGroup candidate
+              admissible <- checkOriginContextGraph semanticOrigin graph
+              traverse (\() ->
+                maybe (Left "context-source: checked Exference projection lost its source group") Right $
+                  renderGroup candidate) admissible
         case semanticOriginContextSource semanticOrigin of
           Just _ | streaming -> pure $ normalizeStreamingOutcome $
             streamContextualQueryResults (synthLimitWindow limits) checkedContextGroup
               (\_ -> DetailedSynthNoTerm) (map Right results)
           Just _ -> do
-            exactGroups <- traverse checkedContextGroup $
+            exactResults <- traverse checkedContextGroup $
               take (synthLimitWindow limits) $ selectionCandidates selection
             let distinct = takeDistinctOn detailedCandidateGroupVariants
-                  (synthLimitWindow limits) exactGroups
-            pure $ if null distinct then DetailedSynthNoTerm notes
-              else DetailedSynthCandidates distinct notes
+                  (synthLimitWindow limits) $ rights exactResults
+                exactNotes = nub $ notes ++ map contextRejectionNote (lefts exactResults)
+            pure $ if null distinct then DetailedSynthNoTerm exactNotes
+              else DetailedSynthCandidates distinct exactNotes
           Nothing -> pure $ if streaming
             then normalizeStreamingOutcome $ streamDetailedQueryResults
               (synthLimitWindow limits) renderGroup results

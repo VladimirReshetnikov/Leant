@@ -43,20 +43,21 @@ SPECIFICATIONS = [
 ]
 
 
-def main():
+def main(specifications=None, *, scope=None, label_prefix='product', additional_sources=()):
+    specifications = SPECIFICATIONS if specifications is None else specifications
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--leant', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--case', choices=[s['label'] for s in SPECIFICATIONS], action='append')
+    parser.add_argument('--case', choices=[s['label'] for s in specifications], action='append')
     parser.add_argument('--engine', choices=['djinn', 'exference', 'both'], action='append')
     parser.add_argument('--backend', type=Path)
     options = parser.parse_args()
     out = rt.prepare_output_directory(options.output)
     (out / 'controller.py').write_bytes(Path(__file__).read_bytes())
-    specs = [s for s in SPECIFICATIONS if not options.case or s['label'] in options.case]
+    specs = [s for s in specifications if not options.case or s['label'] in options.case]
     engines = options.engine or ['djinn', 'exference', 'both']
-    report = dict(status='running', scope='Fresh public ordinary/named/False product queries with exact displayed full-signature replay and typed graph ownership.', specifications=specs, results=[], source_hashes={}, executable_hashes={})
-    files = [Path(__file__), Path(existing.__file__), Path(existing.runtime_pins.__file__), Path(rt.__file__), ROOT/'test-church/run_corpus.py']
+    report = dict(status='running', scope=scope or 'Fresh public ordinary/named/False product queries with exact displayed full-signature replay and typed graph ownership.', specifications=specs, results=[], source_hashes={}, executable_hashes={})
+    files = [*additional_sources, Path(__file__), Path(existing.__file__), Path(existing.runtime_pins.__file__), Path(rt.__file__), ROOT/'test-church/run_corpus.py']
     for base in [ROOT, ROOT/'lib/Djex']:
         tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=base).decode().split('\0')
         files += [base / p for p in tracked if p.endswith(('.hs', '.cabal', '.lean')) and (base / p).is_file()]
@@ -88,7 +89,7 @@ def main():
             assert spec['oracle_replay']['status']=='passed', 'reference fixture failed'
             for engine in engines:
                 for mode in ['ordinary', 'where', 'false']:
-                    label = 'product_'+spec['label']+'_'+engine+'_'+mode
+                    label = label_prefix+'_'+spec['label']+'_'+engine+'_'+mode
                     # The where-clause function is a local at the source's
                     # fixed universe; only the separately replayed global
                     # definition accepts an explicit universe argument list.
@@ -110,6 +111,8 @@ def main():
                             term = row['live']['candidate']
                             assert not re.search(r'\b(sorry|admit|unsafe|axiom|native_decide|ProductReplay)\b', term), 'untrusted output'
                             row['owned'] = existing.accepted_observation(block, case, term)
+                            if spec.get('require_context_introduction'):
+                                assert row['owned']['observation']['origin']['graph']['context_introductions'], 'contextual query lost its dictionary introduction'
                             row['replay'] = replay(label+'-replay', spec, term, spec['ordinary'] if mode=='ordinary' else spec['predicate'])
                             assert row['replay']['status']=='passed', 'exact replay failed'
                             if mode=='where': assert row['live']['observations']['inconclusive']==0, 'inconclusive positive'

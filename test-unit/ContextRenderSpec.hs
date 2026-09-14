@@ -7,7 +7,7 @@ import Data.List (isInfixOf)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Language.Haskell.Synthesis.Constraint (Constraint (..))
-import Language.Haskell.Synthesis.Name (Name, parseName)
+import Language.Haskell.Synthesis.Name (Boxity (..), Name, parseName)
 import qualified Language.Haskell.Synthesis.Type as T
 import qualified Language.Haskell.Synthesis.TypedGenerated as Q
 import Leant.Synth.ContextRender
@@ -96,6 +96,15 @@ tests = testGroup "direct Lean lexical context rendering"
       contains "(leantLocal2 :" $ contextRenderedExpression wildcard
       contains "=> @leantLocal2)" $ contextRenderedExpression wildcard
       noEvidenceHoles wildcard
+  , testCase "render boxed unit, pair and right-associated triple values at their exact types" $ do
+      unit <- rendered $ tupleFixture 0
+      pair <- rendered $ tupleFixture 2
+      triple <- rendered $ tupleFixture 3
+      contains "_root_.Unit.unit" $ contextRenderedExpression unit
+      contains "_root_.Prod" $ contextRenderedType pair
+      contains "⟨@leantLocal1, @leantLocal1⟩" $ contextRenderedExpression pair
+      contains "⟨@leantLocal1, @leantLocal1, @leantLocal1⟩" $ contextRenderedExpression triple
+      mapM_ noEvidenceHoles [unit, pair, triple]
   , testCase "missing class authority fails before a poisoned provider map is forced" $ do
       let (environment, graph) = duplicateFixture 0
       renderLeanContextGraph environment
@@ -202,6 +211,9 @@ contextReplaySource = do
   nested <- renderFixture nestedFixture
   provider <- renderFixture providerFixture
   alias <- renderFixture letFixture
+  unit <- renderFixture $ tupleFixture 0
+  pair <- renderFixture $ tupleFixture 2
+  triple <- renderFixture $ tupleFixture 3
   pure $ unlines
     [ "set_option autoImplicit false"
     , "namespace ContextFixture"
@@ -227,6 +239,9 @@ contextReplaySource = do
         "(A : Type) → [ContextFixture.C A] → Nat" provider
     , definition "contextAlias"
         "[ContextFixture.C Nat] → ([ContextFixture.C Nat] → Nat) → Nat" alias
+    , definition "contextUnit" "[ContextFixture.C Nat] → Nat → Unit" unit
+    , definition "contextPair" "[ContextFixture.C Nat] → Nat → Nat × Nat" pair
+    , definition "contextTriple" "[ContextFixture.C Nat] → Nat → Nat × Nat × Nat" triple
     , "theorem contextFirstPayload : @contextChooseFirst ContextFixture.first ContextFixture.second (@ContextFixture.observe Nat) = 11 := by rfl"
     , "theorem contextSecondPayload : @contextChooseSecond ContextFixture.first ContextFixture.second (@ContextFixture.observe Nat) = 29 := by rfl"
     , "theorem contextOuterPayload : @contextChooseOuter ContextFixture.first ContextFixture.second (@ContextFixture.observe Nat) = 11 := by rfl"
@@ -234,6 +249,9 @@ contextReplaySource = do
     , "theorem contextNestedPayload : @contextNested Nat ContextFixture.first Bool ContextFixture.boolSecond (@ContextFixture.observe Nat) = 11 := by rfl"
     , "theorem contextProviderPayload : @contextProvider Nat ContextFixture.first = 11 := by rfl"
     , "theorem contextAliasPayload : @contextAlias ContextFixture.second (@ContextFixture.observe Nat) = 29 := by rfl"
+    , "theorem contextUnitPayload : @contextUnit ContextFixture.first 7 = () := by rfl"
+    , "theorem contextPairPayload : @contextPair ContextFixture.first 7 = (7,7) := by rfl"
+    , "theorem contextTriplePayload : @contextTriple ContextFixture.second 29 = (29,29,29) := by rfl"
     , "theorem contextFirstWrong : @contextChooseFirst ContextFixture.first ContextFixture.second (@ContextFixture.observe Nat) ≠ 29 := by decide"
     , "theorem contextSecondWrong : @contextChooseSecond ContextFixture.first ContextFixture.second (@ContextFixture.observe Nat) ≠ 11 := by decide"
     , "#print axioms contextFirstPayload"
@@ -243,6 +261,9 @@ contextReplaySource = do
     , "#print axioms contextNestedPayload"
     , "#print axioms contextProviderPayload"
     , "#print axioms contextAliasPayload"
+    , "#print axioms contextUnitPayload"
+    , "#print axioms contextPairPayload"
+    , "#print axioms contextTriplePayload"
     , "#print axioms contextFirstWrong"
     , "#print axioms contextSecondWrong"
     ]
@@ -379,6 +400,17 @@ letFixture = fixture Map.empty [] [] $ Q.TermGraphSource (nid 0)
   offered = qualified [classC nat] nat
   body = arrow offered nat
   source = qualified [classC nat] body
+
+tupleFixture :: Int -> (Environment, Graph)
+tupleFixture count = fixture Map.empty [] [] $ Q.TermGraphSource (nid 0) $
+  [ (nid 0, node source $ intro 0 1 source)
+  , (nid 1, node (arrow nat result) $ Q.TypedLambda [bind 1 0 nat] (nid 2))
+  , (nid 2, node result $ Q.TypedTuple [nid $ fromIntegral (3 + index) | index <- [0 .. count - 1]])
+  ] ++ [(nid $ fromIntegral (3 + index), node nat $ Q.TypedLocal (oid $ fromIntegral (3 + index)) 0)
+       | index <- [0 .. count - 1]]
+ where
+  result = T.TupleType Boxed $ replicate count nat
+  source = qualified [classC nat] $ arrow nat result
 
 independentFixture :: (Environment, Graph)
 independentFixture = fixture Map.empty [] [] $ Q.TermGraphSource (nid 0)

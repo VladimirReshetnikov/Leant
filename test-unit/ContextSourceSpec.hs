@@ -70,15 +70,18 @@ tests = testGroup "Production lexical Given source metadata"
        parsed <- expectRight $ parseGoalSexp $ packet source
        metadata <- requireMetadata parsed
        pgFrag parsed @?= contextSourceFragment metadata
-       let limits = defaultSynthLimits
-             { synthLimitWindow = 8, synthLimitBudget = Just 1024 }
+       let steps = if label == "unequal universe selected callback" then 4096 else 1024
+           limits = defaultSynthLimits
+             { synthLimitWindow = if label == "unequal universe selected callback" then 60 else 8
+             , synthLimitBudget = Just $ fromIntegral steps }
            outcome = synthesizeContextualWithProvidersSkippingDetailedWith
-             streaming limits engine 1024 Set.empty [] metadata $ pgFrag parsed
+             streaming limits engine steps Set.empty [] metadata $ pgFrag parsed
        step <- expectRight $ advanceDetailedSynthCursor 1 $ startDetailedSynthCursor outcome
        groups <- case step of
          DetailedSynthCursorCandidateBatch batch _ -> pure $ detailedCandidateBatchGroups batch
          DetailedSynthCursorEngineFailed failure -> fail failure
          DetailedSynthCursorNoTerm notes -> fail $ "no contextual candidate: " ++ show notes
+         DetailedSynthCursorNaturallyExhausted notes -> fail $ "contextual candidates exhausted: " ++ show notes
          _ -> fail "contextual production cursor returned no checked candidate"
        length groups @?= 1
        forM_ groups $ \group -> do
@@ -96,6 +99,12 @@ tests = testGroup "Production lexical Given source metadata"
            (\owned -> inspectCandidate requiresApplication $ djinnSourceCandidate owned)
            (\owned -> inspectCandidate requiresApplication $ typedCandidateSemanticCandidate owned)
            authority
+         if "selected callback" `isInfixOf` label then
+           foldCandidateSourceAuthority
+             (requireTypeSelection . D.typedCandidateTermGraph . djinnSourceCandidate)
+             (requireTypeSelection . D.typedCandidateTermGraph . typedCandidateSemanticCandidate)
+             authority
+           else pure ()
          forM_ (detailedCandidateGroupVerificationVariants group) $ \variant -> do
            assertBool "verification variant changed its source authority" $
              detailedVerificationVariantSourceAuthority variant == Just authority
@@ -264,6 +273,32 @@ tests = testGroup "Production lexical Given source metadata"
                "(nominal-at (name \"List\") 1 " ++ levels ++ " (args " ++ var "a" ++ "))"
          parsed <- expectRight $ parseGoalSexp $ packet source
          assertUnsupported parsed
+   , testCase "higher universe variables cannot enter legacy Type-0 class arguments" $ do
+       let source = allAt "a" "(succ (succ zero))" $ given "a" $ arrow (var "a") (var "a")
+       parsed <- expectRight $ parseGoalSexp $ packet source
+       assertUnsupported parsed
+   , testCase "rejected universe choices retain the Djinn raw window in both collection modes" $
+       forM_ [False, True] $ \streaming -> do
+         parsed <- expectRight $ parseGoalSexp $ packet $ sourceOf "unequal universe selected callback"
+         metadata <- requireMetadata parsed
+         let limits = defaultSynthLimits { synthLimitWindow = 1, synthLimitBudget = Just 4096 }
+             outcome = synthesizeContextualWithProvidersSkippingDetailedWith
+               streaming limits EngineDjinn 4096 Set.empty [] metadata $ pgFrag parsed
+         step <- expectRight $ advanceDetailedSynthCursor 1 $ startDetailedSynthCursor outcome
+         notes <- case step of
+           DetailedSynthCursorNaturallyExhausted messages -> pure messages
+           DetailedSynthCursorNoTerm messages -> pure messages
+           DetailedSynthCursorEngineFailed failure -> fail failure
+           _ -> fail "a rejected raw candidate escaped its window or supplied refutation"
+         assertBool "raw rejection lost its exact source-domain explanation" $
+           any ("selected type universe differs" `isInfixOf`) notes
+         assertBool "raw rejection did not retain the one-candidate cutoff" $
+           any ("candidate limit reached (1)" `isInfixOf`) notes
+   , testCase "unknown-sort and excessive forall domains remain explicit refusals" $
+       forM_ ["zero", "(param \"u\")", concat (replicate 130 "(succ ") ++ "zero" ++ replicate 130 ')'] $ \level -> do
+         let source = all' "a" $ given "a" $ allAt "b" level $ arrow (var "b") (var "b")
+         parsed <- expectRight $ parseGoalSexp $ packet source
+         assertUnsupported parsed
    , testCase "legacy contextual wire explicitly lacks source metadata" $ do
        parsed <- expectRight $ parseGoalSexp "(goal type (query (roots) (head)) (inst \"C Nat\" (atom unsafe \"Nat\")))"
        assertUnsupported parsed
@@ -307,6 +342,18 @@ fixtures =
   , ("forced local Given", all' "a" $ given "a" $ arrow tokenScheme $ arrow (var "a") token, True)
   , ("strict implicit root", strictAll "a" $ given "a" $ arrow (var "a") (var "a"), False)
   , ("strict implicit callback", arrow (arrow strictIdentityScheme token) token, False)
+  , ("higher universe root", all' "a" $ given "a" $
+       allAt "b" "(succ (succ zero))" $ arrow (var "b") (var "b"), False)
+  , ("named universe root", all' "a" $ given "a" $
+       allAt "b" "(succ (param \"u\"))" $ arrow (var "b") (var "b"), False)
+  , ("higher universe selected callback", all' "a" $ given "a" $
+       allAt "c" "(succ (succ zero))" $
+         arrow (allAt "b" "(succ (succ zero))" $ arrow (var "b") token)
+           (arrow (var "c") token), False)
+  , ("unequal universe selected callback", all' "a" $ given "a" $
+       allAt "c" "(succ (succ zero))" $
+         arrow (all' "b" $ arrow (var "b") token)
+           (arrow (var "c") token), False)
   ]
  where
   identityScheme = all' "b" $ given "b" $ arrow (var "b") (var "b")
@@ -337,6 +384,8 @@ listSource argument = "(nominal-at (name \"List\") 1 (levels 0) (args " ++ argum
 
 all' :: String -> String -> String
 all' variable body = "(all explicit " ++ show variable ++ " " ++ body ++ ")"
+allAt :: String -> String -> String -> String
+allAt variable level body = "(all-at explicit " ++ show variable ++ " " ++ level ++ " " ++ body ++ ")"
 given :: String -> String -> String
 given variable body = "(given (name \"ContextFixture\" \"C\") 1 (args " ++ var variable ++ ") " ++ body ++ ")"
 var :: String -> String
@@ -388,6 +437,16 @@ inspectCandidate requiresApplication candidate = do
 
 expectRight :: Show failure => Either failure value -> IO value
 expectRight = either (fail . show) pure
+
+requireTypeSelection :: Show absence => Either absence (D.TermGraph ty local) -> IO ()
+requireTypeSelection available = do
+  graph <- expectRight available
+  assertBool "higher-universe callback fixture bypassed type selection" $
+    any (selected . D.termNodeForm . snd) $ D.termGraphNodes graph
+ where
+  selected D.TypedVisibleTypeApplication{} = True
+  selected D.TypedImplicitTypeApplication{} = True
+  selected _ = False
 
 -- Callback acceptance here is a unit boundary only; the production runner
 -- separately obtains real Lean acceptance and full-type/payload replay.
