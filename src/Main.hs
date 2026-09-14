@@ -570,6 +570,8 @@ data SynthLaneCursorPolicy = SynthLaneCursorPolicy
   , synthLaneCursorWindow :: Int
     -- ^ the cursor's hard cap on observed candidate groups
     -- (@:set synth-window@)
+  , synthLaneCursorQuantum :: Maybe Int
+    -- ^ optional checked-group scheduling slice; does not change lane limits
   , synthLaneCursorShown :: Int
     -- ^ accepted groups a batch may keep (@:set synth-shown@)
   }
@@ -581,6 +583,7 @@ data SynthLaneCursorPolicy = SynthLaneCursorPolicy
 data SynthLaneRunEnd
   = SynthLaneRunStoppedByDisposition
   | SynthLaneRunBatchPolicyReached
+  | SynthLaneRunYielded
   | SynthLaneRunNaturallyExhausted
   | SynthLaneRunHardCapReached
   | SynthLaneRunTimedOut
@@ -600,6 +603,8 @@ data SynthLaneRun = SynthLaneRun
   , synthLaneRunCandidateGroupCount :: Int
   , synthLaneRunNotes :: [String]
   , synthLaneRunEnd :: SynthLaneRunEnd
+  , synthLaneRunContinuation :: Maybe (SynthLaneAccumulation -> IO SynthLaneRun)
+    -- ^ exact suspended cursor and remaining lane allowance; never serialized
   }
 
 -- Output (all user-visible text flows through emit so transcripts capture
@@ -3004,17 +3009,27 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
       runSynthesis includeLibrary checked laneEngine providers accumulation = do
         initial <- runSynthesisPass False includeLibrary checked laneEngine providers accumulation
-        let enrich = case synthLaneRunEnd initial of
-              SynthLaneRunTimedOut -> False
-              SynthLaneRunCursorAdmissionFailed _ -> False
-              SynthLaneRunEngineFailed _ -> False
-              SynthLaneRunStoppedByDisposition -> False
-              _ -> contextualConstructorsAvailable && not includeLibrary
-        if enrich
-          then runSynthesisPass True False
-            (Set.union checked $ Set.fromList $ synthLaneRunCheckedFrontierSpellings initial)
-            laneEngine providers (synthLaneRunAccumulation initial)
-          else pure initial
+        finishPass checked initial
+       where
+        -- Constructor enrichment remains after this lane's original pass.
+        -- Carry its checked frontier through every suspension; resuming cannot
+        -- repeat the pass or refund its engine/verification allowance.
+        finishPass previous initial =
+          let checked' = Set.union previous $ Set.fromList $
+                synthLaneRunCheckedFrontierSpellings initial
+          in case synthLaneRunContinuation initial of
+            Just resume -> pure initial
+              { synthLaneRunContinuation = Just $ \next ->
+                  resume next >>= finishPass checked' }
+            Nothing -> case synthLaneRunEnd initial of
+              SynthLaneRunTimedOut -> pure initial
+              SynthLaneRunCursorAdmissionFailed _ -> pure initial
+              SynthLaneRunEngineFailed _ -> pure initial
+              SynthLaneRunStoppedByDisposition -> pure initial
+              _ | contextualConstructorsAvailable && not includeLibrary ->
+                    runSynthesisPass True False checked' laneEngine providers
+                      (synthLaneRunAccumulation initial)
+                | otherwise -> pure initial
       runSynthesisPass includeConstructors includeLibrary checked laneEngine providers accumulation =
         let base = case contextSource of
               Just (Left failure) -> Left failure
@@ -3049,7 +3064,9 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
               | otherwise = base
         in runSynthLaneCursorWithCollection (isJust contextSource)
           behavioral assessmentContext
-          (ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits)
+          ((ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits)
+            { synthLaneCursorQuantum =
+                if isJust behavioral && discoverProviders then Just 1 else Nothing })
           deadline st goal id outcome accumulation
       tunedForCommand = case behavioral of
         Nothing -> synthesizeTunedDetailedWith
@@ -3112,6 +3129,7 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
             , synthLaneRunCandidateGroupCount = 0
             , synthLaneRunNotes = []
             , synthLaneRunEnd = SynthLaneRunTimedOut
+            , synthLaneRunContinuation = Nothing
             }
           Just branches ->
             let outcome = fmap
@@ -3138,6 +3156,7 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
             , synthLaneRunCandidateGroupCount = 0
             , synthLaneRunNotes = []
             , synthLaneRunEnd = SynthLaneRunTimedOut
+            , synthLaneRunContinuation = Nothing
             }
           Just branches ->
             let outcome = branches >>= \(baseOutcome, libraryOutcome) ->
@@ -3206,12 +3225,20 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
     let accumulation = synthLaneRunAccumulation baseline
         checked = Set.fromList
           (synthLaneRunCheckedFrontierSpellings baseline)
-    if null providers && not contextualConstructorsAvailable
-      then report runDeadline baseline
-      else runProviderLanes runDeadline Nothing (runLane False)
-        checked accumulation
-        (if null providers then [(laneEngine, [])]
-          else providerStagesWithRanking ranking laneEngine providers)
+    let providerLanes
+          | null providers && not contextualConstructorsAvailable = []
+          | null providers = [(laneEngine, [])]
+          | otherwise = providerStagesWithRanking ranking laneEngine providers
+    case synthLaneRunContinuation baseline of
+      Just resume -> runFairSynthLanes runDeadline Nothing checked accumulation
+        ([ \seen current -> runLane False seen providerEngine values current
+         | (providerEngine, values) <- providerLanes
+         ] ++ [\_ current -> resume current])
+      Nothing ->
+        if null providerLanes
+          then report runDeadline baseline
+          else runProviderLanes runDeadline Nothing (runLane False)
+            checked accumulation providerLanes
 
   -- Preserve the established provider-free context search before enriching
   -- its world. Constructor values remain available even when discovery is
@@ -3220,14 +3247,19 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
     Just (Right source) -> not $ null $ contextSourceConstructors source
     _ -> False
 
-  runProviderLanes runDeadline fallback runLane checked accumulation lanes =
-    case lanes of
+  runProviderLanes runDeadline fallback runLane checked accumulation lanes
+    | isJust behavioral = runFairSynthLanes runDeadline fallback checked accumulation
+        [ \seen current -> runLane seen laneEngine providers current
+        | (laneEngine, providers) <- lanes
+        ]
+    | otherwise = case lanes of
     [] -> finish SynthLaneRun
       { synthLaneRunAccumulation = accumulation
       , synthLaneRunCheckedFrontierSpellings = []
       , synthLaneRunCandidateGroupCount = 0
       , synthLaneRunNotes = []
       , synthLaneRunEnd = SynthLaneRunNoTerm
+      , synthLaneRunContinuation = Nothing
       }
     (laneEngine, providers) : remaining -> do
       fresh <- runLane checked laneEngine providers accumulation
@@ -3245,17 +3277,45 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
                 $ synthLaneRunCheckedFrontierSpellings fresh)
               (synthLaneRunAccumulation fresh) remaining
    where
-    -- Once the provider-free lane has proved a sound refutation, every
-    -- provider-side miss is weaker structural evidence.  Retain that result as
-    -- the control-flow fallback while carrying every completed lane into final
-    -- behavioral output.  'report' is also the sole classical entry point, so
-    -- this ordering keeps classical search strictly after constructive
-    -- provider search.
-    finish fresh = case fallback of
-      Just fallbackRun -> report runDeadline
-        (fallbackRun
-          { synthLaneRunAccumulation = synthLaneRunAccumulation fresh })
-      Nothing -> report runDeadline fresh
+    finish = finishConstructiveSearch runDeadline fallback
+
+  -- Cooperative round-robin after the structural lane's first checked group.
+  -- A queued continuation owns its existing engine cursor and absolute lane
+  -- count. New provider worlds see the checked frontier accumulated so far;
+  -- suspended worlds resume exactly once, without rebuilding their searches.
+  runFairSynthLanes runDeadline fallback checked accumulation =
+    observe checked accumulation SynthLaneRun
+      { synthLaneRunAccumulation = accumulation
+      , synthLaneRunCheckedFrontierSpellings = []
+      , synthLaneRunCandidateGroupCount = 0
+      , synthLaneRunNotes = []
+      , synthLaneRunEnd = SynthLaneRunNoTerm
+      , synthLaneRunContinuation = Nothing
+      }
+   where
+    observe _ current previous [] =
+      finishConstructiveSearch runDeadline fallback
+        (previous { synthLaneRunAccumulation = current })
+    observe seen current _ (next : remaining) = do
+      fresh <- next seen current
+      let seen' = Set.union seen $ Set.fromList $
+            synthLaneRunCheckedFrontierSpellings fresh
+          pending = case synthLaneRunContinuation fresh of
+            Nothing -> remaining
+            Just resume -> remaining ++ [\_ accumulated -> resume accumulated]
+      case synthLaneRunEnd fresh of
+        SynthLaneRunTimedOut -> finishConstructiveSearch runDeadline fallback fresh
+        SynthLaneRunCursorAdmissionFailed _ -> finishConstructiveSearch runDeadline fallback fresh
+        SynthLaneRunEngineFailed _ -> finishConstructiveSearch runDeadline fallback fresh
+        SynthLaneRunStoppedByDisposition -> finalize (synthLaneRunAccumulation fresh)
+        _ -> observe seen' (synthLaneRunAccumulation fresh) fresh pending
+
+  -- A failed provider lane cannot invalidate a sound structural refutation.
+  -- Reporting remains the sole classical entry, after constructive search.
+  finishConstructiveSearch runDeadline fallback fresh = case fallback of
+    Just fallbackRun -> report runDeadline
+      (fallbackRun { synthLaneRunAccumulation = synthLaneRunAccumulation fresh })
+    Nothing -> report runDeadline fresh
 
   finalize accumulation = do
     _ <- finalizeSynthLaneAccumulation st args goal accumulation
@@ -3611,6 +3671,7 @@ ordinarySynthLaneCursorPolicy assessmentContext engine limits =
           LengthBehaviorFilter -> True
     , synthLaneCursorRetainsRunNotes = True
     , synthLaneCursorWindow = synthLimitWindow limits
+    , synthLaneCursorQuantum = Nothing
     , synthLaneCursorShown = synthLimitShown limits
     }
 
@@ -3736,7 +3797,7 @@ runSynthLaneCursorWithCollection
   -> IO SynthLaneRun
 runSynthLaneCursorWithCollection contextual behavioral assessmentContext policy deadline st goal transform outcome
     initialAccumulation =
-  observe (1 :: Int) 0 [] [] (startDetailedSynthCursor outcome)
+  drive 0 [] (startDetailedSynthCursor outcome) initialAccumulation
  where
   incremental = contextual || isJust behavioral
   -- Filtering keeps its existing allowance of two ordinary batches. The
@@ -3746,108 +3807,134 @@ runSynthLaneCursorWithCollection contextual behavioral assessmentContext policy 
         fromInteger $ min (toInteger $ synthLaneCursorWindow policy)
           (2 * toInteger (synthLaneCursorBatchSize policy))
     | otherwise = synthLaneCursorBatchSize policy
-  observe batchOrdinal groupCount reverseOutcomes runNotes cursor
-    | incremental && acceptedCount reverseOutcomes >= synthLaneCursorShown policy =
-        finish reverseOutcomes groupCount runNotes SynthLaneRunStoppedByDisposition
-    | incremental && groupCount >= incrementalGroupLimit =
-        finish reverseOutcomes groupCount runNotes SynthLaneRunBatchPolicyReached
-    | otherwise = do
-      forced <- runDetailedSynthCursorBefore
-        (if incremental then 1 else synthLaneCursorBatchSize policy)
-        (synthLaneCursorWindow policy)
-        deadline cursor
-      case forced of
-        Nothing -> finish reverseOutcomes groupCount runNotes
-          SynthLaneRunTimedOut
-        Just (Left err) -> finish reverseOutcomes groupCount runNotes
-          (SynthLaneRunCursorAdmissionFailed err)
-        Just (Right step) -> case step of
-          DetailedSynthCursorCandidateBatch batch successor -> do
-            let groups = map transform (detailedCandidateBatchGroups batch)
-                notes = detailedCandidateBatchNotes batch
-                nextCount = groupCount + length groups
-            when (synthLaneCursorRetainsRunNotes policy) $
-              debugSynthLaneGroups st groupCount groups
-            lane <- verifySynthLane behavioral assessmentContext
-              (if incremental then 1 else synthLaneCursorBatchSize policy) st goal [] groups
-            let reverseOutcomes' = lane : reverseOutcomes
-            if incremental
-              then observe (batchOrdinal + 1) nextCount reverseOutcomes' notes successor
-              else case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
-                SynthLaneSurvivors _ _ ->
-                  finish reverseOutcomes' nextCount notes
-                    SynthLaneRunStoppedByDisposition
-                SynthLaneAssessmentPreserved _ _ ->
-                  finish reverseOutcomes' nextCount notes
-                    SynthLaneRunStoppedByDisposition
-                SynthLaneNoVerified -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
-                SynthLaneAllBehaviorallyRejected _ -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
-          DetailedSynthCursorNaturallyExhausted notes ->
-            finish reverseOutcomes groupCount notes
-              SynthLaneRunNaturallyExhausted
-          DetailedSynthCursorHardCapReached notes ->
-            finish reverseOutcomes groupCount notes SynthLaneRunHardCapReached
-          DetailedSynthCursorEngineFailed err ->
-            finish reverseOutcomes groupCount runNotes
-              (SynthLaneRunEngineFailed err)
-          DetailedSynthCursorRefuted sound ->
-            finish reverseOutcomes groupCount runNotes
-              (SynthLaneRunRefuted sound)
-          DetailedSynthCursorNoTerm notes ->
-            finish reverseOutcomes groupCount notes SynthLaneRunNoTerm
+  drive priorCount priorNotes initialCursor sliceAccumulation =
+    observe (1 :: Int) priorCount [] priorNotes initialCursor
+   where
+    observe batchOrdinal groupCount reverseOutcomes runNotes cursor
+      | incremental && acceptedCount reverseOutcomes >= synthLaneCursorShown policy =
+          finish reverseOutcomes groupCount runNotes SynthLaneRunStoppedByDisposition
+      | incremental && groupCount >= incrementalGroupLimit =
+          finish reverseOutcomes groupCount runNotes SynthLaneRunBatchPolicyReached
+      | otherwise = do
+          ready <- canVerifyAnotherGroup
+          if ready
+            then observeReady batchOrdinal groupCount reverseOutcomes runNotes cursor
+            else finish reverseOutcomes groupCount runNotes SynthLaneRunTimedOut
 
-  acceptedCount reverseOutcomes = case synthLaneAccumulationDisposition
-      (synthLaneCursorShown policy) $ foldl (flip accumulateSynthLaneOutcome)
-        commandAccumulation (reverse reverseOutcomes) of
-    SynthLaneSurvivors presentations _ -> length presentations
-    SynthLaneAssessmentPreserved presentations _ -> length presentations
-    _ -> 0
+    -- Behavioral requests require a whole second. Do not keep consuming
+    -- cursor groups during the subsecond remainder that admits no callback.
+    -- Accepted results and an already reached lane cap are handled above.
+    canVerifyAnotherGroup = case behavioral of
+      Nothing -> pure True
+      Just active -> isJust <$> behavioralRequestSeconds st active
 
-  -- This existing accumulator combines exact verification receipts across
-  -- cursor steps; choosing it does not introduce a behavioral predicate.
-  commandAccumulation
-    | incremental = behavioralSynthLaneAccumulation initialAccumulation
-    | otherwise = initialAccumulation
+    observeReady batchOrdinal groupCount reverseOutcomes runNotes cursor
+      | incremental, Just quantum <- synthLaneCursorQuantum policy
+      , groupCount - priorCount >= quantum = do
+          suspended <- finish reverseOutcomes groupCount runNotes SynthLaneRunYielded
+          pure suspended { synthLaneRunContinuation = Just (drive groupCount runNotes cursor) }
+      | otherwise = do
+        forced <- runDetailedSynthCursorBefore
+          (if incremental then 1 else synthLaneCursorBatchSize policy)
+          (synthLaneCursorWindow policy)
+          deadline cursor
+        case forced of
+          Nothing -> finish reverseOutcomes groupCount runNotes
+            SynthLaneRunTimedOut
+          Just (Left err) -> finish reverseOutcomes groupCount runNotes
+            (SynthLaneRunCursorAdmissionFailed err)
+          Just (Right step) -> case step of
+            DetailedSynthCursorCandidateBatch batch successor -> do
+              ready <- canVerifyAnotherGroup
+              if not ready
+                then finish reverseOutcomes groupCount runNotes SynthLaneRunTimedOut
+                else do
+                  let groups = map transform (detailedCandidateBatchGroups batch)
+                      notes = detailedCandidateBatchNotes batch
+                      nextCount = groupCount + length groups
+                  when (synthLaneCursorRetainsRunNotes policy) $
+                    debugSynthLaneGroups st groupCount groups
+                  lane <- verifySynthLane behavioral assessmentContext
+                    (if incremental then 1 else synthLaneCursorBatchSize policy) st goal [] groups
+                  let reverseOutcomes' = lane : reverseOutcomes
+                  if incremental
+                    then observe (batchOrdinal + 1) nextCount reverseOutcomes' notes successor
+                    else case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
+                      SynthLaneSurvivors _ _ ->
+                        finish reverseOutcomes' nextCount notes
+                          SynthLaneRunStoppedByDisposition
+                      SynthLaneAssessmentPreserved _ _ ->
+                        finish reverseOutcomes' nextCount notes
+                          SynthLaneRunStoppedByDisposition
+                      SynthLaneNoVerified -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
+                      SynthLaneAllBehaviorallyRejected _ -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
+            DetailedSynthCursorNaturallyExhausted notes ->
+              finish reverseOutcomes groupCount notes
+                SynthLaneRunNaturallyExhausted
+            DetailedSynthCursorHardCapReached notes ->
+              finish reverseOutcomes groupCount notes SynthLaneRunHardCapReached
+            DetailedSynthCursorEngineFailed err ->
+              finish reverseOutcomes groupCount runNotes
+                (SynthLaneRunEngineFailed err)
+            DetailedSynthCursorRefuted sound ->
+              finish reverseOutcomes groupCount runNotes
+                (SynthLaneRunRefuted sound)
+            DetailedSynthCursorNoTerm notes ->
+              finish reverseOutcomes groupCount notes SynthLaneRunNoTerm
 
-  continueOrStop batchOrdinal groupCount reverseOutcomes notes successor
-    | synthLaneCursorAllowsFilterSuccessor policy && batchOrdinal < 2 =
-        observe (batchOrdinal + 1) groupCount reverseOutcomes notes successor
-    | otherwise = finish reverseOutcomes groupCount notes
-        SynthLaneRunBatchPolicyReached
+    acceptedCount reverseOutcomes = case synthLaneAccumulationDisposition
+        (synthLaneCursorShown policy) $ foldl (flip accumulateSynthLaneOutcome)
+          commandAccumulation (reverse reverseOutcomes) of
+      SynthLaneSurvivors presentations _ -> length presentations
+      SynthLaneAssessmentPreserved presentations _ -> length presentations
+      _ -> 0
 
-  finish reverseOutcomes groupCount notes runEnd =
-    let noteOwnedReverseOutcomes
-          | synthLaneCursorRetainsRunNotes policy =
-              attachNotesToRightmostHandled notes reverseOutcomes
-          | otherwise = reverseOutcomes
-        chronologicalOutcomes = reverse noteOwnedReverseOutcomes
-        accumulation = foldl
-          (flip accumulateSynthLaneOutcome)
-          commandAccumulation chronologicalOutcomes
-    in pure SynthLaneRun
-      { synthLaneRunAccumulation = accumulation
-      , synthLaneRunCheckedFrontierSpellings = concatMap
-          synthLaneCheckedFrontierSpellings chronologicalOutcomes
-      , synthLaneRunCandidateGroupCount = groupCount
-      , synthLaneRunNotes = notes
-      , synthLaneRunEnd = runEnd
-      }
+    -- This existing accumulator combines exact verification receipts across
+    -- cursor steps; choosing it does not introduce a behavioral predicate.
+    commandAccumulation
+      | incremental = behavioralSynthLaneAccumulation sliceAccumulation
+      | otherwise = sliceAccumulation
 
-  -- Outcomes are buffered only for this run (at most two ordinary batches,
-  -- or the named command's existing verification allowance). Ordinary notes
-  -- attach once to the latest handled result.  If every batch is a Lean miss,
-  -- they stay solely on the run receipt for the final diagnostic.
-  attachNotesToRightmostHandled _ [] = []
-  attachNotesToRightmostHandled notes (lane : earlier) =
-    case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
-      SynthLaneNoVerified ->
-        lane : attachNotesToRightmostHandled notes earlier
-      SynthLaneSurvivors _ _ ->
-        lane { synthLaneOutcomeNotes = notes } : earlier
-      SynthLaneAllBehaviorallyRejected _ ->
-        lane { synthLaneOutcomeNotes = notes } : earlier
-      SynthLaneAssessmentPreserved _ _ ->
-        lane { synthLaneOutcomeNotes = notes } : earlier
+    continueOrStop batchOrdinal groupCount reverseOutcomes notes successor
+      | synthLaneCursorAllowsFilterSuccessor policy && batchOrdinal < 2 =
+          observe (batchOrdinal + 1) groupCount reverseOutcomes notes successor
+      | otherwise = finish reverseOutcomes groupCount notes
+          SynthLaneRunBatchPolicyReached
+
+    finish reverseOutcomes groupCount notes runEnd =
+      let noteOwnedReverseOutcomes
+            | synthLaneCursorRetainsRunNotes policy =
+                attachNotesToRightmostHandled notes reverseOutcomes
+            | otherwise = reverseOutcomes
+          chronologicalOutcomes = reverse noteOwnedReverseOutcomes
+          accumulation = foldl
+            (flip accumulateSynthLaneOutcome)
+            commandAccumulation chronologicalOutcomes
+      in pure SynthLaneRun
+        { synthLaneRunAccumulation = accumulation
+        , synthLaneRunCheckedFrontierSpellings = concatMap
+            synthLaneCheckedFrontierSpellings chronologicalOutcomes
+        , synthLaneRunCandidateGroupCount = groupCount
+        , synthLaneRunNotes = notes
+        , synthLaneRunEnd = runEnd
+        , synthLaneRunContinuation = Nothing
+        }
+
+    -- Outcomes are buffered only for this run (at most two ordinary batches,
+    -- or the named command's existing verification allowance). Ordinary notes
+    -- attach once to the latest handled result.  If every batch is a Lean miss,
+    -- they stay solely on the run receipt for the final diagnostic.
+    attachNotesToRightmostHandled _ [] = []
+    attachNotesToRightmostHandled notes (lane : earlier) =
+      case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
+        SynthLaneNoVerified ->
+          lane : attachNotesToRightmostHandled notes earlier
+        SynthLaneSurvivors _ _ ->
+          lane { synthLaneOutcomeNotes = notes } : earlier
+        SynthLaneAllBehaviorallyRejected _ ->
+          lane { synthLaneOutcomeNotes = notes } : earlier
+        SynthLaneAssessmentPreserved _ _ ->
+          lane { synthLaneOutcomeNotes = notes } : earlier
 
 -- | Debug candidate ordinals cover the complete same-run sequence rather
 -- than restarting at one for a filter successor batch.
@@ -3921,6 +4008,7 @@ synthClassical behavioral assessmentContext commandDeadline st goal parsed accum
             , synthLaneCursorAllowsFilterSuccessor = False
             , synthLaneCursorRetainsRunNotes = False
             , synthLaneCursorWindow = synthLimitWindow limits
+            , synthLaneCursorQuantum = Nothing
             , synthLaneCursorShown = synthLimitShown limits
             }
           emDeadline st goal id
@@ -3980,6 +4068,7 @@ synthClassical behavioral assessmentContext commandDeadline st goal parsed accum
     | otherwise = case synthLaneRunEnd laneRun of
         SynthLaneRunStoppedByDisposition -> "0 groups"
         SynthLaneRunBatchPolicyReached -> "0 groups"
+        SynthLaneRunYielded -> "0 groups (suspended)"
         SynthLaneRunNaturallyExhausted -> "0 groups (exhausted)"
         SynthLaneRunHardCapReached -> "0 groups (candidate limit reached)"
         SynthLaneRunTimedOut -> "timeout"

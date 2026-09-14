@@ -36,137 +36,40 @@ There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.github
 — an overview and tutorial, with a detailed tour of `:synth`
 ([LaTeX source](docs/Leant_Overview/Leant_Overview.tex)).
 
-The [strict-implicit Lean binder release](docs/reports/2026-09-13-strict-implicit-source-acceptance.md)
-preserves `⦃α : Type⦄` binders through contextual synthesis, including nested
-callbacks and selected dictionaries. All 719 native unit tests pass, along with
-nine new exact Lean replays and six rejection controls; the existing contextual
-constructor matrix also passes. General universe and dependent-binder support
-remain separate obligations.
+Rank-N and impredicative synthesis now covers nested polymorphic callbacks,
+selected polymorphic arguments, dictionary-qualified selection and composition
+of several Church encodings. The implementations preserve source selections
+through search and independently check generated terms. Lean additionally retains
+exact contextual universes, nominal universe selections and strict-implicit
+binders within the documented supported fragment.
 
-The [nested Church composition release](docs/reports/2026-09-13-maybe-either-head-use-acceptance.md)
-repairs Djinn's Church-encoded `maybeEither` synthesis in both Haskell and Lean.
-Both Haskell engines pass all 13 extended operations in fresh runs, with exact
-independent GHC execution. Native Djinn, Exference and Both pass `maybeEither`
-with exact Lean replay and actual rejection controls.
+| Capability | Current scope and detailed evidence |
+| --- | --- |
+| Explicit Haskell ground kinds, both engines | The [11-case public corpus](docs/reports/2026-09-14-exference-kinded-source-acceptance.md) passes for Djinn and Exference, including vacuous/shadowed binders, higher-kinded callbacks, aliases and impredicative pairs. Provider-kind composition and native adoption remain further gates. |
+| Selected polymorphic types and dictionaries in Lean | [Nominal and chained selections](docs/reports/2026-09-14-selected-polymorphic-types-acceptance.md), [dictionary-qualified selection](docs/reports/2026-09-14-dictionary-selection-acceptance.md), [contextual universes](docs/reports/2026-09-14-contextual-universe-acceptance.md) and [strict-implicit binders](docs/reports/2026-09-13-strict-implicit-source-acceptance.md) have scoped acceptance. The original simultaneous two-universe query remains open. |
+| Church composition and product construction | Accepted [nested Church composition](docs/reports/2026-09-13-maybe-either-head-use-acceptance.md), [intrinsic-unit construction](docs/reports/2026-09-14-intrinsic-unit-construction-acceptance.md) and [native sort/product construction](docs/reports/2026-09-13-native-sort-products-acceptance.md) retain exact replay and rejection controls. |
+| Search responsiveness and provider discovery | The [Haskell Djinn proof-prefix repair](docs/reports/2026-09-14-contextual-proof-cutoff-acceptance.md) resolves the observed default timeout. Lean [qualified provider identity](docs/reports/2026-09-14-session-provider-identity.md) and [cooperative scheduling](docs/reports/2026-09-14-provider-scheduling.md) preserve session names, structural continuation and existing limits. |
 
-Djinn's additional search branch avoids repeating the same function head along
-an application path while allowing independent reuse in sibling arguments.
-It retains the original first proof, complete original search and shared bounds.
-The detailed report records 137 passing Djinn unit tests and the complete
-canonical/native release checks, including 711 native unit tests.
+The latest native scheduling increment passes a strict executable build and
+18 public cells: 11 exact Lean replays and seven actual-False controls. It does
+not claim a fresh full native unit-suite run. Earlier reports retain their own
+source/runtime snapshots and validation counts.
 
-Earlier accepted improvements compose [polymorphic constructors with contextual methods](docs/reports/2026-09-13-contextual-constructor-use-acceptance.md),
-preserve [lexical type and dictionary selections](docs/reports/2026-09-13-exference-native-acceptance.md),
-and repair [trailing type-witness rendering](docs/reports/2026-09-13-trailing-type-witness-acceptance.md).
+The [current priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
+are Exference kind integration and native dependency adoption, original integer
+`at`, then simultaneous two-universe composition. Leant currently pins Djex
+`9a2d59d9`; the later Haskell kind and proof-prefix milestones await native
+integration. Provider admission is repaired, but the original integer query
+still has no accepted implementation. Lean Djinn `length`, broader class/provider
+universes, reductions and extrema remain further work.
 
-The [Church behavior ledger](test-church/behavior-ledger.md) records 94
-historical acceptances, 23 attempted cells without indexed acceptance and 43
-cells without indexed evidence, out of 160. These are historical receipt counts,
-not a current-revision pass rate or a completeness theorem. Missing indexed
-evidence does not establish that a case was never attempted.
+The [Church behavior ledger](test-church/behavior-ledger.md) records 94 historical
+acceptances, 23 attempted cells without indexed acceptance and 43 without indexed
+evidence out of 160. These are historical evidence categories, not a current
+pass rate or a completeness theorem. Lean counterparts of partial functions use
+supplied defaults or inhabitance assumptions; Lean's universe rules still apply.
 
-The [Djinn public ground-kind milestone](docs/reports/2026-09-13-djinn-kinded-source-acceptance.md)
-preserves explicit kinds through rank-N source checking and generated Haskell,
-including vacuous and shadowed binders, polymorphic aliases, constrained callbacks
-and impredicative pairs. On the final Djex root snapshot, all 11 one-shot outputs
-and 10 named-`where` outputs compile and execute at their original signatures;
-all 11 actual-False controls pass. All **1,276 tests in seven suites pass**, including the completed 138-test CLI
-rerun on unchanged source and runtime hashes; its separate receipt is linked
-from the milestone report.
-The [general product-construction release](docs/reports/2026-09-13-product-alternatives-acceptance.md)
-now closes the `(7,9)` named-query miss. Its complete 11-case kinded-source matrix
-passes 22 exact GHC replays and 11 actual-False controls; all **383 selected
-regression tests** pass (146 Djinn, 187 integration, 38 API and 12 focused CLI).
-The checked source is integrated into Djex, and the native release below validates
-Leant against that dependency. Exference explicit Haskell kinds are covered by the later public milestone below.
-
-The [native sort/product release](docs/reports/2026-09-13-native-sort-products-acceptance.md)
-retains exact sort levels and supplies canonical type witnesses, including sorts
-needed only by providers. It also repairs eta-reduced premise reconstruction.
-All **726 native tests** pass, together with **90 public checks: 63 exact Lean
-kernel replays and 27 False controls**. Leant now pins the tested Djex product
-implementation. Exact contextual binder universes are covered by the subsequent release below.
-
-The [public Lean universe baseline](docs/reports/2026-09-13-public-universe-baseline.md)
-passes all 24 cells for identity and nested callbacks at `Type 1` and named
-universe `u`, through Djinn and Exference: 16 exact kernel replays and eight
-actual-False controls. This validates existing context-free support. Contextual
-dictionary universes and universe-bearing global providers remain separate
-implementation requirements beyond that baseline and the native sort release.
-
-The [intrinsic-unit construction release](docs/reports/2026-09-14-intrinsic-unit-construction-acceptance.md)
-adds Exference unit construction in an empty inventory, including arguments of
-local rank-N functions. It preserves the existing constructor path when the
-built-in unit constructor is already present. All **13 extended Haskell operations,
-515 ordinary Exference tests and 100 private engine tests pass**, with exact GHC
-replay and False controls for the public unit cases. This closes the prototype's
-`maybeEither` regression at the original 256-candidate limit.
-
-The [contextual binder-universe release](docs/reports/2026-09-14-contextual-universe-acceptance.md)
-preserves exact `Type` binder domains, named universes, shadowing and selected
-callback universes through contextual synthesis. All **63 public universe cases,
-746 native tests, and 42 constructor/strict-binder regression cases pass**, with
-exact Lean replay and False controls. Leant integrates the tested source and pins
-Djex `66b3212b`. Higher-universe classes/providers remain separate capabilities;
-selected polymorphic types are covered by the later increment below.
-The [selected polymorphic type release](docs/reports/2026-09-14-selected-polymorphic-types-acceptance.md)
-adds exact nominal universe signatures and source-anchored reconstruction of
-polymorphic type selections, including chained selections and qualified payloads.
-It passes 95 focused checks, all 763 native tests, 72 distinct public checks across
-Djinn, Exference and Both, and all 105 existing contextual regression checks.
-One environment-preparation timeout passed a focused retry at unchanged source,
-runtime identities and limits; the original failed attempt remains in the archive.
-The [qualified-consumer repair](docs/reports/2026-09-14-contextual-polytype-acceptance.md)
-adds scoped quantified choices to Djinn's contextual specialization. It passes
-147 Djinn tests and both Haskell engines' direct/wrapped public examples, with
-eight exact GHC replays and four actual-False controls. Djinn's public acceptance
-uses 4,096 choices; the subsequent prefix-checking repair below also validates
-the default unbounded-query setting.
-The [native dictionary-selection release](docs/reports/2026-09-14-dictionary-selection-acceptance.md)
-preserves source evidence across dictionary application and integrates Djex
-`9a2d59d9`. Its strict build, emitted Lean serializer, 98 focused tests and all
-766 native tests pass. The 69 affected public checks comprise 46 exact Lean
-replays, 17 actual-False controls and six explicit class-universe refusals.
-The report records the corrected lexical harness, retained failed attempt and
-complete source/runtime/replay archive.
-The [contextual proof-prefix repair](docs/reports/2026-09-14-contextual-proof-cutoff-acceptance.md)
-now resolves the observed default Haskell Djinn timeout: contextual batch search
-checks the requested raw proof prefix before conversion. All 148 Djinn and 187
-adapter integration tests pass, along with eight exact GHC replays and six
-rejection controls across default and finite-budget public runs. Search defaults
-and limits are unchanged; Leant retains its separately accepted native pin above.
-The [Exference public ground-kind milestone](docs/reports/2026-09-14-exference-kinded-source-acceptance.md)
-now connects lexical kind ownership through alias expansion, search, independent
-checking and emitted-candidate evidence. The original 11-case Exference corpus
-passes 22 exact GHC replays, 11 actual-False controls and a malformed-kind
-rejection, covering vacuous/shadowed binders, higher-kinded callbacks, aliases
-and impredicative pairs. All **1,659 tests in seven affected suites pass**,
-including certificate retention and compatibility-first deep evaluation.
-The [session-provider identity repair](docs/reports/2026-09-14-session-provider-identity.md)
-retains Lean's fully qualified declaration names through synthesis replay,
-including append and undo. All 768 native tests, six public inventory sessions
-and nine literal-False queries pass. The original integer-indexing diagnostic now admits the intended
-generic `Int` primitive; matching synthesis and provider scheduling remain open.
-The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-retain source-kinded composition with caller-supplied global-provider kinds,
-deconstructor transport checks, and native dependency adoption as further gates.
-Leant's separately accepted pin remains unchanged. Integer `at` now has a concrete
-provider-admission diagnosis; the original two-universe query remains open. A focused
-Lean Djinn `length` diagnosis precedes broader class/provider universe work and reductions.
-These scoped releases do not establish arbitrary synthesis completeness.
-
-The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
-preserves explicit binder kinds in emitted signatures and passes eight GHC
-rendering fixtures plus rejection checks. The [checked source-kind transport
-prerequisite](docs/reports/2026-09-13-source-kind-transport-prerequisite.md)
-preserves annotations through conversion and synonym expansion. The new Djinn
-execution checkpoint has its own root validation and public replay records
-beyond those prerequisites.
-All ten representative extrema probes miss at their original bounds; the carrier
-experiment also reaches its search budget without a match. Further extrema work
-requires a bounded construction trace. Integer indexing, Lean Djinn length,
-contextual evidence and supplied-fold trees remain required. The failed reduction
-variants stay paused until a trace justifies a different construction change.
+Read the [Djex rank-N and impredicative synthesis rules](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n.md) and the [Leant synthesis guide](#synth--automatic-term-synthesis) for usage and limitations.
 
 ## Contents
 

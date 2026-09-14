@@ -1,0 +1,4583 @@
+{
+  "scope": "Cooperative native provider scheduling and deadline admission accepted; original Int indexing remains open.",
+  "archive": "provider-scheduling-2026-09-14.zip",
+  "archive_sha256": "a43e64a6b62553bd201f2439dcedcd65283e02f5bd1de6eda2500f49c8fa7fdf",
+  "archive_bytes": 4967802,
+  "member_count": 905,
+  "acceptance": {
+    "public_cells": 18,
+    "exact_lean_replays": 11,
+    "actual_false_controls": 7,
+    "fresh_full_native_suite": false,
+    "indexing_candidates_accepted": 0
+  },
+  "runs": [
+    {
+      "directory": "provider-scheduling-public-v1",
+      "status": "failed",
+      "receipt_sha256": "b1fe86d14b7b28bc9b9b6b5d5b0fee303ce6ddf10d8f12892b92ca0ff196bd15"
+    },
+    {
+      "directory": "provider-scheduling-public-v2",
+      "status": "passed",
+      "receipt_sha256": "8ddbd171a2115251651c22ee1a6fbe7fc59d312cac404951b274a7af5adf70f6"
+    },
+    {
+      "directory": "provider-scheduling-public-v3",
+      "status": "passed",
+      "receipt_sha256": "9e9d625f0216c696916de959f5ade0dd00502f4cf66f9d470ec492829a44f660"
+    },
+    {
+      "directory": "provider-scheduling-dictionary-v1",
+      "status": "passed",
+      "receipt_sha256": "6c10d1b41f41d756c1f19af657a0917da06525cbc26b3ce7d984a9ef0f8f0dc2"
+    },
+    {
+      "directory": "priority3-native-int-at-scheduled-v1",
+      "status": "failed",
+      "receipt_sha256": "899851e359b3a17640082ffea36455dfff51cf03623e2004524c4de21271eed1"
+    },
+    {
+      "directory": "priority3-native-int-at-scheduled-v2",
+      "status": "failed",
+      "receipt_sha256": "d1caba15e7843a67f2f1fd63493e5d5bce073dfb0ef5b837c576f69208593a66"
+    },
+    {
+      "directory": "priority3-int-primitive-use-v1",
+      "status": "passed",
+      "receipt_sha256": "b1d6d238724f57b5b51f2a4d9b5832d8d495bb52e937e668343e40d2544cc70a"
+    },
+    {
+      "directory": "priority3-predicate-elaboration-v1",
+      "status": "failed",
+      "receipt_sha256": "0d83f72b40e67db38d1c542563aadcbe88740dd88e95136a58700f040339b707"
+    }
+  ],
+  "members": [
+    {
+      "path": "INTERPRETATION.md",
+      "sha256": "14f07d7293c8b48bfbba23a993128f81e41bda8b4e3e1f3f4adefd27b360d4e7",
+      "bytes": 1014
+    },
+    {
+      "path": "controllers-and-builds/package-provider-scheduling.py",
+      "sha256": "230abc20c4ec3746800332018d93ec3b41b6f7e296bfce78a9e462857641df69",
+      "bytes": 6225
+    },
+    {
+      "path": "controllers-and-builds/probe-int-primitive-use.py",
+      "sha256": "8e7804c2281395b9099f81528f13ad0731ea94e158ad50128c115fcab66b4391",
+      "bytes": 4032
+    },
+    {
+      "path": "controllers-and-builds/probe-predicate-elaboration.py",
+      "sha256": "13127387e562ac67fd53cf0755b0ad826ccee64aa5ccfc6b2146ed5a8bfbe1f1",
+      "bytes": 3074
+    },
+    {
+      "path": "controllers-and-builds/provider-scheduling-build-v1.log",
+      "sha256": "fbbaf76b97feb064b7baec47455cc59c16a22b7f23dbb3c09edd230222585ac9",
+      "bytes": 555
+    },
+    {
+      "path": "controllers-and-builds/provider-scheduling-build-v2.log",
+      "sha256": "fbbaf76b97feb064b7baec47455cc59c16a22b7f23dbb3c09edd230222585ac9",
+      "bytes": 555
+    },
+    {
+      "path": "final-source/Djex/docs/examples/Church.hs",
+      "sha256": "782e4edaa5bf813e30e39ae02d52278ab0566315ebc521401a947b98c44cfd11",
+      "bytes": 77973
+    },
+    {
+      "path": "final-source/Djex/test-church/behavior_extended_spec.py",
+      "sha256": "7c8f0f42c28b533e72ffe9debceaedad1192438820efc344dcbdfe76d04eb444",
+      "bytes": 41250
+    },
+    {
+      "path": "final-source/Djex/test-church/behavior_partial_spec.py",
+      "sha256": "85066eab8089205346e591e3673f936844005e3846705c74d92d3a7e635b5716",
+      "bytes": 48899
+    },
+    {
+      "path": "final-source/Djex/test-church/behavior_runtime.py",
+      "sha256": "b5240378e17d3fb25af8ad18fc0ba88f0226dc2116b99efe3300f4b006a88028",
+      "bytes": 17809
+    },
+    {
+      "path": "final-source/Djex/test-church/behavior_spec.py",
+      "sha256": "426fb6cf5e8a607608bed4ca52a74776cd38d1c5f7a5c49866fda6b2a98cedf4",
+      "bytes": 12300
+    },
+    {
+      "path": "final-source/Djex/test-church/manifest.json",
+      "sha256": "0c2954eeb36811ea065aba86187d09cd8761529de1acefd5111ccf088b189ed9",
+      "bytes": 1868921
+    },
+    {
+      "path": "final-source/Leant/bench-parallel/Bench.hs",
+      "sha256": "927399b19bba03d0f8b48b91510849a2cb005c0318890ca24f9c744514284636",
+      "bytes": 25943
+    },
+    {
+      "path": "final-source/Leant/cabal.project",
+      "sha256": "5c3a4c4d485b6e682eb0233c9d9385353c009978cd45013cad3a516b1c3d1554",
+      "bytes": 221
+    },
+    {
+      "path": "final-source/Leant/dist-newstyle/priority3-native-int-at-scheduled-v2/PartialOracle_at.lean",
+      "sha256": "fd0b271b5e4ecda82eb42c7ee480e9cc5405a1624f30c5fdb80def8acd7e0ea0",
+      "bytes": 139776
+    },
+    {
+      "path": "final-source/Leant/dist-newstyle/priority3-native-int-at-scheduled-v2/PartialPrimitiveControls.lean",
+      "sha256": "281d25ee35aced3986e5d7f1253dbe7718c8a9007811f8a0cae4acb1f8163279",
+      "bytes": 1253
+    },
+    {
+      "path": "final-source/Leant/dist-newstyle/priority3-native-int-at-scheduled-v2/partial_exference_at.txt",
+      "sha256": "20e2f977cf0a178b6fa002785286ccefaae942b7ae20abdf2e75552715310e4c",
+      "bytes": 25254
+    },
+    {
+      "path": "final-source/Leant/dist-newstyle/priority3-native-int-at-scheduled-v2/partial_exference_reject_all.txt",
+      "sha256": "a9accedf6fe6c2074297ff5cd33e183152df0390991762e046e8818572ed0038",
+      "bytes": 407
+    },
+    {
+      "path": "final-source/Leant/leant.cabal",
+      "sha256": "1014f2fd8d59e0974aec2ca1dc683d1192209fe634018fd2f407a2e1b3709fae",
+      "bytes": 8429
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/app/Main.hs",
+      "sha256": "d60c2e7429955eba1794ada56b840a1ddb579bad58d5747761c534e33d261d79",
+      "bytes": 363
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/bench-parallel/Main.hs",
+      "sha256": "5e7a430f96bdc8071f02ad14ba4f1db965ff1fbd2784f2c62c5365d6f67575d9",
+      "bytes": 6609
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djex.cabal",
+      "sha256": "2e26d83d112c8c079d8ae7bb4d4e7c38780ead9e5f47202d077ea55d3a0c2539",
+      "bytes": 32407
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/app/Main.hs",
+      "sha256": "198981ca1df3b2323222aa85ab6884c3003667204b5c58f2ebde68c72da65ad5",
+      "bytes": 88
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/bench/Bench.hs",
+      "sha256": "5b4becaf6b6d8f7ef070359f31732f3d43ac9b8ea8e50960a33277779fc9f5e6",
+      "bytes": 4575
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/bench/Corpus.hs",
+      "sha256": "fb4d78e1c236f7b75b395472696fa83ac05a4b85225e2bdcf992ffea552d8979",
+      "bytes": 6972
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Core.hs",
+      "sha256": "c8ad406381f2ad484d94840490d5c59a11427d759e38581ffbd510025880ccc0",
+      "bytes": 224468
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/Declaration.hs",
+      "sha256": "ba19aab9c20d514e1f13fae2ab6798874846e61850f708e91462b294034245a1",
+      "bytes": 18371
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/Environment.hs",
+      "sha256": "6dbf77c4edc1d1b46f4495131dd05a25d33bc561dacbe1f319ea02d3f40da87b",
+      "bytes": 102446
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/Generated.hs",
+      "sha256": "f4a1387fbb766e6cbc154392b2738df6994c57bf9c373ae49b007e1b9a2f1885",
+      "bytes": 11315
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/HCheck.hs",
+      "sha256": "21eaaa63fd7576b41b1fe6319904beb55ff1388fbc65bbb27e02ef2d8bbde1dd",
+      "bytes": 2558
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/HCheck/Implementation.hs",
+      "sha256": "f68567a5cb74b69f1916baa0c6ff5664d5999605156deee87465ee4bf0b621c9",
+      "bytes": 15792
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/HIdentifier.hs",
+      "sha256": "cf3d23fde83786e15f715480e2fe76f815fc38afc385990e6b0ae40d847c672b",
+      "bytes": 8264
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/HTypes.hs",
+      "sha256": "7fe1ffb615ef4a43203efc0f465b96b6edd3839e130323d07f1aaf0d5856e7fd",
+      "bytes": 25579
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/LJT.hs",
+      "sha256": "d40cce24906a61107545e248cf7b17694154c7b15f1c36ce80c948d150fe0574",
+      "bytes": 68684
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/LJTFormula.hs",
+      "sha256": "3c77fc6129a2bc1520ce1969a8b0a41c4ee5e30d166083719a1b60779f6eb8d7",
+      "bytes": 13208
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/ProofCheck.hs",
+      "sha256": "7a488d12c2277f11522267e67a7c1f7cbbb5d971c32da20a158343956e709151",
+      "bytes": 1151
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/ProofEnv.hs",
+      "sha256": "4641e7cd525ed31f63275018eab868240b1bb566f3ec1d17618af4d6c0b6c8e8",
+      "bytes": 4649
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/Type.hs",
+      "sha256": "ac713e5b2793b75152d82a8a9c47d743356c99a373b16021f16abb16451423ab",
+      "bytes": 14806
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Djinn/Internal/TypeFormula.hs",
+      "sha256": "b9d6b5aaee94eef4473eea4fe1a0fcbb32734adea335d55c0c8a2c265caa1950",
+      "bytes": 89813
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Language/Haskell/Djex/Djinn.hs",
+      "sha256": "b3d819229649d30068fb6ba1243fe5f75948e588a3b3b532ed4f00edac906883",
+      "bytes": 22003
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Language/Haskell/Djex/Djinn/Internal/Request.hs",
+      "sha256": "65a660dafab5470581edc293f7e9e3efc9a6117d611c2ead95f8902816fe4fed",
+      "bytes": 13122
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-core/Language/Haskell/Djex/Djinn/Internal/Session.hs",
+      "sha256": "9c1a4e9570d86102d71316cde43731c830e7b980dec9fbfcc97993899da98afa",
+      "bytes": 11269
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-frontend/Djinn.hs",
+      "sha256": "4ca738ab1f8c72833cfee001067a7a8e2999fa9eee73c23f33d174c0936f6e08",
+      "bytes": 28424
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-frontend/Djinn/Internal/Help.hs",
+      "sha256": "b2e3aafc5386e41929d2e92ceddc3b4b6afde21c3ab4662dbbc0817926765e7e",
+      "bytes": 9094
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-frontend/Djinn/Internal/REPL.hs",
+      "sha256": "86719b81493c2021a2f6eb0ea2f951cb2e19ff8263e1f27d84eabc76b7b02a14",
+      "bytes": 1934
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/CheckedCandidate.hs",
+      "sha256": "050daa7c9c3b287658a81c55b02d6f677d74ccf8e427794bb00b6d799c010835",
+      "bytes": 8212
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/ContextualInstantiation.hs",
+      "sha256": "1ff93b4fbbf1e63d6fea36d033ab9b862f7485abaae3983410f08e6e8edb0d0c",
+      "bytes": 17008
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/DirectedInstantiation.hs",
+      "sha256": "d5b051b839e5bc1533d78b202cafc05dbb1b5d36cba15be74635306b64c8fa0e",
+      "bytes": 6738
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/GeneratedDeduplication.hs",
+      "sha256": "462532e4abcf701b85ab14390f0e5a3bcb74c939187931a0ee606eca5a02f33f",
+      "bytes": 2488
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/Instantiation.hs",
+      "sha256": "781d59c941beb183dd2f9fbee10a4687f5b35148ecc810477a5891e20840b64a",
+      "bytes": 66305
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/InstantiationEvidence.hs",
+      "sha256": "62504461f0275f939f6914875b3ae5d1487133349d0b2ff5d2c1c1f0f9eaf91f",
+      "bytes": 4441
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/LexicalKinds.hs",
+      "sha256": "e5a27d532092adee311534358b5b6c41e6c3d735cdd4397f2c8e62db2ee86e54",
+      "bytes": 6453
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/PlanFamily.hs",
+      "sha256": "5ec0798f05486163b8688bddb8dd4c746eecc93e3610453e1cb7817b16578a68",
+      "bytes": 800
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/ProofCheck/Evidence.hs",
+      "sha256": "04391366ef681cf824338a819b7aae61d535949ab1612b0a4f066e700f7be071",
+      "bytes": 20561
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/ProofToGenerated.hs",
+      "sha256": "c0f04f6c286ec0486b82ac3cb8442dbd8b9353f675ca82c727ffa7b7fe2d9576",
+      "bytes": 22752
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/SourceAnnotation.hs",
+      "sha256": "865d27911c22a92210003cf6af2222dd7d9853344ea75bb80254b5e0c980d78a",
+      "bytes": 6063
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/SourceEvidence.hs",
+      "sha256": "71c81e136cf3aa3be3ab4d47494ea9452d9ba7cd6e1deb8a06666b9f860db4de",
+      "bytes": 25407
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/SourceGraph.hs",
+      "sha256": "407a136956018a7f4fad95c658833d99545951822887957cf46ab86e5120cb48",
+      "bytes": 53676
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/SourceGraphKinds.hs",
+      "sha256": "eae494888db18133e8f38a12e1c5d63f50defa6f8f14f463a3beb8232375aa7a",
+      "bytes": 17030
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/src-internal/Djinn/Internal/SourceTypingContext.hs",
+      "sha256": "76af1bf5ec863655e4bcfb935fcb90640d2d3bae46a7bde77dd0050158c5caf9",
+      "bytes": 5225
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-cli/CLISpec.hs",
+      "sha256": "dddcf16191d38e7687608070e6b44fcd74a61002f1ba662fc8b5fe7ad870e8b9",
+      "bytes": 23943
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-frontend-api/Spec.hs",
+      "sha256": "8cefe1bcb14d8bc82d71a9de9fe975c3c214a004c9ee1f6d1f51ddc842a27a1a",
+      "bytes": 4948
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-property/PropertySpec.hs",
+      "sha256": "3223de4e70191e2f7105756cfc4cdd186e85fb547774af2c8e8ea9236eb13f9b",
+      "bytes": 6978
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph-private/ContextualErasureSpec.hs",
+      "sha256": "187c314bb34fb407b4f2776a90a3d6ebcad3d90b6b7f1da03526c358b77a9c3d",
+      "bytes": 16299
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph-private/ContextualInstantiationSpec.hs",
+      "sha256": "0bdd3343e5dc9176592a5f452bec2f84c880ba745fb6ae677be120ca1358f776",
+      "bytes": 28149
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph-private/DjinnContextSpec.hs",
+      "sha256": "3b29c8a085f2a8e8b113b386c4432300039f2f1828e0245d5a142047d391427d",
+      "bytes": 14406
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph-private/KindGraphCases.hs",
+      "sha256": "d6e090384f7ebeb48c569157f6cac1b7930356f58869941304d7651a32890162",
+      "bytes": 15820
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph-private/LexicalKindSpec.hs",
+      "sha256": "1a27370d8ba393b2bafc29fed5dddd186e1eaedd0a57170e8b626ff86eb5e9db",
+      "bytes": 4969
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph-private/NestedGivenErasureSpec.hs",
+      "sha256": "67d5c0ad1ab28ab69d01f8b093d702593bfe41d879280aa8e4647cc9ee149c90",
+      "bytes": 24117
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph-private/SourceSelectionSpec.hs",
+      "sha256": "ff40b0103a5e7fc824e98a683d81ec5862b8f9bffcf477dd0755bb19e82b74b5",
+      "bytes": 14806
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph-private/Spec.hs",
+      "sha256": "7c9d0d7ccfc2993fb6e55068fe4bfcd748c010327ffc7b7475786f2e198dd9cb",
+      "bytes": 19248
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph/KindCases.hs",
+      "sha256": "cf09e37ec3610a45a4978c8a38c32c255101a23a173ec075501b78c618a37f17",
+      "bytes": 16073
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-source-graph/Spec.hs",
+      "sha256": "efbb41e4a632a1f3e56eb3b616dc877c233b90ca245ae13dcc7bcca7d9c3923d",
+      "bytes": 30988
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-unit/HCheckCompatibility.hs",
+      "sha256": "d0f844f6eb8d5e16a4466ebcd45fcd726ba4f0901e76e974e800bd67a130ced2",
+      "bytes": 5117
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-unit/HKindCompatibility.hs",
+      "sha256": "951df7dcf2d0e69b2f442955c023c086620349c04a182e655e3db3a5a1cb8899",
+      "bytes": 2429
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-unit/HTypeCompatibility.hs",
+      "sha256": "27b996914ee42cac658c9d5e81021247f0e69233fcdf7366d15da17d9571525e",
+      "bytes": 1568
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-unit/ProductAlternativeSpec.hs",
+      "sha256": "242620c699e8c8c91c82260ce1c42ba06a187d5e2239ffc1e93fb50e5a1aa2be",
+      "bytes": 9898
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/djinn/test-unit/Spec.hs",
+      "sha256": "e60dc89845437ccc7f6d4c86798d20ceea004c742bb6a75adef1c381092895d6",
+      "bytes": 551678
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/docs/examples/Church.hs",
+      "sha256": "9dadbc9c3491cff3b371db8e1c3039807df37a2f4258fad9c34fc25d269ae80b",
+      "bytes": 79837
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/docs/examples/Spec.hs",
+      "sha256": "bc3e850a4268d28189b4193a8227bb306dddc1c8b2686891312f8dfce81e529f",
+      "bytes": 75279
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/app/Main.hs",
+      "sha256": "25b1dd3958822a24f6ccce31961b70cb10f731975e467301a5616fb235fc54f8",
+      "bytes": 118
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/bench/Bench.hs",
+      "sha256": "c098e7ff4f81b7d5c18637902fd0fe551b626f5d42a366d3c547e8697d28389a",
+      "bytes": 7309
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/bench/Corpus.hs",
+      "sha256": "67825cdaf8953ef4837fba4c440d03c61c48c75ad8f43d98325badd2e8dbffc7",
+      "bytes": 6528
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Applicative.hs",
+      "sha256": "e5a55fe90bf6dda9728ae93e88e0d7baeafeb7e8e6619281083d170657364035",
+      "bytes": 2164
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Arrow.hs",
+      "sha256": "361928e0f7dc9082e8d45616f7f438ca4f4418734f260464abf89448aff4e209",
+      "bytes": 858
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Bits.hs",
+      "sha256": "9b50035c05be2113d46cea0502487ca81725a3b15f130fd12b1be299908a2340",
+      "bytes": 133
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Bool.hs",
+      "sha256": "c1df79a891055bc35a527b63e4c1a9b233daf569c22139795d71ba5d21e7e4f2",
+      "bytes": 1046
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Category.hs",
+      "sha256": "6f73c53cf68f8681f3f8d1cfe87b20d219b2889d12ea3c398ada6143119746fb",
+      "bytes": 120
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Char.hs",
+      "sha256": "65d131cd6e716dd12e5f51f89b952cbc11fde9b5a591634f80962f295f537263",
+      "bytes": 930
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Comonad.hs",
+      "sha256": "d4ac22f94f347c379d0c608f30ce8e276aee6a812a5d62950307e376852c0337",
+      "bytes": 608
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Complex.hs",
+      "sha256": "d80cc1f138bf4415d2c164f5f6ed560e6a30eb7ea48bce3741bbfb9268f72689",
+      "bytes": 781
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Cont.hs",
+      "sha256": "5ec89622f611243a5da5865f976515cc747c2076ebd7b07a22085399f171d117",
+      "bytes": 173
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/ControlConcurrentSTM.hs",
+      "sha256": "24038650a1feed7958c7e22d7907a7312bc354517811efc3c38306a3d709834f",
+      "bytes": 199
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/ControlException.hs",
+      "sha256": "180a30734e81b43296b26241ebc9e7b8b8d1fe227a82224d89abc440d330ea91",
+      "bytes": 182
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/ControlMonadIOClass.hs",
+      "sha256": "39b5b3bd907bc6ac7bfff347b60b3b1de3432a1718828e31296ae597a3f051d0",
+      "bytes": 200
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/ControlMonadST.hs",
+      "sha256": "0939754037988ff98fe4784e8f9a32d4dceb3c54b816cb7842c4a607a477aadf",
+      "bytes": 156
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/ControlMonadTransClass.hs",
+      "sha256": "033c27cb81204bfe120e2027947fc97c34cfe1c23f09334bc96fffdcee551da5",
+      "bytes": 165
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Data.hs",
+      "sha256": "7c6c2baeef6c862d3e0ecbb2eee18683ef0050aaf426b88a9514b6ba4f04ffcb",
+      "bytes": 2680
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/DataFunction.hs",
+      "sha256": "92e8d5883a8b7a3b8e0fabf289c43ebcc2f2feb5269054d5295af14efecb7dac",
+      "bytes": 56
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/DataFunctorConst.hs",
+      "sha256": "c797a8ae5fbd82bc79d583c2ff96a744f89d9f5370c510adaed84f336ccbb481",
+      "bytes": 51
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/DataFunctorIdentity.hs",
+      "sha256": "d614fd421d924c3b18c6d0cef1c612c7a2def7177736a42e87222bf385ed47a5",
+      "bytes": 55
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Either.hs",
+      "sha256": "c8d0b2c79a09fbc16b5c3edfd9c3fc559ea9434124b786b347001b6e03be392b",
+      "bytes": 1359
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/EitherT.hs",
+      "sha256": "d455cc42474bf916b1e0ef4609821ebf0ac73d979ed6110ec4ac5296b1c6bc16",
+      "bytes": 320
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Eq.hs",
+      "sha256": "6b6a1d207d976a2392380ec1d236d28ed5725a0e809da64a7b494a810cc8b271",
+      "bytes": 2135
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Foldable.hs",
+      "sha256": "1bc33289fc2182035b06e409f8a96097630b6c1c880e13be3900c73fcffdcddb",
+      "bytes": 705
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Functor.hs",
+      "sha256": "6713ea0cd562b9c57e839ba5dbab0f093adf96c6ce4e7668f709ad2aacfd7a4c",
+      "bytes": 1487
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Generics.hs",
+      "sha256": "7f0f336ef4ed9b98307b47989463d5f5129cd5fe8d62862841db680bb1d7cd26",
+      "bytes": 364
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Int.hs",
+      "sha256": "be2324be2ccfd50057b2b18ab8f2f88b186e21ae94092b13b10f89717290c48c",
+      "bytes": 3012
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Ix.hs",
+      "sha256": "6fae4019d3c6a12c8f10885f34e22c297ba2c171bd5ad5cffc621ff5a9761f77",
+      "bytes": 1110
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/List.hs",
+      "sha256": "c18dc2297b73b1eec9c21481cb80d6e7e5780670cd8009597706b1fb7f75e396",
+      "bytes": 1161
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Map.hs",
+      "sha256": "e358b5a8e3fc7531d9756d4eb9b76cff2743e2f3715c53e58190b75abc6fad9f",
+      "bytes": 179
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Maybe.hs",
+      "sha256": "0984e0cb3e0dfc804c626599e6ad79fa0dbc21160d9c8cc00ffeb3f064d53d7e",
+      "bytes": 1566
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Monad.hs",
+      "sha256": "34920137585f949018d1c25768b15564143b9571efcf94737fbccaadec6f6e06",
+      "bytes": 1642
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/MonadLoops.hs",
+      "sha256": "1e1d92e765904ef05cbd0803b76026f5f537da1ce039742f01c8575cf881013a",
+      "bytes": 814
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Monoid.hs",
+      "sha256": "cb0dc6df14766dcc61273127352347b51d1709128271f803268953f82f92f4f8",
+      "bytes": 1094
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Ord.hs",
+      "sha256": "87340fb016ef9f25cca2516076e844b45a1d815bc13965ced5f7a81e0c4758af",
+      "bytes": 2863
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Prelude.hs",
+      "sha256": "a0d178917ff03f41e1d89beddb1aa88d86c98e222e979956d6c27646f1a4da99",
+      "bytes": 3755
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Printf.hs",
+      "sha256": "3bf40d82da5f9a032e0c747008d0027495d977d396b3d86a936d618e29eacb03",
+      "bytes": 110
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Proxy.hs",
+      "sha256": "57750f940df7d4d30fa70ffa35c067edf55a52d55928969aceed700dfd5eeb0f",
+      "bytes": 636
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Ratio.hs",
+      "sha256": "50a8b09f383607c976ef54792b18ae2919f2536794c8a2fdfff1076fc0c839fd",
+      "bytes": 1070
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Read.hs",
+      "sha256": "3997852d473a7222439d977b292628a784780b8b3ab069ed7c7b8969dd55129d",
+      "bytes": 500
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Show.hs",
+      "sha256": "c11dc3905806c9a52eec558dd0b6d246c25643dd131766d1049c4d28c8704a90",
+      "bytes": 2563
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/State.hs",
+      "sha256": "5dabaebd1d6947af597e7013e889e76c81e88607b82cbc0fef4dfe99f5d0d966",
+      "bytes": 1229
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Storable.hs",
+      "sha256": "388cdf1bcca0a971163d2250759ace9745adc5a65a3b906ae05b217386297bc2",
+      "bytes": 210
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/String.hs",
+      "sha256": "2a66f23246a79ad166f8b9db7ded70bd8b850354a3a833a06a8d9ec0bf85478a",
+      "bytes": 159
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/SystemConsoleGetOpt.hs",
+      "sha256": "da2b46281f455f401bd782d49e3d12da1f79448181cc67824b0b26937494ff3e",
+      "bytes": 292
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/SystemIO.hs",
+      "sha256": "a1adf622fb98cc83210bd0bf4124413c16958cdbffd812b7712921d47ae88400",
+      "bytes": 365
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Text.hs",
+      "sha256": "abba1f83464ade40ba657cdbe0c4681bf850735198feab4fb6c7a9a630636e3b",
+      "bytes": 625
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/TextParserCombinatorsReadP.hs",
+      "sha256": "48deffeb89f4c90ca7b81580f56b2f6f37315a97451c190f00bcbaa59a76547f",
+      "bytes": 59
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/TextParserCombinatorsReadPrec.hs",
+      "sha256": "a3d056bbd7b3a8ba9d24419093f36873fb004b4ad69a7a7573c6d3647fbfbe7f",
+      "bytes": 65
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Traversable.hs",
+      "sha256": "3f83e7d457c5ea654de198bb036f802d8598923298d77e5c0264c44091278dc6",
+      "bytes": 939
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Typeable.hs",
+      "sha256": "b081cac4ef8617aeaba5996ba0bd70ee996983b8af5b3f7c723000c4901f3fd3",
+      "bytes": 866
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Void.hs",
+      "sha256": "bced0c066b870419af6c04e54e8a580c72bedafb735cb8935767a289112534b3",
+      "bytes": 850
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/environment/Word.hs",
+      "sha256": "64e6a206bc6f13d7d2dc44b273340829714da3d920a86e64a7f19129a9da9e12",
+      "bytes": 2844
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Djex/Exference.hs",
+      "sha256": "aae90276b6fb5ffe66c3891f78fff620224d350715ded7ec899c7d0bd0b4f133",
+      "bytes": 46737
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Djex/Exference/Internal/Request.hs",
+      "sha256": "3038082cfdb9c2d75b3a94e1bba56bd929b1ce72eae4482f62ada8630a423539",
+      "bytes": 12548
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Djex/Exference/Internal/Session.hs",
+      "sha256": "3946875f9e6941b26d6e1a42766641f11b0446189e325436b3e14a2182265fd7",
+      "bytes": 23296
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference.hs",
+      "sha256": "b6d73fff5dc913a8e25d68685a9ff543bc90c68883033744c8515847d0d5b67e",
+      "bytes": 1838
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core.hs",
+      "sha256": "8b85d5442b068854cc3c943078b06cc2f3feab8d1a20d9050d4bdd74a4784b40",
+      "bytes": 4891
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Candidate.hs",
+      "sha256": "4d39970bfe9098b9208ce614fd73bd64c1644254ccab67fb6d5a05f21f4dc80e",
+      "bytes": 456
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/ConstraintSolver.hs",
+      "sha256": "6051515a852875507b83ee53765bd193588a868f0c2542517ca0f90e1f3cdcf5",
+      "bytes": 8113
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Declaration.hs",
+      "sha256": "e84e894e1b2e024111c31729eab3df524dddd68e818aeca7b088cece461ea69d",
+      "bytes": 54971
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/ExferenceStats.hs",
+      "sha256": "2e783b989ef2bfb12319a30d8e85f24da1b4adef3940bfb42b2a773ce08cd3e7",
+      "bytes": 2264
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Expression.hs",
+      "sha256": "c05eec3f20fc73f9f9474866a9536d96f258556560cb3c3346e6c3414a61219e",
+      "bytes": 26055
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/ExpressionCheck.hs",
+      "sha256": "94d94bd4a47e89027d06dc4162d0ee0ed1a2bd52493457ff7106a592dff8d574",
+      "bytes": 707
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/ExpressionSimplify.hs",
+      "sha256": "dc90de03524e890ae863996742873bd4e211ddc49999a2fe87fc98cb401a09c4",
+      "bytes": 409
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/FunctionBinding.hs",
+      "sha256": "a1445a4d29918bc7fa9e8238cff36d860cbd2beaf66292ddc74793ccf253a620",
+      "bytes": 19059
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/Candidate.hs",
+      "sha256": "2d3cc458de2089d7d45b145fa79fed5ddc286172327cd58ec886191c71d6737f",
+      "bytes": 15084
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/Exference.hs",
+      "sha256": "7e3099f4923021e48b42c4364aa756301d040ad7d72bcb7a1409cb3dab2aec79",
+      "bytes": 157425
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/ExferenceNode.hs",
+      "sha256": "2b15a56f559c42258aafdd9c8b8f06d235513d170b85d643e8235a5e404df7f1",
+      "bytes": 11739
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/ExferenceNodeBuilder.hs",
+      "sha256": "7876abbb5657860e44574708849e8ac30ed5788d87f6c2c4f742aac3b901c55e",
+      "bytes": 5164
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/ExpressionCheck.hs",
+      "sha256": "2c863b0e0c2db07123747211c4fe07d7f11fd11178d6723b1b47ce489f5ecdc3",
+      "bytes": 140607
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/FlexibleIds.hs",
+      "sha256": "4c2b66c85fe3766e2c4bafe963922ff3695767aa8685aa3c988469e8d9c89011",
+      "bytes": 4976
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/Options.hs",
+      "sha256": "183aee939fac7883ea14c686c8c28e36c38f26e0d4efa8aa517e07a0f0f235e6",
+      "bytes": 6583
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/Polytype.hs",
+      "sha256": "453cd46ceffd6f0ebd271c8df21ac265be7b3669986a7daa6966ef47edf6c508",
+      "bytes": 23880
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/RigidScope.hs",
+      "sha256": "a9555df7bf5bf020ac4b4066d88d5f275107dedec50d7b3ee7271bbf83ecb37e",
+      "bytes": 5828
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/Scope.hs",
+      "sha256": "4487853f5633ac1d63c2542a8eae02632cd3e3792f3724ce99806f58257be22e",
+      "bytes": 8456
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/ScopedConstraint.hs",
+      "sha256": "4749eb325227fcb7bda0c415cce36edffd846a89746d66eecfcaf24a920a4d33",
+      "bytes": 3107
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/SearchControl.hs",
+      "sha256": "e80083ae5b158e7ce52c2196ea60ea40dbb92cbff976c2d6b855c4d62fca5eeb",
+      "bytes": 5257
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/SourceNames.hs",
+      "sha256": "201f65d6755a6d2d919087c982117e22ddf366e0bfe6f4fa1d9b79e7c5d032f1",
+      "bytes": 1077
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Internal/VariableSupply.hs",
+      "sha256": "987718d704beeb56e7aa6f0ec9cebb5223321e44c1636dd8ea387ed22f967115",
+      "bytes": 8095
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Name.hs",
+      "sha256": "f24ce7b929b5fe74dd00362ce8e12db2941b47537a842259013027d3bf6f4562",
+      "bytes": 7117
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/RigidInstantiation.hs",
+      "sha256": "6dc0cda5ec2d804012a8dafc9d5aa7e76e688ad6cd6622cdf7b0fccb6f889b7b",
+      "bytes": 12794
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Score.hs",
+      "sha256": "6c2515640c17f21d89e9af92df10fe36adf153e3489708007b0d7e4f204b76b4",
+      "bytes": 7437
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/TypeUtils.hs",
+      "sha256": "1fb4292c3814215bdb3d84dc3725d87f916d3b19745e6c40b44b85a99f17f849",
+      "bytes": 8901
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Types.hs",
+      "sha256": "253fda537c69a7d3ba1d06e2700afc9b47c7e16e876f0e96f10d74572e90f5be",
+      "bytes": 54487
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Core/Unify.hs",
+      "sha256": "f0bf239b3e5f5fe9584431dcde25cdc983243153a19e173db2cacdac70f002df",
+      "bytes": 26526
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/Diagnostic.hs",
+      "sha256": "ddc782f5482516ebe95165ad8de7d7c63c9662884071e0aeba57f37840e2eba7",
+      "bytes": 1834
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-core/Language/Haskell/Exference/SimpleDict.hs",
+      "sha256": "618529ea30c78d12aca373692e0d2db95ba1afef6f93a10f7e24455b7e056399",
+      "bytes": 693
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Djex/Exference/HaskellSrc.hs",
+      "sha256": "e531f876ddeaecdba8ad9b30b640a60f2f6316ae43000d333fa6baa0fe6bffd9",
+      "bytes": 14517
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/BindingsFromHaskellSrc.hs",
+      "sha256": "353899345ff456ab3840e9aaa14b5c0c96804b0812ac5b98826ec4e9554fea2a",
+      "bytes": 21092
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/CLI.hs",
+      "sha256": "a32919dab7eccc9be7a5a9c26af463c3cdf8b5f5e4346f1e3177621702139597",
+      "bytes": 21024
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/ClassEnvFromHaskellSrc.hs",
+      "sha256": "0f2606585ccfe7fc231df278f70df3d6322822965e0f604cfaf51babe29cc8ef",
+      "bytes": 22239
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/EnvironmentParser.hs",
+      "sha256": "2f2e7d42935a8ed7cf4f66c34cec8f585d8fbb89e313dc658fb8500cbfd03a7e",
+      "bytes": 87819
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/ExpressionToHaskellSrc.hs",
+      "sha256": "dea256de97c9cb79eb60db8af4ac1145b4ae3d9d86a6216ac05c0c4a961ce738",
+      "bytes": 20197
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/ExtractionError.hs",
+      "sha256": "07c86a2203da5d42906291fe3e7c0ba91a3d74e80376f7298659a0846d92063c",
+      "bytes": 4666
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/HaskellSrcUtils.hs",
+      "sha256": "ab03851c9c9fb10316e921a30fe01d067c9047ad3aad37ca486953ba57c91641",
+      "bytes": 7476
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/Internal/SourceTypeScope.hs",
+      "sha256": "3ee7bdd417dff10cd73c0bcec9dfebe9754a884a3cc740826fdff921f10ffe0f",
+      "bytes": 18674
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/Internal/TypeParsing.hs",
+      "sha256": "647ca78cc4df0c61e8e325bc0fbffc469fd5e656b062c3f0c1eecb8920ad1eea",
+      "bytes": 3883
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/Session.hs",
+      "sha256": "abe6c3736f6f5068dc988a12bbdfec5d16201c0cb67c5475389141be778fc10b",
+      "bytes": 1909
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/TypeDeclsFromHaskellSrc.hs",
+      "sha256": "5a57dd9babbdaf43683a61866b1f22bdf46362e279fa7d45882facce667b29f3",
+      "bytes": 19318
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/src-frontend/Language/Haskell/Exference/TypeFromHaskellSrc.hs",
+      "sha256": "1884b8e54287333754ce5c12cb9a2b2304eac482ee035cd83747599fd04ec271",
+      "bytes": 39364
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-cli/CLISpec.hs",
+      "sha256": "feed98345936fe0bc75555a2e4cbbb65b5a67d8364543031117b8eab465837b5",
+      "bytes": 24879
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-engine/EngineSpec.hs",
+      "sha256": "70562fb8aecdcf8823b3f9f6d9a58d23478d151f9d213bf89564496e0b88eff5",
+      "bytes": 147127
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-engine/GivenEvidenceSpec.hs",
+      "sha256": "b7a1d90c72649346b814ff24c89f47d2b693e320e068cec80fca87da4c30966f",
+      "bytes": 19840
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-engine/ImplicitConstructorGraphSpec.hs",
+      "sha256": "8de6042390af7e72dc571ff90ce5a2ea4abcb2aed6e2662ceb3ccc73470982f1",
+      "bytes": 10514
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-engine/Language/Haskell/Exference/Core/Internal/Testing.hs",
+      "sha256": "07405a6c99865b656b54820a2a09530fb6c0994ac5d0490391e96a88f0ce2f8d",
+      "bytes": 12853
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-engine/NestedForallGraphSpec.hs",
+      "sha256": "82be0c3f053f74fd4bf5e79a87e284101d3af9f98061237d4704aad4896822c0",
+      "bytes": 10009
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-frontend-api/Spec.hs",
+      "sha256": "7d28770bc6ffd5d5e8853f170e29c1762252ca8c5d867a04ca1fff405607b055",
+      "bytes": 2236
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-unit/CompatibilityImport.hs",
+      "sha256": "4f4da1bcafd84a60c7652d13df9fbb24c343046262028335bd7eb0590498f24d",
+      "bytes": 1459
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-unit/DeprecatedCompatibility.hs",
+      "sha256": "426b55a2240e29ad19f9a934b567d3f7f456930a21deba8c4d40c20bd2d4a469",
+      "bytes": 1117
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/exference/test-unit/Spec.hs",
+      "sha256": "b3af774bcabcd9b9418c1eabe249642893bab1cb9dd53d34e917cc11fca25d49",
+      "bytes": 608534
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex.hs",
+      "sha256": "43b4ac1ae2aa8cb41bff2f0663a24500b0b8d1172f59aec0f4e4296aee5902d6",
+      "bytes": 9118
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/CLI.hs",
+      "sha256": "29f4e91e5d9c3a19c1a1c5790b8bbe49a617e8ca55599af70b222990ccfca3f0",
+      "bytes": 30528
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/Command.hs",
+      "sha256": "f5865434da1d74f3bb4e3a8279459bc4db0e32055a3b956985040e181313158b",
+      "bytes": 44057
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/Command/Output.hs",
+      "sha256": "3578bef3cfd8c124e7c143fcf02d7907b58204881fb9da3ebf034e1c3b142e87",
+      "bytes": 1803
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/Command/Typed.hs",
+      "sha256": "386c69ef5eab6e2ccf7eba669675cab9b6730838dfc5f20bc9d46e06111d64ea",
+      "bytes": 2774
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/HaskellSrc.hs",
+      "sha256": "4338dcbe8b6aa6015779fa8f0dd0beb25932da4bec14ef773f46ac636d7629a5",
+      "bytes": 8474
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/HaskellSrc/Kinded.hs",
+      "sha256": "329e79e81e72b4a0cbfcbdfd24a1b4417e46a6f8398b50b7f9e816ee8a69b152",
+      "bytes": 6654
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/HaskellSrc/Scope.hs",
+      "sha256": "dbbbabb18590d910a63f6c197f60e3f8945c079aeb3c03de322bfc3af36807b7",
+      "bytes": 7091
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/Internal/DependencyGraph.hs",
+      "sha256": "3facef560d3e4486fe6de8fa8cb05fb733d855823d06cae4d6a17dee7542d60e",
+      "bytes": 2533
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/Internal/ImplicitPrelude.hs",
+      "sha256": "9cd560537b4e2ef31002b5bcaf62391a83160126818f9b497122ccf02aa54f08",
+      "bytes": 2712
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/Package.hs",
+      "sha256": "70465bff7c5bd912843be39d5bc90e5c13f964648538dde25b9999e6a59d68ed",
+      "bytes": 7873
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL.hs",
+      "sha256": "762e330459ecf800cc8184c36c2e2e26e26d78868b453439245e0c81ae4d2ed3",
+      "bytes": 111048
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/Behavioral.hs",
+      "sha256": "ede25e7b5ae0dab36d646e429479a508be8deef1e33ffd88405a676690c5eb83",
+      "bytes": 12724
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/BehavioralWorker.hs",
+      "sha256": "1e13f5207edc4c922e899ec92abe647be60219be234779c8f8a1d5fe8571d0d3",
+      "bytes": 18866
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/Command.hs",
+      "sha256": "0f10b2118ffbce1d5fe23be212831977b55bd1044967449bde672525efc55eb8",
+      "bytes": 35790
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/DjinnScope.hs",
+      "sha256": "84d86926f833296803c1bcce36cd8b4b66f7c5bd8e60e39611213ef709e04cde",
+      "bytes": 38524
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/Driver.hs",
+      "sha256": "63a62540a1b4933c10f1130d18e7d615d3a67226dc76fdb8cd2aecefb558ef4b",
+      "bytes": 10920
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/Eval.hs",
+      "sha256": "d34186c322d89d5c9948423fdb9f07a74057729bece456536b7827d70900831d",
+      "bytes": 8450
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/Kind.hs",
+      "sha256": "8b0d09e0835e8c66e3d95830790a8843856c4bf4790e14afaedf05fe5a820513",
+      "bytes": 12887
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/LengthWhere.hs",
+      "sha256": "2f987d3f904ada8cfed01f548d06387b3bb80ec3673c46adf41c025dcf8ed0f4",
+      "bytes": 12916
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/Parallel.hs",
+      "sha256": "83a741138a30d10c732cd59543000f27abdbc627d5be89c0409caaf1a13a1ba3",
+      "bytes": 14331
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/Scope.hs",
+      "sha256": "e9f6d11eec0598fa159e0e76d9f4b6beaed9e10aba9e9a60c66f92524c8345b2",
+      "bytes": 55826
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/Type.hs",
+      "sha256": "d539bddfa7499a7e08afb4fe9b8b736813ee0b45dcaaf2deed262a75e2a4105d",
+      "bytes": 42468
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/REPL/Workspace.hs",
+      "sha256": "ee41767666476bc73c4a25d1dd5cfbf5e5cb8e106d41d3275a89910eef8dc1b6",
+      "bytes": 43412
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/src/Language/Haskell/Djex/Text.hs",
+      "sha256": "4bb8eb0a9202d6a25b34553feb88495e4b2252106c0e31d1c123ba4ab251bb4a",
+      "bytes": 2797
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Alpha.hs",
+      "sha256": "19167e01c77c1a4e97fe6b58c45f2d02ebf9bb1fcbe345669c813a24bc1cc345",
+      "bytes": 21046
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/ClassResolution.hs",
+      "sha256": "fe6e82260fe4c2428923128d65e3d4a5a88cb0637f60f5183550e06c92efb524",
+      "bytes": 62464
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Fingerprint.hs",
+      "sha256": "85d99f4a9bfd3d3b92049f5980dd096b4b8a521a51a54e7479439bcf7b82facc",
+      "bytes": 14522
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Fingerprint/Type.hs",
+      "sha256": "dffe2ae00e4627aacfeb7dfcef14ce7c348f23d17ed714665a5203150381fded",
+      "bytes": 4292
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Causal.hs",
+      "sha256": "46e36045e40323a92916ca9928719254c0d05238e70da9f69c8e48877f518ad4",
+      "bytes": 1807
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Causal/BoundaryWhitespace.hs",
+      "sha256": "f826dd770c4679baa129e912549694ab7decce0d8bf0d1a75da9588493c546b0",
+      "bytes": 2541
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Causal/Driver.hs",
+      "sha256": "6ea367ffa5263c0d9001e4ef78f02f30d1487a4cbf355b41c6f2a82497d60b10",
+      "bytes": 17274
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Causal/StdoutChunk.hs",
+      "sha256": "be898d84837dc7c51dcf74fa26637f0ff0876e826f2484256633510ff144a343",
+      "bytes": 1617
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Causal/Stream.hs",
+      "sha256": "64332d471cbae1087871fe3afe775a6f16a6e52890ffbb61778c467c6d3190a2",
+      "bytes": 12100
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Lexical.hs",
+      "sha256": "5de63b3d110bb24b7d64675910ceb4535b063dfeae7e490c672f814467d4c033",
+      "bytes": 3475
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/QFLIA.hs",
+      "sha256": "14fb86f0b59b3c83c52fcfa8caa88f2a814021ac8a0586fcd889d424b0045dd8",
+      "bytes": 10022
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Response.hs",
+      "sha256": "19c0713675fed93cfbcd19a2a7600d10f4be7b9f00094756d316e999a5ad9153",
+      "bytes": 20910
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Response/Standard.hs",
+      "sha256": "f3444ca409eb5fb2f1064a855473caedf8cdc6ee6084fe5ab9ffd5970cc44705",
+      "bytes": 4083
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Stream.hs",
+      "sha256": "f297b24b044775e5f8f87ee4787802638f9ee6092a87bd2008b60a7d641fb642",
+      "bytes": 24363
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Z3/Execution.hs",
+      "sha256": "93e11f9f4c6a55fa7b1cd03530def351db5744da1e0a573b5b0d3f638c2716c8",
+      "bytes": 16303
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Z3/Process.hs",
+      "sha256": "0c8cf26deac0e5525dae4860560be4fd3e9c2f496e2faaa9774c8eb096914e15",
+      "bytes": 162099
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length.hs",
+      "sha256": "1a77bddd4d0facdf853498ad6bff47d51ca7c41a746880fa363f92eaece3c892",
+      "bytes": 102462
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/CounterexampleBank.hs",
+      "sha256": "5483b3da59f8c644ef59e0593743e205e3cda5c8cae39200bb942720e6a69b3c",
+      "bytes": 43872
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/Problem.hs",
+      "sha256": "31dbfb05f829077169a64dba99ae3053d7e1176301663cd45a429dfdcf1f67a5",
+      "bytes": 41363
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/Problem/Candidate.hs",
+      "sha256": "cc565c80f9a1fe369a21c20471b30dea7a3dbcbfc13f79af98eb265900b6df49",
+      "bytes": 142159
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib.hs",
+      "sha256": "dac0da2fde776a01fe3aa307ad31dfc3d330c3e95fbad4e48d0411f4e974b8cc",
+      "bytes": 86592
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Execution.hs",
+      "sha256": "564677ba72eede3a69ae7dc83bb960aec1f80f8a99447b0afc2f417b7bcb34f2",
+      "bytes": 40179
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Observation.hs",
+      "sha256": "a27089f4de47ff0768d7087deaffbab7cce760bc6ea11d7ecf5e7a80858d4f3d",
+      "bytes": 7316
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Protocol.hs",
+      "sha256": "abdbba337dd465855bb0d02009ab31add45dfd466748c91dd1c212c61376cb55",
+      "bytes": 51890
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Protocol/SpinePair.hs",
+      "sha256": "24d64e69b7d724e719e309f5528b9dca0040e27659a0815eb773d4fbdca7699c",
+      "bytes": 18126
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Response.hs",
+      "sha256": "bfa957c78b74f06e951d3b030c6d190056851f18049d9fbaf80b267d1a1555e0",
+      "bytes": 18606
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session.hs",
+      "sha256": "0b50ec1c04af0ffd37fbe5631fef23e1d615ccfcf84138134d0cc2bfa1c3cda7",
+      "bytes": 204712
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session/Capability.hs",
+      "sha256": "3aa8c2b155bdfcf8404a1221be0390b561c434745123e115bd4260375d4dcc41",
+      "bytes": 43338
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session/Process.hs",
+      "sha256": "7ca603c87496e25fa08acdbc9e61c99159a0a7006ec9b6d5168b033cce119307",
+      "bytes": 67067
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session/Transport.hs",
+      "sha256": "112f32d00cafe2ff513d6e83d6a79f160a091ba8014e7cba432a264d2469d1df",
+      "bytes": 3298
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Problem.hs",
+      "sha256": "b60e8238761ea2f139c00fed51ace591d15612e5fe82b3f80b0929c1b0410b26",
+      "bytes": 23070
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/TypeInstantiation.hs",
+      "sha256": "5dbb8e4e759e3ce94b8d08645ed4df797de8f12f8dcfd473472e519ad62ea34a",
+      "bytes": 8569
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/TypedCandidate.hs",
+      "sha256": "e0690fbf447c5e24c3c75bf834f2ec2c4841cfcb3e54d5a69f495967db78cd9e",
+      "bytes": 12545
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/TypedGenerated/Certificate.hs",
+      "sha256": "02717e963411b4e037c344fe6aa49038343fa4243bf94fe8b46da92f2a29404b",
+      "bytes": 37455
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/TypedGenerated/Certificate/Association.hs",
+      "sha256": "b0d9df87d15fb3a8d4fb2fe8ff15dd9371c51c8470c5c9996f800c8c8d96c3f3",
+      "bytes": 27617
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/internal/Language/Haskell/Synthesis/Internal/TypedGenerated/Fingerprint.hs",
+      "sha256": "c25a4041c7594b05e7afacdf03717d65974616cc5d976fcafbcd8c958971014f",
+      "bytes": 33743
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Behavioral.hs",
+      "sha256": "1385c325e3563839b7c94f4e6195b10100450789b6da072cf5ea628ad1db5df7",
+      "bytes": 7771
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Candidate.hs",
+      "sha256": "47d5ccc6b746a6b151209a90acf9df70e8913054e9423512a9321de6197a80f2",
+      "bytes": 3960
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/CandidateQuality.hs",
+      "sha256": "51831127b3d41a758ff54547bde7bd2c992e63f8d6d3e13bfac424d5f843702c",
+      "bytes": 15258
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Class.hs",
+      "sha256": "f4d6ef709f87d520c9f40bab301c61dedd905ef4047e96a736f7574c9bca2175",
+      "bytes": 8053
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Collection.hs",
+      "sha256": "a3a8a276c7bf2c91dc6b1cb3cecf5078de7be7b665a4c843ea2e51a609d3cf3f",
+      "bytes": 7183
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Constraint.hs",
+      "sha256": "1c833edec51d6a7bf61610002c46a9bdfd95b71559e33f9f7fb4f56e6a4e3e58",
+      "bytes": 5405
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Count.hs",
+      "sha256": "8d3db530bec9f364d7d6c2caa3bfecc307dd3c950342dd666453a9f1f9d3ca4b",
+      "bytes": 1939
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Declaration.hs",
+      "sha256": "3f5fb6dcec1103f0130d6d2bc29bade0e6a49db9e6109cda4f3055727a2fe975",
+      "bytes": 21769
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Diagnostic.hs",
+      "sha256": "41a7801b21337e2649511bf290eb95b711b3b899aecb33538acb0a1a2faa61e3",
+      "bytes": 11819
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Environment.hs",
+      "sha256": "42a165e81c0ea9a856c1bc72ac85f97a521353f13e13dadefdbdc90b6d56692c",
+      "bytes": 19673
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Fingerprint.hs",
+      "sha256": "8a363e877321b70e9ea29e3da1db3a3856b59db88f82613f45eb9c09a2fdbd22",
+      "bytes": 714
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Fresh.hs",
+      "sha256": "53fad7309574f39377e6e009d77b725925ab77419dda34baebeef9e010b6a16d",
+      "bytes": 4326
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Generated.hs",
+      "sha256": "5937f3ed06f31acd8c02bcc39f7a3c6abd8cd57b71f15c5e76013c055061c6d1",
+      "bytes": 89132
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Internal/InstanceHead.hs",
+      "sha256": "c5824685d4e9dd80910156dd44a9a87514d635e003314b5e2575427be3cece66",
+      "bytes": 8416
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Inventory.hs",
+      "sha256": "997e3725cdc4701c77dbfb94c0a6dc98dfd26b26bdb68344e595fc495575616a",
+      "bytes": 6887
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Kind.hs",
+      "sha256": "8e8e1310b60d65d8f6c8a152a26d1b8ad7f0f1da9edbc14db3df2f4a8c0f25f8",
+      "bytes": 2808
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/KindInference.hs",
+      "sha256": "8d6eb6d24dd1bee61c903263a66b83aaae84d7f274f36dbe23de3a6b2e894b18",
+      "bytes": 41763
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Name.hs",
+      "sha256": "332c9cafa88eea6343691d9b5c1cd8de39b5d83ae1df7679f730aee06ef2045d",
+      "bytes": 25135
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Observability.hs",
+      "sha256": "095429544dd83f760ee96dc41f0feec36560082576627078c5df54185bc9dd3c",
+      "bytes": 6540
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Qualification.hs",
+      "sha256": "d567454e71c2349c912aaeecf3547f407baee543e93e4638922254dc2727cfea",
+      "bytes": 3411
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Query.hs",
+      "sha256": "7ea09bc969294c2c9ae05f3dfd07aa47e110bf67490978c0747b98f213bba254",
+      "bytes": 23994
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Search.hs",
+      "sha256": "63eb8450ebe6280a7f5d195081d572ba8ea0e1dc7c1ef4a67a466361f702a269",
+      "bytes": 4764
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Selection.hs",
+      "sha256": "9d1a62e25bb465e6c0f5b1b83119b56fa385202a5ad6cd5007208fb284b34f9c",
+      "bytes": 17347
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length.hs",
+      "sha256": "2b19f89b5ff661dd142fb13168cd2c7239e3946dc9840bbb7a6cde9783792330",
+      "bytes": 5745
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length/CounterexampleBank.hs",
+      "sha256": "611bac9b782206502a6ec0cfa9444f72b371cf433aa98efb2ab35d7f66b974b5",
+      "bytes": 5262
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Evaluate.hs",
+      "sha256": "0451618f8ec99eb266419562e1f5c281d10125220f3e3301424124117cd4098a",
+      "bytes": 173654
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Problem.hs",
+      "sha256": "b6f748311ea81b252fc8c4e0ee48f4e542fcc712941e00bb87fe2b095a42541f",
+      "bytes": 5258
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib.hs",
+      "sha256": "286581ea4589d0b91ddfad9ac52ed8923cee72bffcc67f32685fc5ae92568165",
+      "bytes": 5488
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Execution.hs",
+      "sha256": "322382bea8b73e03555ac3f406d8b828871b4ca101795160b1f5f0e790d7e106",
+      "bytes": 3826
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs",
+      "sha256": "1e0c3c011803041ecf5601a2646b9fe00e1d0fd9b50bbe65f0665094817136c1",
+      "bytes": 57800
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Observation.hs",
+      "sha256": "8378e7c3bea5d482faf899039c99f88684e176c40beb7a5913f7756fd369e5eb",
+      "bytes": 1669
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Response.hs",
+      "sha256": "376811d1c465886f2a8590ce36a75dfe2d515cb0fed760dea49abadc7ee15db7",
+      "bytes": 1966
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Where.hs",
+      "sha256": "506e0c75a700f9a3fc0a15b0fa23cd0a14ef25164f49ac170ec9d5f4099265ea",
+      "bytes": 53088
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Observation.hs",
+      "sha256": "9050dafd6a9c97261a6f0d3915a5095b9ae5694585ba4f7ee58b00cf63905e73",
+      "bytes": 4357
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Semantic/Problem.hs",
+      "sha256": "39abb740f2abf36c55b9fb9b51426875384ab38ecfd9c80de0474e7346b87e18",
+      "bytes": 3707
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/SourceKind.hs",
+      "sha256": "fba3f2f175c988d17657fe4c9a845c8f2f6f9509dbf92d72d156297639666d50",
+      "bytes": 7408
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/SourceKind/Expansion.hs",
+      "sha256": "7c95d0dacd3d49c1fe79f5f3382468d83684e1e11b2511166c43410113ad2031",
+      "bytes": 7822
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/Type.hs",
+      "sha256": "ce02e6bd113a46236458b9def3e9a99706a4dd0b6b235bdc8598037532aaf269",
+      "bytes": 44092
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/TypeAtom.hs",
+      "sha256": "fd31e0e695d4f1eaca804583ed883e354951ac68e0298668f182de2b8a7578c1",
+      "bytes": 12815
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/TypeInstantiation.hs",
+      "sha256": "c22e76440a54686e0c9fd224dd60b2f3415e7f99e0a436637be78f2cedd6f016",
+      "bytes": 747
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/TypeRender.hs",
+      "sha256": "78f84fae2134d1906dee6229982d196f8a6249d4f5d4e4d5237ceaa28495bf1c",
+      "bytes": 6966
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/TypeSynonym.hs",
+      "sha256": "ae36df45cc20387e6fea006d2be180a353fc0f8b578fcd901063140d6d82f7d2",
+      "bytes": 36007
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/TypedCandidate.hs",
+      "sha256": "145acdaf022d432548a121180535c33f3762de45354d390158c93a4e9b13dca6",
+      "bytes": 856
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/TypedGenerated.hs",
+      "sha256": "d18ed416b15ece590ac58d3f4b398b2dd1a9434779a2b7ae82434620aa0fc3e5",
+      "bytes": 81929
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/TypedGenerated/Fingerprint.hs",
+      "sha256": "3314ae4928166a11d5f96184ad624931df45e56adbd6bb57ced0099388a18b45",
+      "bytes": 1353
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/src/Language/Haskell/Synthesis/TypedGenerated/Haskell.hs",
+      "sha256": "206b3a4c3e6528876ae9be7c3256b2ff912cb08ab919e8855a60df870031243b",
+      "bytes": 24103
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-certificate/AssociationSpec.hs",
+      "sha256": "e5762118d0415e06f86a79e6741a97832bfc616621da1a78a0e95edca985c01d",
+      "bytes": 63273
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-certificate/Spec.hs",
+      "sha256": "f88773972b5221b08f39f26ad1ec6d2d1562547864823514dc63bb0ad3bcc783",
+      "bytes": 26697
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-certificate/TypedCandidateSpec.hs",
+      "sha256": "1c0737d7a22f246e318ebb2df2803dfa480c2985f90c868f1429e928e713661e",
+      "bytes": 14767
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-fingerprint/Spec.hs",
+      "sha256": "91aa625a0999ff2a52b6c653b1a8101630bc1e5db4636aadcfd6ff4125faa0b7",
+      "bytes": 18643
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-length/DjinnSourceGraphSpec.hs",
+      "sha256": "c964f41563b6673c36bb50a3b4c53c0b4b5f2c48dd4863fe061fadbfee5310c8",
+      "bytes": 10330
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-length/LengthWhereSpec.hs",
+      "sha256": "378bd8ed597eda2965f52ff26d975503dc0c9decca85b3412c56b27361c3fdc3",
+      "bytes": 57452
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-length/SMTLibLiveSpec.hs",
+      "sha256": "bfe8f25d1d89180ee1f0670698e8e1c08754a442ed3d9cddb47133b20a8b13ea",
+      "bytes": 189802
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-length/SMTLibQFLIASpec.hs",
+      "sha256": "dc36bb697f5a5d825884229974662641004cebb62599274eb0ffc0329e27a4b1",
+      "bytes": 6339
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-length/Spec.hs",
+      "sha256": "5cdb93d87c3fd45d48a6358bffc6a5a0b749a1c8d70c356fd98fa45a63a14bf3",
+      "bytes": 858023
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test-term-graph-fingerprint/Spec.hs",
+      "sha256": "2216aa97b9ebea682dcd40104de62bb12fdcf5c7fc96eee1c31447055de9283c",
+      "bytes": 14526
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/BehavioralSpec.hs",
+      "sha256": "fb93e27d4d3b742be9bc0e73471a7deff099d136b287042db44c4c0e2d3d122d",
+      "bytes": 4238
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/CandidateQualitySpec.hs",
+      "sha256": "dfd45a6716d2185fbdd291fe344eb094c21e3c871fbd3b2dfe36c74a153e7b87",
+      "bytes": 8712
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/ClassResolutionSpec.hs",
+      "sha256": "6214b73b8f4449dfa8c3a1af6004f74a624b3f91ca537d743513938df4ae07d1",
+      "bytes": 45773
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/ContextHaskellSpec.hs",
+      "sha256": "e9d262685a9d1636d8bc6ac087068b77551840fe5475b3843b4648ed28603eff",
+      "bytes": 16560
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/SMTLibCausalBoundaryWhitespaceSpec.hs",
+      "sha256": "74c3ff7516f008bcd33a8c4caa7e2b32c10f3022b63f59f56ba0e4aec2e31f9f",
+      "bytes": 2528
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/SMTLibCausalDriverSpec.hs",
+      "sha256": "654b736ec71439d9a5c774aed2fd77771a998d21dccad8213abecf47e3935a75",
+      "bytes": 16569
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/SMTLibCausalStdoutChunkSpec.hs",
+      "sha256": "42d9a13c7f4074897c2a6600e41d4603a99267d4851292c85d06d29dc3ebb5e9",
+      "bytes": 1683
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/SMTLibCausalStreamSpec.hs",
+      "sha256": "68e31a39c5160c4ee8eb4399052343ee60e8978a0321efd86f7b24557c68722a",
+      "bytes": 8081
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/SMTLibLexicalSpec.hs",
+      "sha256": "bd4bea98362b4bc49e3157f05f3a3b2e7c5b6997cada2e9b30251a5aec33cbe1",
+      "bytes": 633
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/SMTLibStandardResponseSpec.hs",
+      "sha256": "1544a38f1beedc31eccdfe53e44aa29145d22a14743523bed1a1dd4ad8910adc",
+      "bytes": 4173
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/SMTLibStreamSpec.hs",
+      "sha256": "cf433589004a888ece2827a817e62805a790621884b090eea9b4275cdb4b0531",
+      "bytes": 22066
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/SourceKindExpansionSpec.hs",
+      "sha256": "3bd53a5aaf710cde1439a567acd39c1612b89c6f636bba4584b6b2c0b8b8bbdb",
+      "bytes": 9130
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/SourceKindSpec.hs",
+      "sha256": "7f875b2707349b72e99f74595e1b83a63f65a6732e12a38fe16e66ad7c3a8669",
+      "bytes": 6248
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/synthesis/test/Spec.hs",
+      "sha256": "31d17154a8103a168c9243a37a0f2c9a6eb2827bc0c959995224e74a63500d2a",
+      "bytes": 373534
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-api/AbstractionBoundary.hs",
+      "sha256": "99d1eaab30fdf88fb3f36b6bed49a155cf6d4b304601a25e27273a992f7ce46b",
+      "bytes": 91012
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-api/ExferencePatternImports.hs",
+      "sha256": "918059d73cb6d8f1aef8ce19eb59481db6d1b31ab918f237a5d00c74ee740caa",
+      "bytes": 2110
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-api/FacadeSpec.hs",
+      "sha256": "a163728805edd219be493bb249b977cf3310d31a0b1891a64c3156ffa1307b10",
+      "bytes": 146650
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-api/Spec.hs",
+      "sha256": "f67117cd6a0bee69dbdf0074a32c8cc5ab93ebc0726487a349f1d882aff5039f",
+      "bytes": 37417
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-church/Main.hs",
+      "sha256": "14e99a88a05ff6d2f92147600ac420e91e5e7e4bc03f406e89c182399eae5138",
+      "bytes": 10160
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-church/behavior_runtime.py",
+      "sha256": "610aba95c2be827c72b2756c6b88b074166921b733523a3d40c1c23d99a3007a",
+      "bytes": 18155
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-church/probe_scopes.hs",
+      "sha256": "34112fd19dc8a271312762bd2629ae37ef8b0aa9ee401237f8311b1a2c230994",
+      "bytes": 15881
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-church/quality_probe.hs",
+      "sha256": "75e068101661447b7298bb96e35748523fb88d6f154bcc1ba887365752ca9cf0",
+      "bytes": 11269
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-church/receipts/priority4-exference-forall-witness/Candidate.hs",
+      "sha256": "cf6db8a387c4a4ced46797df8fa6d72ead24918af4b51bf2cf418bda3bb733f8",
+      "bytes": 4276
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-church/receipts/priority4-exference-forall-witness/Main.hs",
+      "sha256": "64e7929111ea9205a794aa33f59fbcdfd6340035202d2b06db43f782b86ad07b",
+      "bytes": 6176
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-church/source_scope_rendering.hs",
+      "sha256": "56757210b921eed5b2f49ccc028771bd76f33fec5e6c656fd6ec6ac4997aba62",
+      "bytes": 3911
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-cli/Spec.hs",
+      "sha256": "3e8101d33990963d39ba349af9219fa9f4347582ff4d20cf731f5c48bebf7212",
+      "bytes": 255051
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-integration/ContextBudgetSpec.hs",
+      "sha256": "518e6144f8d920abd35506158d25a7c033d4540c9c2e3287978bc4e15a01ed62",
+      "bytes": 16416
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-integration/ContextEvidenceSpec.hs",
+      "sha256": "2ae8ecf00bec6f81a340aa4e58f5ae1373aa2d7fab22b6109464483d0895e6d0",
+      "bytes": 60431
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-integration/ContextHaskellReplaySpec.hs",
+      "sha256": "7aa033617d1167191a21ad76a1038ef84cdebb5b0c05a4e60dc23d9898ff0fc6",
+      "bytes": 11374
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-integration/KindedSourceConversionSpec.hs",
+      "sha256": "9dbf3dd4b361ac664ac7303f42f6059f7851cbcd79d86e692f4d8cbe96945a68",
+      "bytes": 6051
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-integration/RecursorSpec.hs",
+      "sha256": "3fbc25af8edf42b86024d066caa50a76f89515f8c80bbc4628eb79f881ef82d8",
+      "bytes": 18550
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-integration/SourceKindParserSpec.hs",
+      "sha256": "e4de2ed879bc2903675058eb00de4bff2c4324e39f93b6ee49f1641897fa691d",
+      "bytes": 1912
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-integration/SourceKindRequestSpec.hs",
+      "sha256": "624952243efaf72e49d3aa728a628729e2f85e072e255e18e84afeaca28294cb",
+      "bytes": 11272
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-integration/Spec.hs",
+      "sha256": "8f5e06d7fb9e0b042776a4188f2223807ff4c117698188fbeb4daa8850c16317",
+      "bytes": 291005
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-parallel/Spec.hs",
+      "sha256": "26968af46fa9365ce5182732fe72b6d7345a0e28766e9439133a99b153a4697a",
+      "bytes": 34968
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-support/CLIAssertions.hs",
+      "sha256": "221a4d077b351af352a2f43d9c5487a4bdf2150a8338d25956a0b9ec5e3ddf6f",
+      "bytes": 2256
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-support/fake-cabal/Main.hs",
+      "sha256": "8076192b1cec1ec7129aa6a0c2840e09d4d2ed5f6faa41e1d07575bdee7c2136",
+      "bytes": 2343
+    },
+    {
+      "path": "final-source/Leant/lib/Djex/test-support/fake-z3/Main.hs",
+      "sha256": "2052a4d331a4e10beffb47334c6b8dd45a554aa1363e363a9a952409505d84b9",
+      "bytes": 20823
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Backend.hs",
+      "sha256": "175a93f83363f34bc24a76bd9b7a07eee84cec17f4bd2e996bb511278d97116a",
+      "bytes": 42843
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Backend/Isolated.hs",
+      "sha256": "22485927a2fbdf648549cbb3bd06bad9e848246759a08b2db1e099ca608d3e81",
+      "bytes": 21784
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Builtins.hs",
+      "sha256": "ccf1abe57474a798443c1c2619a03e2f273689b18ec5dd1a38f9f4a253062840",
+      "bytes": 7577
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Classify.hs",
+      "sha256": "7da055e424055073886f6f897fd095b5ad6b0991cd84a18e982de843bebec603",
+      "bytes": 4576
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Format.hs",
+      "sha256": "6929220a7b4d3e26012d0a18f5501a5b35f089e733c430898beee35ff83c38f2",
+      "bytes": 4500
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Json.hs",
+      "sha256": "13782ed23040276f648ed64a70e855a9808666f76554ab8a5e6d8a9b756b2367",
+      "bytes": 6199
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Json/Bounded.hs",
+      "sha256": "b722a7e6fe50407864fff4a90dc474a7f8043ed11dfe4da1c717624de3b6be10",
+      "bytes": 23353
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Options.hs",
+      "sha256": "1dd439b910ed5878901b9b64de932ba539d4d794223cfdd545ca4cda9b7218ce",
+      "bytes": 6803
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Session/Replay.hs",
+      "sha256": "a1ed05ffea7181fccb8ab18de6ab30be3beb65544b2fc998bf1b45f4a73a5a24",
+      "bytes": 1962
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Session/Snapshot.hs",
+      "sha256": "9f5e6a3106f6ab6b3b1779243aa2f4f3a5abc01f764043fd1c0985077a90fd0b",
+      "bytes": 8709
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Behavioral.hs",
+      "sha256": "895667825df2da184d2f14252e92ed93a16c6c41f3313c019086729700c86f7f",
+      "bytes": 6887
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/BehavioralSelection.hs",
+      "sha256": "ba324fe2c5a9d3f397293f17b631b505c941d0dae501a6f1555f9e3877a2e1d3",
+      "bytes": 1781
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/BehavioralSelection/Internal.hs",
+      "sha256": "b78745b197bb07a5cc3bc327f5d2b0c62a3c7ea4e84f8065ddec1020cfbbecd8",
+      "bytes": 12519
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/CandidateObservation.hs",
+      "sha256": "d26a4ccb39591829822dc6f798dcb87494ca5a3547b1a0e28eb7e4442b097984",
+      "bytes": 6046
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/ContextRender.hs",
+      "sha256": "4cc7c5716205a8e74c2a4c0a8f972319de9409f3568d878e255812695e4780ef",
+      "bytes": 34816
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/ContextSource.hs",
+      "sha256": "be74425fbad519b4bbabc823b81ba85cd637fdae048f1304d487daadf9fb48c0",
+      "bytes": 51095
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/ContextUniverse.hs",
+      "sha256": "b7a900e11bb8a105859971c5398e9724192dca471aa60b7b6a3089431d355e4f",
+      "bytes": 5997
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Engine.hs",
+      "sha256": "d7fa31469318698722abc3d57d13fce784ff147365b46ffbe6198a8740328815",
+      "bytes": 256610
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Engine/Parallel.hs",
+      "sha256": "7340f68cff4e7d4a96db6bf5db56c90ddcb3fe062533715840b18058570e2446",
+      "bytes": 1277
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Fragment.hs",
+      "sha256": "c63a0c03554a27760198bd4de0cd31d394ed3adbd45da2e2d08452df1bbf2282",
+      "bytes": 147926
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Adapter.hs",
+      "sha256": "5a2980e2b4e7a808ab51e2b80b8c64e358b6f7a3a5cc6f7e676283cd2bbb4413",
+      "bytes": 7623
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Command.hs",
+      "sha256": "8836634f4b8636b6d42b5768d843f256819762a5ac5c408e601dae6fe6e5d547",
+      "bytes": 17466
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Configuration.hs",
+      "sha256": "7b8277c1632b677b4722e36340ac92bbee8cc5195e1cf678521d6afe80bd89ef",
+      "bytes": 58277
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Configuration/File.hs",
+      "sha256": "fdc56b3a4221e711491eefc8798163e362313cb22041371c9371182e9a7e2ba0",
+      "bytes": 77580
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Configuration/File/Acquire.hs",
+      "sha256": "68659d65445b894d935b960823b1a74210b2503039ab988413d022b29a88b8ab",
+      "bytes": 8649
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Contract.hs",
+      "sha256": "7a3552a75a2fed8d5153d0c662b5bf858128113a356d3054acaf103e5d3fe40f",
+      "bytes": 4842
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Contract/File.hs",
+      "sha256": "de6a8781fe9e8bb485f3a5381e9de7aa381c862723c242e49a6e0fd112895652",
+      "bytes": 6207
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Contract/File/Acquire.hs",
+      "sha256": "e5cd018fc9d78ef15314954413b58ec58bb88140157ec83167fcdaf9448571e1",
+      "bytes": 7726
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/CounterexampleBank/Internal.hs",
+      "sha256": "c07d90a7494ec8eb35b987be00ad0f112c82c731c35e728cde003b95abd10282",
+      "bytes": 57170
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/File/Acquire.hs",
+      "sha256": "ec4c1e79c5f735b460ea83eb01665f87bfbcb3dc2bd3d132c6d72138802e39ab",
+      "bytes": 11010
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Handoff.hs",
+      "sha256": "f4e926327111198b7c28ca594fd30808859ddafdf30ce8a0de1b41281bd075ee",
+      "bytes": 31772
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Integration.hs",
+      "sha256": "a11dd942cc1af0e844fc0b706b2dade6226132b1ea44534f63090d7f93c929ed",
+      "bytes": 25176
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/PostVerification.hs",
+      "sha256": "32cb15747bd971f53d218206f5e382e48380445bfa12c28d00ef6545147181f6",
+      "bytes": 1122
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/PostVerification/Internal.hs",
+      "sha256": "49d62de181e9b1fc7871e9f358fd14f7bb5a0a4310f0b2bf95b345fc8c6e2b96",
+      "bytes": 6178
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Presentation.hs",
+      "sha256": "87b7b2106eb40f0a33d2011ca63e05bf5128806bb6f460b01c77a006269df8de",
+      "bytes": 32238
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Ranking.hs",
+      "sha256": "22050178ca5a5b6a3557f2db8c8b72f79e6aa242fc0f3c5a5b9d46b078d8f43c",
+      "bytes": 2436
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Ranking/Generic.hs",
+      "sha256": "eb979b2c9bf6426e9bc7941d098b57386da5fce9977a977230ce435f68c01e83",
+      "bytes": 92374
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Ranking/Internal.hs",
+      "sha256": "a15bd9878b6e22044551d067868bcb9aa8d4b0f30bc85850c95a1ec20aba08d4",
+      "bytes": 58376
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Selection.hs",
+      "sha256": "df2a51ffa0c86d94aa4ae6b9be301a515ddc6983cc7154f7cdf280c53be520fa",
+      "bytes": 1787
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Selection/Generic.hs",
+      "sha256": "56f001ee6de3366e031f909dc11976fda5538d9d28a5384f6158488561e64871",
+      "bytes": 12515
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Selection/Internal.hs",
+      "sha256": "411b211067bc3ea7cf821af5cbcd5487568341f49b935f412c5cd5e22542788a",
+      "bytes": 12339
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/SpinePair/PostVerification.hs",
+      "sha256": "0f2caf730c11f8293636fc68da47cfe074ca527936d6692183c757dc8fc4f15c",
+      "bytes": 1002
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/SpinePair/PostVerification/Internal.hs",
+      "sha256": "58e4eacf6008e689aaa4954435bb30a8419f5be47a605b578de34dd7766afa11",
+      "bytes": 6949
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/SpinePair/Ranking.hs",
+      "sha256": "05bac42e3da48c741f087fc61c2f3daa31257d1a9c3f94e673ac77e053eae3d7",
+      "bytes": 2214
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/SpinePair/Ranking/Internal.hs",
+      "sha256": "26c3b03a7b2464e6c405cfe0a37ac9884d39f86a771401b348d6cfe5a172278f",
+      "bytes": 62721
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/SpinePair/Selection.hs",
+      "sha256": "317db2a42f59f20ca5b4792ecdc53eb8f54821ca45e52a91ebb3329f0d90c35c",
+      "bytes": 1950
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/SpinePair/Selection/Internal.hs",
+      "sha256": "a1e229d48c52d360537f9e23c8d7bc533e19871084cc6570d54f84503bd45fa5",
+      "bytes": 13556
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Length/Where.hs",
+      "sha256": "775cdf39958ee2348c0049392c76a3dfad114da812ebab9892bb79cd7fde7437",
+      "bytes": 14866
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Observability.hs",
+      "sha256": "c056cc5270585749bd0753904fe10c323f56c055d0e46639609b5e8f13ad8744",
+      "bytes": 10531
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/PostVerification.hs",
+      "sha256": "b2f1374db9689e6d49ee1d7770f70e5b7e9bceada187dbd3af1c186b536c46d7",
+      "bytes": 7779
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/ProviderCache.hs",
+      "sha256": "f439d68acb6781210168bbffa7292bc6e4588b37a9a8f315b7f50d2fbf5b496f",
+      "bytes": 5206
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Render.hs",
+      "sha256": "bd898691d6d70bfa8b85b1e115add8c5bd8650893340cd95ca9f54c5cae20375",
+      "bytes": 123669
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Replay.hs",
+      "sha256": "8e2429829786e932880ac29c9c42146aaf4a020b598d43ac6551731dc0b0f543",
+      "bytes": 1987
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Verification.hs",
+      "sha256": "4045c4cb2560704694d87bc7f20f378f0503ebda77daa492b068bd46e596bc88",
+      "bytes": 13084
+    },
+    {
+      "path": "final-source/Leant/src/Leant/Synth/Verification/Parallel.hs",
+      "sha256": "59c9fb1266ab08044f486be58f33671ef36bb184ed3d0b566caafa5ee5ed189f",
+      "bytes": 4142
+    },
+    {
+      "path": "final-source/Leant/src/Main.hs",
+      "sha256": "2466141a0d865cc8057dfae66b83c51be8958f7add39f6cd6ba367f9670ec932",
+      "bytes": 286793
+    },
+    {
+      "path": "final-source/Leant/test-behavioral/CombinedDecisionPrograms.hs",
+      "sha256": "9b91c38ef309012295d9cb314e0165b269b14a42796b65ad1a185da904e72d01",
+      "bytes": 1857
+    },
+    {
+      "path": "final-source/Leant/test-behavioral/run_provider_scheduling.py",
+      "sha256": "93b6e78dddb682495ed8e7283161d249cfd28b7d07abd353fdef37658d738384",
+      "bytes": 8187
+    },
+    {
+      "path": "final-source/Leant/test-church/MixedSpineSyntax.lean",
+      "sha256": "f3f85a0d4103a0169ec0528b8711dbd65aa07d8f49043cc3b1a97d74825646a2",
+      "bytes": 3603
+    },
+    {
+      "path": "final-source/Leant/test-church/UniverseProbe.lean",
+      "sha256": "5b8ea58f024e2f033bf4f138eb8b6aee24f8b450de9627a9e786157849d9843c",
+      "bytes": 4368
+    },
+    {
+      "path": "final-source/Leant/test-church/behavior_extended_probe.py",
+      "sha256": "a38c3ee34f4a087657ea34556f1af0f32c5ea96da7d2e03f04b6a4df554821b2",
+      "bytes": 35914
+    },
+    {
+      "path": "final-source/Leant/test-church/behavior_partial_probe.py",
+      "sha256": "cb82c8ca6c67a40486acfca4cef0143f28e076959da56b2fe9844579f940254e",
+      "bytes": 36965
+    },
+    {
+      "path": "final-source/Leant/test-church/behavior_probe.py",
+      "sha256": "c891f561faf266fc1e96e79f98b97ca14559177beda8b6a1da38e4fa3d2dcbfe",
+      "bytes": 15923
+    },
+    {
+      "path": "final-source/Leant/test-church/check-provider-discovery.hs",
+      "sha256": "5ad0577b3660b3e671d4171ae8451c2ab15479b1aa7202b2fe91063b6b7a77b3",
+      "bytes": 5186
+    },
+    {
+      "path": "final-source/Leant/test-church/run_corpus.py",
+      "sha256": "a6a8034272ce50cdafd1dcfd6a4a3cdfab3ddbd58a1c4eb26ef3cebf64f6873a",
+      "bytes": 16283
+    },
+    {
+      "path": "final-source/Leant/test-context/ProviderInventoryProbe.hs",
+      "sha256": "ac852ebd998b0b826e8798960db5e2afc6226e999b38aaa73fc79edf803d53a5",
+      "bytes": 2787
+    },
+    {
+      "path": "final-source/Leant/test-context/global-methods/MethodOracle.lean",
+      "sha256": "b0b3d2eeacf30169adb6420357e9434f414cff0f6413b59477547c3ecce13793",
+      "bytes": 1037
+    },
+    {
+      "path": "final-source/Leant/test-context/global-methods/ProjectionOracle.lean",
+      "sha256": "f8ec292ccb0fb23b547588c194e0e6063e04e5b9ff8a7a913a56a240b2d1511d",
+      "bytes": 1694
+    },
+    {
+      "path": "final-source/Leant/test-context/global-methods/cache-window32/NativeCacheOracle.lean",
+      "sha256": "0198ac2f34fe0a29576c09991e8c63badba2c7fa27449a2749f7fd844277b352",
+      "bytes": 1055
+    },
+    {
+      "path": "final-source/Leant/test-context/global-methods/cache-window4/NativeCacheOracle.lean",
+      "sha256": "0198ac2f34fe0a29576c09991e8c63badba2c7fa27449a2749f7fd844277b352",
+      "bytes": 1055
+    },
+    {
+      "path": "final-source/Leant/test-context/run_dictionary_selection.py",
+      "sha256": "104f4b41a7f695b01a6f07a93d96fcb30db1f4e13d68241bedff21bb22c139f0",
+      "bytes": 3474
+    },
+    {
+      "path": "final-source/Leant/test-context/run_production.py",
+      "sha256": "bc7b40799162cdd867e53b66567c5343d5f3cd04f1ec8d12a15613e73e00eeab",
+      "bytes": 36342
+    },
+    {
+      "path": "final-source/Leant/test-context/run_products.py",
+      "sha256": "593534648cbf40d106421d79318e5e9ca52b46a250c4b3eb869758d9615578e3",
+      "bytes": 9898
+    },
+    {
+      "path": "final-source/Leant/test-recursive/NativeFoldWitnesses.lean",
+      "sha256": "34be28e234e6c43efa955f475a8c182ce60ab9162c0e89aaa1ee09a4298fab66",
+      "bytes": 6025
+    },
+    {
+      "path": "final-source/Leant/test-recursive/tree-accumulator/CheckControls.hs",
+      "sha256": "bee33291dda8d7ee6cac39f9987c40128692d7f06ebfbb72b3ebc33370eaedfb",
+      "bytes": 199
+    },
+    {
+      "path": "final-source/Leant/test-recursive/tree-accumulator/TreeAccumulatorControls.hs",
+      "sha256": "4811f60a367649f0a47e922ac3dc8b7f01b2762bf8b51c7ccdac6ac3d9d7602e",
+      "bytes": 4252
+    },
+    {
+      "path": "final-source/Leant/test-recursive/tree-accumulator/TreeAccumulatorControls.lean",
+      "sha256": "fc6c570444c93aecd66b8a25eb773413da168f5b6388e6211b7b85fd30daa390",
+      "bytes": 7885
+    },
+    {
+      "path": "final-source/Leant/test-recursive/tree-accumulator/TreeAccumulatorProbe.hs",
+      "sha256": "8848b3a487cb36d083eaab8c170699a8308356a082cac931bd993a80887600f6",
+      "bytes": 9820
+    },
+    {
+      "path": "final-source/Leant/test-recursive/tree-accumulator/TreeAccumulatorProviders.hs",
+      "sha256": "67e1db4c43f997dbb36c8ff71659a97b52b2f181251b51898e2b082c268ba7f0",
+      "bytes": 345
+    },
+    {
+      "path": "final-source/Leant/test-recursive/tree-accumulator/TreeAccumulatorProviders.lean",
+      "sha256": "0f8b1d865e8276025031ebb976cb253b7aae838bab3a11b949ea7b84c7e63fe6",
+      "bytes": 498
+    },
+    {
+      "path": "final-source/Leant/test-unit/BackendTraceSpec.hs",
+      "sha256": "9ec8c87486f9b46d4d620f13146819822a9d310106a1f74c90500e052b8c1859",
+      "bytes": 25164
+    },
+    {
+      "path": "final-source/Leant/test-unit/ContextDictionarySelectionSpec.hs",
+      "sha256": "5e4cfc2a216ea7ff09c0cf8428ebe776b0d5874726befd7b1495cde20bf1c2fd",
+      "bytes": 5636
+    },
+    {
+      "path": "final-source/Leant/test-unit/ContextRenderSpec.hs",
+      "sha256": "a5f8f71a76d424bbb489c97ed9ae93576536d670b2acc81740b894a32a81e546",
+      "bytes": 29137
+    },
+    {
+      "path": "final-source/Leant/test-unit/ContextSelectionSpec.hs",
+      "sha256": "4b1de934eae020de63b90e0343df83e9c56158c45dd02899ab31379d11678994",
+      "bytes": 7506
+    },
+    {
+      "path": "final-source/Leant/test-unit/ContextSourceSpec.hs",
+      "sha256": "cce9aa73a314ccd2f1ac6fab0634e08645c0dcd3b84510885c12a6acf7e117cc",
+      "bytes": 31412
+    },
+    {
+      "path": "final-source/Leant/test-unit/ContextUniverseSpec.hs",
+      "sha256": "74852792cfa79856437da2ed54a97f05fd6b9287efca3b45bbdbfcac6c7cbac1",
+      "bytes": 5887
+    },
+    {
+      "path": "final-source/Leant/test-unit/GlobalContextProviderSpec.hs",
+      "sha256": "300d42a9ca2f7c5c7f0e1821ab9351e43f415f5525ab474fa4ce6787106c7319",
+      "bytes": 8945
+    },
+    {
+      "path": "final-source/Leant/test-unit/SortSourceSpec.hs",
+      "sha256": "2735b0e868f08bead53bc720cc6ea0de4a549931f78e8ce753bb7ef12eabd43f",
+      "bytes": 5437
+    },
+    {
+      "path": "final-source/Leant/test-unit/Spec.hs",
+      "sha256": "964ade8d5a827fd0080cddadbcc11e8adb92b5f6cd2d912dd21045680b4e867c",
+      "bytes": 1456464
+    },
+    {
+      "path": "final-source/external/lake-manifest.json",
+      "sha256": "38f64dc4d77d0d38e5ece038ff04aa11373f08ba913df0dbb74e105a1de9f537",
+      "bytes": 142
+    },
+    {
+      "path": "final-source/external/lakefile.toml",
+      "sha256": "32f149d6d26f8b5892ceae3259a109013b965779c659ac5b49135b321125b697",
+      "bytes": 197
+    },
+    {
+      "path": "final-source/external/lean-toolchain",
+      "sha256": "56a12c348c1fb7bb3e6475757349976a7e93e94fa2918bf92811b1b2e9634504",
+      "bytes": 26
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/PrimitiveUse.lean",
+      "sha256": "58685f8c3629f036450e446e940306360dbab150d8d752265e64306404bf8e4e",
+      "bytes": 1093
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/controller.py",
+      "sha256": "8e7804c2281395b9099f81528f13ad0731ea94e158ad50128c115fcab66b4391",
+      "bytes": 4032
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/kernel-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/kernel-replay.stdout.txt",
+      "sha256": "3157c4f294c471c92f120d38ac75081d8b516fd482e73d7158a7fd9b91970731",
+      "bytes": 107
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/primitive-use.input.txt",
+      "sha256": "a024b5fc078094440f1c63ef4a8cb5e07764e459b3af97e96a78f1e87a3b2c2c",
+      "bytes": 1130
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/primitive-use.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/primitive-use.stdout.txt",
+      "sha256": "e75bc0c3ce33b08cbcda133d0b3ffc96eefc9dc376818ae493dbaf8844eb97ef",
+      "bytes": 44879
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/processes.json",
+      "sha256": "fe3feeb744e96a926b8db298dea07a1689d3a2e751fcdcb829776797ab725e62",
+      "bytes": 2314
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/results.json",
+      "sha256": "b1d6d238724f57b5b51f2a4d9b5832d8d495bb52e937e668343e40d2544cc70a",
+      "bytes": 12457
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Backend.hs",
+      "sha256": "175a93f83363f34bc24a76bd9b7a07eee84cec17f4bd2e996bb511278d97116a",
+      "bytes": 42843
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Backend/Isolated.hs",
+      "sha256": "22485927a2fbdf648549cbb3bd06bad9e848246759a08b2db1e099ca608d3e81",
+      "bytes": 21784
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Builtins.hs",
+      "sha256": "ccf1abe57474a798443c1c2619a03e2f273689b18ec5dd1a38f9f4a253062840",
+      "bytes": 7577
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Classify.hs",
+      "sha256": "7da055e424055073886f6f897fd095b5ad6b0991cd84a18e982de843bebec603",
+      "bytes": 4576
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Format.hs",
+      "sha256": "6929220a7b4d3e26012d0a18f5501a5b35f089e733c430898beee35ff83c38f2",
+      "bytes": 4500
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Json.hs",
+      "sha256": "13782ed23040276f648ed64a70e855a9808666f76554ab8a5e6d8a9b756b2367",
+      "bytes": 6199
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Json/Bounded.hs",
+      "sha256": "b722a7e6fe50407864fff4a90dc474a7f8043ed11dfe4da1c717624de3b6be10",
+      "bytes": 23353
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Options.hs",
+      "sha256": "1dd439b910ed5878901b9b64de932ba539d4d794223cfdd545ca4cda9b7218ce",
+      "bytes": 6803
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Session/Replay.hs",
+      "sha256": "a1ed05ffea7181fccb8ab18de6ab30be3beb65544b2fc998bf1b45f4a73a5a24",
+      "bytes": 1962
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Session/Snapshot.hs",
+      "sha256": "9f5e6a3106f6ab6b3b1779243aa2f4f3a5abc01f764043fd1c0985077a90fd0b",
+      "bytes": 8709
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Behavioral.hs",
+      "sha256": "895667825df2da184d2f14252e92ed93a16c6c41f3313c019086729700c86f7f",
+      "bytes": 6887
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/BehavioralSelection.hs",
+      "sha256": "ba324fe2c5a9d3f397293f17b631b505c941d0dae501a6f1555f9e3877a2e1d3",
+      "bytes": 1781
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/BehavioralSelection/Internal.hs",
+      "sha256": "b78745b197bb07a5cc3bc327f5d2b0c62a3c7ea4e84f8065ddec1020cfbbecd8",
+      "bytes": 12519
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/CandidateObservation.hs",
+      "sha256": "d26a4ccb39591829822dc6f798dcb87494ca5a3547b1a0e28eb7e4442b097984",
+      "bytes": 6046
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/ContextRender.hs",
+      "sha256": "4cc7c5716205a8e74c2a4c0a8f972319de9409f3568d878e255812695e4780ef",
+      "bytes": 34816
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/ContextSource.hs",
+      "sha256": "be74425fbad519b4bbabc823b81ba85cd637fdae048f1304d487daadf9fb48c0",
+      "bytes": 51095
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/ContextUniverse.hs",
+      "sha256": "b7a900e11bb8a105859971c5398e9724192dca471aa60b7b6a3089431d355e4f",
+      "bytes": 5997
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Engine.hs",
+      "sha256": "d7fa31469318698722abc3d57d13fce784ff147365b46ffbe6198a8740328815",
+      "bytes": 256610
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Engine/Parallel.hs",
+      "sha256": "7340f68cff4e7d4a96db6bf5db56c90ddcb3fe062533715840b18058570e2446",
+      "bytes": 1277
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Fragment.hs",
+      "sha256": "c63a0c03554a27760198bd4de0cd31d394ed3adbd45da2e2d08452df1bbf2282",
+      "bytes": 147926
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Adapter.hs",
+      "sha256": "5a2980e2b4e7a808ab51e2b80b8c64e358b6f7a3a5cc6f7e676283cd2bbb4413",
+      "bytes": 7623
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Command.hs",
+      "sha256": "8836634f4b8636b6d42b5768d843f256819762a5ac5c408e601dae6fe6e5d547",
+      "bytes": 17466
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Configuration.hs",
+      "sha256": "7b8277c1632b677b4722e36340ac92bbee8cc5195e1cf678521d6afe80bd89ef",
+      "bytes": 58277
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Configuration/File.hs",
+      "sha256": "fdc56b3a4221e711491eefc8798163e362313cb22041371c9371182e9a7e2ba0",
+      "bytes": 77580
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Configuration/File/Acquire.hs",
+      "sha256": "68659d65445b894d935b960823b1a74210b2503039ab988413d022b29a88b8ab",
+      "bytes": 8649
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Contract.hs",
+      "sha256": "7a3552a75a2fed8d5153d0c662b5bf858128113a356d3054acaf103e5d3fe40f",
+      "bytes": 4842
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Contract/File.hs",
+      "sha256": "de6a8781fe9e8bb485f3a5381e9de7aa381c862723c242e49a6e0fd112895652",
+      "bytes": 6207
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Contract/File/Acquire.hs",
+      "sha256": "e5cd018fc9d78ef15314954413b58ec58bb88140157ec83167fcdaf9448571e1",
+      "bytes": 7726
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/CounterexampleBank/Internal.hs",
+      "sha256": "c07d90a7494ec8eb35b987be00ad0f112c82c731c35e728cde003b95abd10282",
+      "bytes": 57170
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/File/Acquire.hs",
+      "sha256": "ec4c1e79c5f735b460ea83eb01665f87bfbcb3dc2bd3d132c6d72138802e39ab",
+      "bytes": 11010
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Handoff.hs",
+      "sha256": "f4e926327111198b7c28ca594fd30808859ddafdf30ce8a0de1b41281bd075ee",
+      "bytes": 31772
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Integration.hs",
+      "sha256": "a11dd942cc1af0e844fc0b706b2dade6226132b1ea44534f63090d7f93c929ed",
+      "bytes": 25176
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/PostVerification.hs",
+      "sha256": "32cb15747bd971f53d218206f5e382e48380445bfa12c28d00ef6545147181f6",
+      "bytes": 1122
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/PostVerification/Internal.hs",
+      "sha256": "49d62de181e9b1fc7871e9f358fd14f7bb5a0a4310f0b2bf95b345fc8c6e2b96",
+      "bytes": 6178
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Presentation.hs",
+      "sha256": "87b7b2106eb40f0a33d2011ca63e05bf5128806bb6f460b01c77a006269df8de",
+      "bytes": 32238
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Ranking.hs",
+      "sha256": "22050178ca5a5b6a3557f2db8c8b72f79e6aa242fc0f3c5a5b9d46b078d8f43c",
+      "bytes": 2436
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Ranking/Generic.hs",
+      "sha256": "eb979b2c9bf6426e9bc7941d098b57386da5fce9977a977230ce435f68c01e83",
+      "bytes": 92374
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Ranking/Internal.hs",
+      "sha256": "a15bd9878b6e22044551d067868bcb9aa8d4b0f30bc85850c95a1ec20aba08d4",
+      "bytes": 58376
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Selection.hs",
+      "sha256": "df2a51ffa0c86d94aa4ae6b9be301a515ddc6983cc7154f7cdf280c53be520fa",
+      "bytes": 1787
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Selection/Generic.hs",
+      "sha256": "56f001ee6de3366e031f909dc11976fda5538d9d28a5384f6158488561e64871",
+      "bytes": 12515
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Selection/Internal.hs",
+      "sha256": "411b211067bc3ea7cf821af5cbcd5487568341f49b935f412c5cd5e22542788a",
+      "bytes": 12339
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/SpinePair/PostVerification.hs",
+      "sha256": "0f2caf730c11f8293636fc68da47cfe074ca527936d6692183c757dc8fc4f15c",
+      "bytes": 1002
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/SpinePair/PostVerification/Internal.hs",
+      "sha256": "58e4eacf6008e689aaa4954435bb30a8419f5be47a605b578de34dd7766afa11",
+      "bytes": 6949
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/SpinePair/Ranking.hs",
+      "sha256": "05bac42e3da48c741f087fc61c2f3daa31257d1a9c3f94e673ac77e053eae3d7",
+      "bytes": 2214
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/SpinePair/Ranking/Internal.hs",
+      "sha256": "26c3b03a7b2464e6c405cfe0a37ac9884d39f86a771401b348d6cfe5a172278f",
+      "bytes": 62721
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/SpinePair/Selection.hs",
+      "sha256": "317db2a42f59f20ca5b4792ecdc53eb8f54821ca45e52a91ebb3329f0d90c35c",
+      "bytes": 1950
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/SpinePair/Selection/Internal.hs",
+      "sha256": "a1e229d48c52d360537f9e23c8d7bc533e19871084cc6570d54f84503bd45fa5",
+      "bytes": 13556
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Length/Where.hs",
+      "sha256": "775cdf39958ee2348c0049392c76a3dfad114da812ebab9892bb79cd7fde7437",
+      "bytes": 14866
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Observability.hs",
+      "sha256": "c056cc5270585749bd0753904fe10c323f56c055d0e46639609b5e8f13ad8744",
+      "bytes": 10531
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/PostVerification.hs",
+      "sha256": "b2f1374db9689e6d49ee1d7770f70e5b7e9bceada187dbd3af1c186b536c46d7",
+      "bytes": 7779
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/ProviderCache.hs",
+      "sha256": "f439d68acb6781210168bbffa7292bc6e4588b37a9a8f315b7f50d2fbf5b496f",
+      "bytes": 5206
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Render.hs",
+      "sha256": "bd898691d6d70bfa8b85b1e115add8c5bd8650893340cd95ca9f54c5cae20375",
+      "bytes": 123669
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Replay.hs",
+      "sha256": "8e2429829786e932880ac29c9c42146aaf4a020b598d43ac6551731dc0b0f543",
+      "bytes": 1987
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Verification.hs",
+      "sha256": "4045c4cb2560704694d87bc7f20f378f0503ebda77daa492b068bd46e596bc88",
+      "bytes": 13084
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Leant/Synth/Verification/Parallel.hs",
+      "sha256": "59c9fb1266ab08044f486be58f33671ef36bb184ed3d0b566caafa5ee5ed189f",
+      "bytes": 4142
+    },
+    {
+      "path": "runs/priority3-int-primitive-use-v1/source/src/Main.hs",
+      "sha256": "2466141a0d865cc8057dfae66b83c51be8958f7add39f6cd6ba367f9670ec932",
+      "bytes": 286793
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/PartialOracle_at.lean",
+      "sha256": "fd0b271b5e4ecda82eb42c7ee480e9cc5405a1624f30c5fdb80def8acd7e0ea0",
+      "bytes": 139776
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/PartialPrimitiveControls.lean",
+      "sha256": "281d25ee35aced3986e5d7f1253dbe7718c8a9007811f8a0cae4acb1f8163279",
+      "bytes": 1253
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/oracle-at.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/oracle-at.stdout.txt",
+      "sha256": "7b03282c5798e1bcf6629b7c668d3c796987e8483b1a2ce7bf57a2a799295528",
+      "bytes": 2062
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/partial_exference_at.input.txt",
+      "sha256": "20e2f977cf0a178b6fa002785286ccefaae942b7ae20abdf2e75552715310e4c",
+      "bytes": 25254
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/partial_exference_at.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/partial_exference_at.stdout.txt",
+      "sha256": "48c98644da044d4019ca968cb22f046279914592766c82cca82050cfeba1fa5a",
+      "bytes": 157456
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/partial_exference_at.txt",
+      "sha256": "20e2f977cf0a178b6fa002785286ccefaae942b7ae20abdf2e75552715310e4c",
+      "bytes": 25254
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/partial_exference_reject_all.input.txt",
+      "sha256": "a9accedf6fe6c2074297ff5cd33e183152df0390991762e046e8818572ed0038",
+      "bytes": 407
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/partial_exference_reject_all.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/partial_exference_reject_all.stdout.txt",
+      "sha256": "92d3de687555ea1050fb20f3aa8c53133795002c0b9b03c37e71be5d3baeec02",
+      "bytes": 69174
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/partial_exference_reject_all.txt",
+      "sha256": "a9accedf6fe6c2074297ff5cd33e183152df0390991762e046e8818572ed0038",
+      "bytes": 407
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/primitive-at.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/primitive-at.stdout.txt",
+      "sha256": "c05c5671734f558987d1a034a4c6bd17901a5afcbc8cd598d4523d1f5da45087",
+      "bytes": 207
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/processes.json",
+      "sha256": "9575498df5ead24da8aa89632ed63e5ee011e06bc77b0c0286f63af08108b942",
+      "bytes": 51917
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v1/results.json",
+      "sha256": "899851e359b3a17640082ffea36455dfff51cf03623e2004524c4de21271eed1",
+      "bytes": 1403566
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/PartialOracle_at.lean",
+      "sha256": "fd0b271b5e4ecda82eb42c7ee480e9cc5405a1624f30c5fdb80def8acd7e0ea0",
+      "bytes": 139776
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/PartialPrimitiveControls.lean",
+      "sha256": "281d25ee35aced3986e5d7f1253dbe7718c8a9007811f8a0cae4acb1f8163279",
+      "bytes": 1253
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/oracle-at.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/oracle-at.stdout.txt",
+      "sha256": "7b03282c5798e1bcf6629b7c668d3c796987e8483b1a2ce7bf57a2a799295528",
+      "bytes": 2062
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/partial_exference_at.input.txt",
+      "sha256": "20e2f977cf0a178b6fa002785286ccefaae942b7ae20abdf2e75552715310e4c",
+      "bytes": 25254
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/partial_exference_at.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/partial_exference_at.stdout.txt",
+      "sha256": "d311604cfe319e8fa94fdb50652dc4e81d107377a3883150eab46ab8bec7df9a",
+      "bytes": 32621
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/partial_exference_at.txt",
+      "sha256": "20e2f977cf0a178b6fa002785286ccefaae942b7ae20abdf2e75552715310e4c",
+      "bytes": 25254
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/partial_exference_reject_all.input.txt",
+      "sha256": "a9accedf6fe6c2074297ff5cd33e183152df0390991762e046e8818572ed0038",
+      "bytes": 407
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/partial_exference_reject_all.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/partial_exference_reject_all.stdout.txt",
+      "sha256": "3318e6f08bb1e2356fc0e9679bd4924f325ac1347a1cb4e51c4deeeace4faece",
+      "bytes": 69174
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/partial_exference_reject_all.txt",
+      "sha256": "a9accedf6fe6c2074297ff5cd33e183152df0390991762e046e8818572ed0038",
+      "bytes": 407
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/primitive-at.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/primitive-at.stdout.txt",
+      "sha256": "c05c5671734f558987d1a034a4c6bd17901a5afcbc8cd598d4523d1f5da45087",
+      "bytes": 207
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/processes.json",
+      "sha256": "badf0c344d4312f08957e15b770a21069402c1452a7d21435cb7fca6ea141387",
+      "bytes": 51917
+    },
+    {
+      "path": "runs/priority3-native-int-at-scheduled-v2/results.json",
+      "sha256": "d1caba15e7843a67f2f1fd63493e5d5bce073dfb0ef5b837c576f69208593a66",
+      "bytes": 1403565
+    },
+    {
+      "path": "runs/priority3-predicate-elaboration-v1/controller.py",
+      "sha256": "13127387e562ac67fd53cf0755b0ad826ccee64aa5ccfc6b2146ed5a8bfbe1f1",
+      "bytes": 3074
+    },
+    {
+      "path": "runs/priority3-predicate-elaboration-v1/inline.lean",
+      "sha256": "faeb22efb1405a91c004920cab4015d331e708379901b9d141b4cac44a2797dc",
+      "bytes": 197960
+    },
+    {
+      "path": "runs/priority3-predicate-elaboration-v1/inline.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-predicate-elaboration-v1/inline.stdout.txt",
+      "sha256": "ebd4b718e43aad81b62085f361b808d55accde89687697366d4418174217f6a6",
+      "bytes": 372
+    },
+    {
+      "path": "runs/priority3-predicate-elaboration-v1/processes.json",
+      "sha256": "bd4557bc838013aadcc8c57b16d19db26892aa73cfaa7323722da4064ea5282e",
+      "bytes": 2022
+    },
+    {
+      "path": "runs/priority3-predicate-elaboration-v1/results.json",
+      "sha256": "0d83f72b40e67db38d1c542563aadcbe88740dd88e95136a58700f040339b707",
+      "bytes": 3977
+    },
+    {
+      "path": "runs/priority3-predicate-elaboration-v1/shared.lean",
+      "sha256": "82c2443c86dd8ccc0d590678338ecccd97e9cef99fb7fd16dc5880ce3535f282",
+      "bytes": 25531
+    },
+    {
+      "path": "runs/priority3-predicate-elaboration-v1/shared.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/priority3-predicate-elaboration-v1/shared.stdout.txt",
+      "sha256": "1b83c5b185a42279b1836ecfdc76f23b148554ae96aa5c6bac7c1f9ebe2f058b",
+      "bytes": 2255
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/controller.py",
+      "sha256": "593534648cbf40d106421d79318e5e9ca52b46a250c4b3eb869758d9615578e3",
+      "bytes": 9898
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/forced_polymorphic_result_after_dictionary-oracle.lean",
+      "sha256": "a9e1b475fec8ee7536aa4ce63b64aaccf23aaef6cb68e6b75dd28fd5e9a33806",
+      "bytes": 1230
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/forced_polymorphic_result_after_dictionary-oracle.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/forced_polymorphic_result_after_dictionary-oracle.stdout.txt",
+      "sha256": "5de1d922ad809c1fdef73d66df94f3279a3f326a9b2c3b24a6ab5ae74317ef93",
+      "bytes": 439
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/processes.json",
+      "sha256": "21b8a532dafd93db87a9cf9797a95c5811269e4ad78c79c8c8cf589fe2bcf41a",
+      "bytes": 8592
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/results.json",
+      "sha256": "6c10d1b41f41d756c1f19af657a0917da06525cbc26b3ce7d984a9ef0f8f0dc2",
+      "bytes": 169588
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_false-live.input.txt",
+      "sha256": "87cdd508cdb20d03301e4a17df31b0c2539d61ae2062b9f62052c6a174c81d71",
+      "bytes": 860
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_false-live.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_false-live.stdout.txt",
+      "sha256": "3529d974f355d4cfb22ab2bd534ed6c3767d796358fa195ef85fccceb8f81b84",
+      "bytes": 39149
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_ordinary-live.input.txt",
+      "sha256": "229b2f317f84f47eec3a640b9a58df3387fcfe6107325bc775004f7cf30d330f",
+      "bytes": 766
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_ordinary-live.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_ordinary-live.stdout.txt",
+      "sha256": "b3afd676cdc6ceaaf833d76b8a91ed805446e5ba4740814b698e907385f2cc09",
+      "bytes": 14191
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_ordinary-replay.lean",
+      "sha256": "19b05a36b78ea19d64fd8c2a4cd637cce7cfe3b939f243b2efb93e354cf9ff02",
+      "bytes": 2084
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_ordinary-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_ordinary-replay.stdout.txt",
+      "sha256": "c79a4c444495f37b011a3f5cee48e2f2c66419c7a475ebfb43bcb7f45a1445c1",
+      "bytes": 108
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_where-live.input.txt",
+      "sha256": "ac53c1cee231220a445e0d6cac1f13f171d9fbc1df2840c1540357bd1d61198d",
+      "bytes": 1502
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_where-live.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_where-live.stdout.txt",
+      "sha256": "17e943c67763c49475f2ff26375da342c60fd45f553cca932694b520aa59e0b1",
+      "bytes": 15042
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_where-replay.lean",
+      "sha256": "b62dd9acd30e37bd177d2968ac38f49bb11f493b974312f3bdf570c5e03d9db5",
+      "bytes": 2613
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_where-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-dictionary-v1/selection_dictionary_forced_polymorphic_result_after_dictionary_exference_where-replay.stdout.txt",
+      "sha256": "c79a4c444495f37b011a3f5cee48e2f2c66419c7a475ebfb43bcb7f45a1445c1",
+      "bytes": 108
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/processes.json",
+      "sha256": "ea12bdeefb5f136bb2b19cb4eed743dcec325fbd0bb6c2c1f87db282aa9557f7",
+      "bytes": 1334
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/results.json",
+      "sha256": "b1fe86d14b7b28bc9b9b6b5d5b0fee303ce6ddf10d8f12892b92ca0ff196bd15",
+      "bytes": 10805
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/scheduling_djinn_provider.input.txt",
+      "sha256": "7a98c62ab2810020cd1df29fb850e9382bdff84a8d5ea8cea97bd6b04ade493e",
+      "bytes": 543
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/scheduling_djinn_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/scheduling_djinn_provider.stdout.txt",
+      "sha256": "2532a9aae1c8d058632a457b60c483f64b98c816bf521123a580eef5509d422e",
+      "bytes": 3039
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/cabal.project",
+      "sha256": "5c3a4c4d485b6e682eb0233c9d9385353c009978cd45013cad3a516b1c3d1554",
+      "bytes": 221
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/leant.cabal",
+      "sha256": "1014f2fd8d59e0974aec2ca1dc683d1192209fe634018fd2f407a2e1b3709fae",
+      "bytes": 8429
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/lib/Djex/test-church/behavior_runtime.py",
+      "sha256": "610aba95c2be827c72b2756c6b88b074166921b733523a3d40c1c23d99a3007a",
+      "bytes": 18155
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Backend.hs",
+      "sha256": "175a93f83363f34bc24a76bd9b7a07eee84cec17f4bd2e996bb511278d97116a",
+      "bytes": 42843
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Backend/Isolated.hs",
+      "sha256": "22485927a2fbdf648549cbb3bd06bad9e848246759a08b2db1e099ca608d3e81",
+      "bytes": 21784
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Builtins.hs",
+      "sha256": "ccf1abe57474a798443c1c2619a03e2f273689b18ec5dd1a38f9f4a253062840",
+      "bytes": 7577
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Classify.hs",
+      "sha256": "7da055e424055073886f6f897fd095b5ad6b0991cd84a18e982de843bebec603",
+      "bytes": 4576
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Format.hs",
+      "sha256": "6929220a7b4d3e26012d0a18f5501a5b35f089e733c430898beee35ff83c38f2",
+      "bytes": 4500
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Json.hs",
+      "sha256": "13782ed23040276f648ed64a70e855a9808666f76554ab8a5e6d8a9b756b2367",
+      "bytes": 6199
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Json/Bounded.hs",
+      "sha256": "b722a7e6fe50407864fff4a90dc474a7f8043ed11dfe4da1c717624de3b6be10",
+      "bytes": 23353
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Options.hs",
+      "sha256": "1dd439b910ed5878901b9b64de932ba539d4d794223cfdd545ca4cda9b7218ce",
+      "bytes": 6803
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Session/Replay.hs",
+      "sha256": "a1ed05ffea7181fccb8ab18de6ab30be3beb65544b2fc998bf1b45f4a73a5a24",
+      "bytes": 1962
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Session/Snapshot.hs",
+      "sha256": "9f5e6a3106f6ab6b3b1779243aa2f4f3a5abc01f764043fd1c0985077a90fd0b",
+      "bytes": 8709
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Behavioral.hs",
+      "sha256": "895667825df2da184d2f14252e92ed93a16c6c41f3313c019086729700c86f7f",
+      "bytes": 6887
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/BehavioralSelection.hs",
+      "sha256": "ba324fe2c5a9d3f397293f17b631b505c941d0dae501a6f1555f9e3877a2e1d3",
+      "bytes": 1781
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/BehavioralSelection/Internal.hs",
+      "sha256": "b78745b197bb07a5cc3bc327f5d2b0c62a3c7ea4e84f8065ddec1020cfbbecd8",
+      "bytes": 12519
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/CandidateObservation.hs",
+      "sha256": "d26a4ccb39591829822dc6f798dcb87494ca5a3547b1a0e28eb7e4442b097984",
+      "bytes": 6046
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/ContextRender.hs",
+      "sha256": "4cc7c5716205a8e74c2a4c0a8f972319de9409f3568d878e255812695e4780ef",
+      "bytes": 34816
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/ContextSource.hs",
+      "sha256": "be74425fbad519b4bbabc823b81ba85cd637fdae048f1304d487daadf9fb48c0",
+      "bytes": 51095
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/ContextUniverse.hs",
+      "sha256": "b7a900e11bb8a105859971c5398e9724192dca471aa60b7b6a3089431d355e4f",
+      "bytes": 5997
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Engine.hs",
+      "sha256": "d7fa31469318698722abc3d57d13fce784ff147365b46ffbe6198a8740328815",
+      "bytes": 256610
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Engine/Parallel.hs",
+      "sha256": "7340f68cff4e7d4a96db6bf5db56c90ddcb3fe062533715840b18058570e2446",
+      "bytes": 1277
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Fragment.hs",
+      "sha256": "c63a0c03554a27760198bd4de0cd31d394ed3adbd45da2e2d08452df1bbf2282",
+      "bytes": 147926
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Adapter.hs",
+      "sha256": "5a2980e2b4e7a808ab51e2b80b8c64e358b6f7a3a5cc6f7e676283cd2bbb4413",
+      "bytes": 7623
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Command.hs",
+      "sha256": "8836634f4b8636b6d42b5768d843f256819762a5ac5c408e601dae6fe6e5d547",
+      "bytes": 17466
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Configuration.hs",
+      "sha256": "7b8277c1632b677b4722e36340ac92bbee8cc5195e1cf678521d6afe80bd89ef",
+      "bytes": 58277
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Configuration/File.hs",
+      "sha256": "fdc56b3a4221e711491eefc8798163e362313cb22041371c9371182e9a7e2ba0",
+      "bytes": 77580
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Configuration/File/Acquire.hs",
+      "sha256": "68659d65445b894d935b960823b1a74210b2503039ab988413d022b29a88b8ab",
+      "bytes": 8649
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Contract.hs",
+      "sha256": "7a3552a75a2fed8d5153d0c662b5bf858128113a356d3054acaf103e5d3fe40f",
+      "bytes": 4842
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Contract/File.hs",
+      "sha256": "de6a8781fe9e8bb485f3a5381e9de7aa381c862723c242e49a6e0fd112895652",
+      "bytes": 6207
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Contract/File/Acquire.hs",
+      "sha256": "e5cd018fc9d78ef15314954413b58ec58bb88140157ec83167fcdaf9448571e1",
+      "bytes": 7726
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/CounterexampleBank/Internal.hs",
+      "sha256": "c07d90a7494ec8eb35b987be00ad0f112c82c731c35e728cde003b95abd10282",
+      "bytes": 57170
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/File/Acquire.hs",
+      "sha256": "ec4c1e79c5f735b460ea83eb01665f87bfbcb3dc2bd3d132c6d72138802e39ab",
+      "bytes": 11010
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Handoff.hs",
+      "sha256": "f4e926327111198b7c28ca594fd30808859ddafdf30ce8a0de1b41281bd075ee",
+      "bytes": 31772
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Integration.hs",
+      "sha256": "a11dd942cc1af0e844fc0b706b2dade6226132b1ea44534f63090d7f93c929ed",
+      "bytes": 25176
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/PostVerification.hs",
+      "sha256": "32cb15747bd971f53d218206f5e382e48380445bfa12c28d00ef6545147181f6",
+      "bytes": 1122
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/PostVerification/Internal.hs",
+      "sha256": "49d62de181e9b1fc7871e9f358fd14f7bb5a0a4310f0b2bf95b345fc8c6e2b96",
+      "bytes": 6178
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Presentation.hs",
+      "sha256": "87b7b2106eb40f0a33d2011ca63e05bf5128806bb6f460b01c77a006269df8de",
+      "bytes": 32238
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Ranking.hs",
+      "sha256": "22050178ca5a5b6a3557f2db8c8b72f79e6aa242fc0f3c5a5b9d46b078d8f43c",
+      "bytes": 2436
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Ranking/Generic.hs",
+      "sha256": "eb979b2c9bf6426e9bc7941d098b57386da5fce9977a977230ce435f68c01e83",
+      "bytes": 92374
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Ranking/Internal.hs",
+      "sha256": "a15bd9878b6e22044551d067868bcb9aa8d4b0f30bc85850c95a1ec20aba08d4",
+      "bytes": 58376
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Selection.hs",
+      "sha256": "df2a51ffa0c86d94aa4ae6b9be301a515ddc6983cc7154f7cdf280c53be520fa",
+      "bytes": 1787
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Selection/Generic.hs",
+      "sha256": "56f001ee6de3366e031f909dc11976fda5538d9d28a5384f6158488561e64871",
+      "bytes": 12515
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Selection/Internal.hs",
+      "sha256": "411b211067bc3ea7cf821af5cbcd5487568341f49b935f412c5cd5e22542788a",
+      "bytes": 12339
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/SpinePair/PostVerification.hs",
+      "sha256": "0f2caf730c11f8293636fc68da47cfe074ca527936d6692183c757dc8fc4f15c",
+      "bytes": 1002
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/SpinePair/PostVerification/Internal.hs",
+      "sha256": "58e4eacf6008e689aaa4954435bb30a8419f5be47a605b578de34dd7766afa11",
+      "bytes": 6949
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/SpinePair/Ranking.hs",
+      "sha256": "05bac42e3da48c741f087fc61c2f3daa31257d1a9c3f94e673ac77e053eae3d7",
+      "bytes": 2214
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/SpinePair/Ranking/Internal.hs",
+      "sha256": "26c3b03a7b2464e6c405cfe0a37ac9884d39f86a771401b348d6cfe5a172278f",
+      "bytes": 62721
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/SpinePair/Selection.hs",
+      "sha256": "317db2a42f59f20ca5b4792ecdc53eb8f54821ca45e52a91ebb3329f0d90c35c",
+      "bytes": 1950
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/SpinePair/Selection/Internal.hs",
+      "sha256": "a1e229d48c52d360537f9e23c8d7bc533e19871084cc6570d54f84503bd45fa5",
+      "bytes": 13556
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Length/Where.hs",
+      "sha256": "775cdf39958ee2348c0049392c76a3dfad114da812ebab9892bb79cd7fde7437",
+      "bytes": 14866
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Observability.hs",
+      "sha256": "c056cc5270585749bd0753904fe10c323f56c055d0e46639609b5e8f13ad8744",
+      "bytes": 10531
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/PostVerification.hs",
+      "sha256": "b2f1374db9689e6d49ee1d7770f70e5b7e9bceada187dbd3af1c186b536c46d7",
+      "bytes": 7779
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/ProviderCache.hs",
+      "sha256": "f439d68acb6781210168bbffa7292bc6e4588b37a9a8f315b7f50d2fbf5b496f",
+      "bytes": 5206
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Render.hs",
+      "sha256": "bd898691d6d70bfa8b85b1e115add8c5bd8650893340cd95ca9f54c5cae20375",
+      "bytes": 123669
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Replay.hs",
+      "sha256": "8e2429829786e932880ac29c9c42146aaf4a020b598d43ac6551731dc0b0f543",
+      "bytes": 1987
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Verification.hs",
+      "sha256": "4045c4cb2560704694d87bc7f20f378f0503ebda77daa492b068bd46e596bc88",
+      "bytes": 13084
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Leant/Synth/Verification/Parallel.hs",
+      "sha256": "59c9fb1266ab08044f486be58f33671ef36bb184ed3d0b566caafa5ee5ed189f",
+      "bytes": 4142
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/src/Main.hs",
+      "sha256": "3bd60288843386f719f4412c53e99ec4f455c4d663f7e72512fb2e8dac424c2b",
+      "bytes": 285827
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/test-behavioral/run_provider_scheduling.py",
+      "sha256": "cd3458378176011b9026d3fd479e77e5c734fcd91f17191a577c3f0bb67c2cf5",
+      "bytes": 7401
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/test-church/behavior_probe.py",
+      "sha256": "c891f561faf266fc1e96e79f98b97ca14559177beda8b6a1da38e4fa3d2dcbfe",
+      "bytes": 15923
+    },
+    {
+      "path": "runs/provider-scheduling-public-v1/source/test-church/run_corpus.py",
+      "sha256": "a6a8034272ce50cdafd1dcfd6a4a3cdfab3ddbd58a1c4eb26ef3cebf64f6873a",
+      "bytes": 16283
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/processes.json",
+      "sha256": "ca0db239dca71afee3d97f19b973bb2eb25edda290755ae687e8b8d6f193aea3",
+      "bytes": 29829
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/results.json",
+      "sha256": "8ddbd171a2115251651c22ee1a6fbe7fc59d312cac404951b274a7af5adf70f6",
+      "bytes": 48455
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_left-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_left-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_left.input.txt",
+      "sha256": "64d32011d1867340a077cd8059e9ab1c0d391884ca880f266d66a3bb2f3fa382",
+      "bytes": 492
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_left.lean",
+      "sha256": "01eaa74e7103422c231a735f27b58bb88c08d4cc010bd502a5c18b826254ee0b",
+      "bytes": 340
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_left.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_left.stdout.txt",
+      "sha256": "c4b4d489405f52a5d9ea6dc19d56420cdce1bade98cbe0b573a6afbae87a9105",
+      "bytes": 3119
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_provider-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_provider-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_provider.input.txt",
+      "sha256": "8ccfc47c96c01377318a500dbf05267cdf4bf1a56371b4a9978fab7c67c11255",
+      "bytes": 561
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_provider.lean",
+      "sha256": "04d8503d7b5a6f6df1558251e18dd996e55017abf0270fbedb0ad1e7abf2e464",
+      "bytes": 409
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_provider.stdout.txt",
+      "sha256": "4e21181f07b7e761905d75690fd6d839dbc8fca2338bdc6264d1da1757de5a70",
+      "bytes": 4100
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_reject_empty.input.txt",
+      "sha256": "e11845ab1958f38ea26a02027bf705a9833391d1e620ab45eb1a4efa0140c787",
+      "bytes": 421
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_reject_empty.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_reject_empty.stdout.txt",
+      "sha256": "4abdcd5a0269583e59ec856cf53465c409956bbf48a9956252917e0e33dc3ece",
+      "bytes": 2397
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_reject_provider.input.txt",
+      "sha256": "3a6a0feb7af0061007e03b1711a08451327fa17c7256a3d895ffb68f3e73878c",
+      "bytes": 469
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_reject_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_reject_provider.stdout.txt",
+      "sha256": "6a7f9d0988d947257ffb205c68801e5c7a39390a767408ae2e5a7173e83c5967",
+      "bytes": 4293
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_right-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_right-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_right.input.txt",
+      "sha256": "70df64db4dfb8b886f4a1484722627524eb662563dd4556c374b49b4052aa4ef",
+      "bytes": 494
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_right.lean",
+      "sha256": "fca768aa89bccb833a7e5603f34ba97803c38348c018d1687361a0495ac4ae80",
+      "bytes": 339
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_right.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_both_right.stdout.txt",
+      "sha256": "1ec153b167b6b89b6e6d271cec44b17d21c794655b3b9ab65762202eec5a1077",
+      "bytes": 3026
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_left-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_left-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_left.input.txt",
+      "sha256": "9ce37f1cf5369cd901337ba5458ab224dd1b1dc8a9f5ad5daa7120248f3769c2",
+      "bytes": 496
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_left.lean",
+      "sha256": "01eaa74e7103422c231a735f27b58bb88c08d4cc010bd502a5c18b826254ee0b",
+      "bytes": 340
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_left.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_left.stdout.txt",
+      "sha256": "f8161ff4a8c40bae1f33c792a671a2788b9286710ccdfa0fbfc8e9dbf3692893",
+      "bytes": 3177
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_provider-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_provider-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_provider.input.txt",
+      "sha256": "09e04dd4616d944aaf94930347606cf9e3c463a0584733093337bc39173c28f6",
+      "bytes": 566
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_provider.lean",
+      "sha256": "04d8503d7b5a6f6df1558251e18dd996e55017abf0270fbedb0ad1e7abf2e464",
+      "bytes": 409
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_provider.stdout.txt",
+      "sha256": "f5f38be32fb5d909486cc1528781d991a78607c523582271fe2f3deedf0ac1b1",
+      "bytes": 4046
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_reject_empty.input.txt",
+      "sha256": "fa96bd60a7faf017dd4cca4ec8c3206a9a36ccddc2259e7933a220266194d033",
+      "bytes": 423
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_reject_empty.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_reject_empty.stdout.txt",
+      "sha256": "a2d40c0c026d08607bc7f4deb01fbbe5e4222467225e8ee3d367e62995e86e3e",
+      "bytes": 1872
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_reject_provider.input.txt",
+      "sha256": "4ae02247c33d2d0cdba84fb68a351526a3f4f6f3e80ee6e0e392b75981888a94",
+      "bytes": 471
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_reject_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_reject_provider.stdout.txt",
+      "sha256": "e9fdda2032f1fb9c0ff081b22c15c29f6620bbd2ef09bafdb969e27430ece8c4",
+      "bytes": 2989
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_right-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_right-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_right.input.txt",
+      "sha256": "2ecb3dd1593e7bf590ca6c3a4339abe5fe61bbdbf80bc4e27b934040a35b1de2",
+      "bytes": 498
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_right.lean",
+      "sha256": "fca768aa89bccb833a7e5603f34ba97803c38348c018d1687361a0495ac4ae80",
+      "bytes": 339
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_right.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_djinn_right.stdout.txt",
+      "sha256": "17c2bf7f73b1dfbc2409672ea0bf4749f55a05fe1872aa25d724f1828f0814b8",
+      "bytes": 3031
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_left-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_left-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_left.input.txt",
+      "sha256": "372c7c4e2411396bc0a47e8d404c14589dcf3515fb703444e07494304fffbbdf",
+      "bytes": 512
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_left.lean",
+      "sha256": "01eaa74e7103422c231a735f27b58bb88c08d4cc010bd502a5c18b826254ee0b",
+      "bytes": 340
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_left.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_left.stdout.txt",
+      "sha256": "127e6714703925c327b98bff4d38be26e61afd9be348044b06a39ad8e5ae5475",
+      "bytes": 2941
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_provider-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_provider-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_provider.input.txt",
+      "sha256": "5d6525d277e4229a783ec2e4605b7d68d816417bc9dc4e3fa1ed8a5fd3ac3051",
+      "bytes": 586
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_provider.lean",
+      "sha256": "04d8503d7b5a6f6df1558251e18dd996e55017abf0270fbedb0ad1e7abf2e464",
+      "bytes": 409
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_provider.stdout.txt",
+      "sha256": "6fa62d2688e57522d5dc25d48855cbbcc3939d364fb4ca4cf15237c094f4bcfa",
+      "bytes": 3305
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_reject_empty.input.txt",
+      "sha256": "f56ad9da515cd9d442e2fc2f6ba0da1cc52d7d3fa80db934782f155cb96c3ff7",
+      "bytes": 431
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_reject_empty.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_reject_empty.stdout.txt",
+      "sha256": "2647a87d1f6526bd2ef45f2d0f20d8f17fd0d243bc249d98df9435a42f7ef5f7",
+      "bytes": 2132
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_reject_provider.input.txt",
+      "sha256": "1bcd6824fba50600b3259eaeb7b256b08a0e7e5170c150f33a02edf4b0ab3395",
+      "bytes": 479
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_reject_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_reject_provider.stdout.txt",
+      "sha256": "dffc4236f23645336b7dacf7bd8711c5c94eef6813325a5d4b7d4fb9e61edca1",
+      "bytes": 2982
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_right-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_right-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_right.input.txt",
+      "sha256": "999ff483ac72dc85a5a8649ca3f57fec8063144519096da670a2a7955f486d3b",
+      "bytes": 514
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_right.lean",
+      "sha256": "fca768aa89bccb833a7e5603f34ba97803c38348c018d1687361a0495ac4ae80",
+      "bytes": 339
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_right.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/scheduling_exference_right.stdout.txt",
+      "sha256": "07fb41adbbb5a30a4dba9859a5fecc015b753ed62953a93411a7ac5c194f9b18",
+      "bytes": 3091
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/cabal.project",
+      "sha256": "5c3a4c4d485b6e682eb0233c9d9385353c009978cd45013cad3a516b1c3d1554",
+      "bytes": 221
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/leant.cabal",
+      "sha256": "1014f2fd8d59e0974aec2ca1dc683d1192209fe634018fd2f407a2e1b3709fae",
+      "bytes": 8429
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/lib/Djex/test-church/behavior_runtime.py",
+      "sha256": "610aba95c2be827c72b2756c6b88b074166921b733523a3d40c1c23d99a3007a",
+      "bytes": 18155
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Backend.hs",
+      "sha256": "175a93f83363f34bc24a76bd9b7a07eee84cec17f4bd2e996bb511278d97116a",
+      "bytes": 42843
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Backend/Isolated.hs",
+      "sha256": "22485927a2fbdf648549cbb3bd06bad9e848246759a08b2db1e099ca608d3e81",
+      "bytes": 21784
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Builtins.hs",
+      "sha256": "ccf1abe57474a798443c1c2619a03e2f273689b18ec5dd1a38f9f4a253062840",
+      "bytes": 7577
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Classify.hs",
+      "sha256": "7da055e424055073886f6f897fd095b5ad6b0991cd84a18e982de843bebec603",
+      "bytes": 4576
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Format.hs",
+      "sha256": "6929220a7b4d3e26012d0a18f5501a5b35f089e733c430898beee35ff83c38f2",
+      "bytes": 4500
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Json.hs",
+      "sha256": "13782ed23040276f648ed64a70e855a9808666f76554ab8a5e6d8a9b756b2367",
+      "bytes": 6199
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Json/Bounded.hs",
+      "sha256": "b722a7e6fe50407864fff4a90dc474a7f8043ed11dfe4da1c717624de3b6be10",
+      "bytes": 23353
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Options.hs",
+      "sha256": "1dd439b910ed5878901b9b64de932ba539d4d794223cfdd545ca4cda9b7218ce",
+      "bytes": 6803
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Session/Replay.hs",
+      "sha256": "a1ed05ffea7181fccb8ab18de6ab30be3beb65544b2fc998bf1b45f4a73a5a24",
+      "bytes": 1962
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Session/Snapshot.hs",
+      "sha256": "9f5e6a3106f6ab6b3b1779243aa2f4f3a5abc01f764043fd1c0985077a90fd0b",
+      "bytes": 8709
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Behavioral.hs",
+      "sha256": "895667825df2da184d2f14252e92ed93a16c6c41f3313c019086729700c86f7f",
+      "bytes": 6887
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/BehavioralSelection.hs",
+      "sha256": "ba324fe2c5a9d3f397293f17b631b505c941d0dae501a6f1555f9e3877a2e1d3",
+      "bytes": 1781
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/BehavioralSelection/Internal.hs",
+      "sha256": "b78745b197bb07a5cc3bc327f5d2b0c62a3c7ea4e84f8065ddec1020cfbbecd8",
+      "bytes": 12519
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/CandidateObservation.hs",
+      "sha256": "d26a4ccb39591829822dc6f798dcb87494ca5a3547b1a0e28eb7e4442b097984",
+      "bytes": 6046
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/ContextRender.hs",
+      "sha256": "4cc7c5716205a8e74c2a4c0a8f972319de9409f3568d878e255812695e4780ef",
+      "bytes": 34816
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/ContextSource.hs",
+      "sha256": "be74425fbad519b4bbabc823b81ba85cd637fdae048f1304d487daadf9fb48c0",
+      "bytes": 51095
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/ContextUniverse.hs",
+      "sha256": "b7a900e11bb8a105859971c5398e9724192dca471aa60b7b6a3089431d355e4f",
+      "bytes": 5997
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Engine.hs",
+      "sha256": "d7fa31469318698722abc3d57d13fce784ff147365b46ffbe6198a8740328815",
+      "bytes": 256610
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Engine/Parallel.hs",
+      "sha256": "7340f68cff4e7d4a96db6bf5db56c90ddcb3fe062533715840b18058570e2446",
+      "bytes": 1277
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Fragment.hs",
+      "sha256": "c63a0c03554a27760198bd4de0cd31d394ed3adbd45da2e2d08452df1bbf2282",
+      "bytes": 147926
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Adapter.hs",
+      "sha256": "5a2980e2b4e7a808ab51e2b80b8c64e358b6f7a3a5cc6f7e676283cd2bbb4413",
+      "bytes": 7623
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Command.hs",
+      "sha256": "8836634f4b8636b6d42b5768d843f256819762a5ac5c408e601dae6fe6e5d547",
+      "bytes": 17466
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Configuration.hs",
+      "sha256": "7b8277c1632b677b4722e36340ac92bbee8cc5195e1cf678521d6afe80bd89ef",
+      "bytes": 58277
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Configuration/File.hs",
+      "sha256": "fdc56b3a4221e711491eefc8798163e362313cb22041371c9371182e9a7e2ba0",
+      "bytes": 77580
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Configuration/File/Acquire.hs",
+      "sha256": "68659d65445b894d935b960823b1a74210b2503039ab988413d022b29a88b8ab",
+      "bytes": 8649
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Contract.hs",
+      "sha256": "7a3552a75a2fed8d5153d0c662b5bf858128113a356d3054acaf103e5d3fe40f",
+      "bytes": 4842
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Contract/File.hs",
+      "sha256": "de6a8781fe9e8bb485f3a5381e9de7aa381c862723c242e49a6e0fd112895652",
+      "bytes": 6207
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Contract/File/Acquire.hs",
+      "sha256": "e5cd018fc9d78ef15314954413b58ec58bb88140157ec83167fcdaf9448571e1",
+      "bytes": 7726
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/CounterexampleBank/Internal.hs",
+      "sha256": "c07d90a7494ec8eb35b987be00ad0f112c82c731c35e728cde003b95abd10282",
+      "bytes": 57170
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/File/Acquire.hs",
+      "sha256": "ec4c1e79c5f735b460ea83eb01665f87bfbcb3dc2bd3d132c6d72138802e39ab",
+      "bytes": 11010
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Handoff.hs",
+      "sha256": "f4e926327111198b7c28ca594fd30808859ddafdf30ce8a0de1b41281bd075ee",
+      "bytes": 31772
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Integration.hs",
+      "sha256": "a11dd942cc1af0e844fc0b706b2dade6226132b1ea44534f63090d7f93c929ed",
+      "bytes": 25176
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/PostVerification.hs",
+      "sha256": "32cb15747bd971f53d218206f5e382e48380445bfa12c28d00ef6545147181f6",
+      "bytes": 1122
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/PostVerification/Internal.hs",
+      "sha256": "49d62de181e9b1fc7871e9f358fd14f7bb5a0a4310f0b2bf95b345fc8c6e2b96",
+      "bytes": 6178
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Presentation.hs",
+      "sha256": "87b7b2106eb40f0a33d2011ca63e05bf5128806bb6f460b01c77a006269df8de",
+      "bytes": 32238
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Ranking.hs",
+      "sha256": "22050178ca5a5b6a3557f2db8c8b72f79e6aa242fc0f3c5a5b9d46b078d8f43c",
+      "bytes": 2436
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Ranking/Generic.hs",
+      "sha256": "eb979b2c9bf6426e9bc7941d098b57386da5fce9977a977230ce435f68c01e83",
+      "bytes": 92374
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Ranking/Internal.hs",
+      "sha256": "a15bd9878b6e22044551d067868bcb9aa8d4b0f30bc85850c95a1ec20aba08d4",
+      "bytes": 58376
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Selection.hs",
+      "sha256": "df2a51ffa0c86d94aa4ae6b9be301a515ddc6983cc7154f7cdf280c53be520fa",
+      "bytes": 1787
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Selection/Generic.hs",
+      "sha256": "56f001ee6de3366e031f909dc11976fda5538d9d28a5384f6158488561e64871",
+      "bytes": 12515
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Selection/Internal.hs",
+      "sha256": "411b211067bc3ea7cf821af5cbcd5487568341f49b935f412c5cd5e22542788a",
+      "bytes": 12339
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/SpinePair/PostVerification.hs",
+      "sha256": "0f2caf730c11f8293636fc68da47cfe074ca527936d6692183c757dc8fc4f15c",
+      "bytes": 1002
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/SpinePair/PostVerification/Internal.hs",
+      "sha256": "58e4eacf6008e689aaa4954435bb30a8419f5be47a605b578de34dd7766afa11",
+      "bytes": 6949
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/SpinePair/Ranking.hs",
+      "sha256": "05bac42e3da48c741f087fc61c2f3daa31257d1a9c3f94e673ac77e053eae3d7",
+      "bytes": 2214
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/SpinePair/Ranking/Internal.hs",
+      "sha256": "26c3b03a7b2464e6c405cfe0a37ac9884d39f86a771401b348d6cfe5a172278f",
+      "bytes": 62721
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/SpinePair/Selection.hs",
+      "sha256": "317db2a42f59f20ca5b4792ecdc53eb8f54821ca45e52a91ebb3329f0d90c35c",
+      "bytes": 1950
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/SpinePair/Selection/Internal.hs",
+      "sha256": "a1e229d48c52d360537f9e23c8d7bc533e19871084cc6570d54f84503bd45fa5",
+      "bytes": 13556
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Length/Where.hs",
+      "sha256": "775cdf39958ee2348c0049392c76a3dfad114da812ebab9892bb79cd7fde7437",
+      "bytes": 14866
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Observability.hs",
+      "sha256": "c056cc5270585749bd0753904fe10c323f56c055d0e46639609b5e8f13ad8744",
+      "bytes": 10531
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/PostVerification.hs",
+      "sha256": "b2f1374db9689e6d49ee1d7770f70e5b7e9bceada187dbd3af1c186b536c46d7",
+      "bytes": 7779
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/ProviderCache.hs",
+      "sha256": "f439d68acb6781210168bbffa7292bc6e4588b37a9a8f315b7f50d2fbf5b496f",
+      "bytes": 5206
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Render.hs",
+      "sha256": "bd898691d6d70bfa8b85b1e115add8c5bd8650893340cd95ca9f54c5cae20375",
+      "bytes": 123669
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Replay.hs",
+      "sha256": "8e2429829786e932880ac29c9c42146aaf4a020b598d43ac6551731dc0b0f543",
+      "bytes": 1987
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Verification.hs",
+      "sha256": "4045c4cb2560704694d87bc7f20f378f0503ebda77daa492b068bd46e596bc88",
+      "bytes": 13084
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Leant/Synth/Verification/Parallel.hs",
+      "sha256": "59c9fb1266ab08044f486be58f33671ef36bb184ed3d0b566caafa5ee5ed189f",
+      "bytes": 4142
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/src/Main.hs",
+      "sha256": "3bd60288843386f719f4412c53e99ec4f455c4d663f7e72512fb2e8dac424c2b",
+      "bytes": 285827
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/test-behavioral/run_provider_scheduling.py",
+      "sha256": "5ec6d0d943791571bf076ca6dc1e498861eb4dba9e736d00721d357df795f5a2",
+      "bytes": 7704
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/test-church/behavior_probe.py",
+      "sha256": "c891f561faf266fc1e96e79f98b97ca14559177beda8b6a1da38e4fa3d2dcbfe",
+      "bytes": 15923
+    },
+    {
+      "path": "runs/provider-scheduling-public-v2/source/test-church/run_corpus.py",
+      "sha256": "a6a8034272ce50cdafd1dcfd6a4a3cdfab3ddbd58a1c4eb26ef3cebf64f6873a",
+      "bytes": 16283
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/processes.json",
+      "sha256": "e65dd37a7c045205c95edde4e14eb9ac51919502069fdb9996e928ef1bcc587a",
+      "bytes": 29834
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/results.json",
+      "sha256": "9e9d625f0216c696916de959f5ade0dd00502f4cf66f9d470ec492829a44f660",
+      "bytes": 48460
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_left-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_left-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_left.input.txt",
+      "sha256": "64d32011d1867340a077cd8059e9ab1c0d391884ca880f266d66a3bb2f3fa382",
+      "bytes": 492
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_left.lean",
+      "sha256": "01eaa74e7103422c231a735f27b58bb88c08d4cc010bd502a5c18b826254ee0b",
+      "bytes": 340
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_left.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_left.stdout.txt",
+      "sha256": "c4b4d489405f52a5d9ea6dc19d56420cdce1bade98cbe0b573a6afbae87a9105",
+      "bytes": 3119
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_provider-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_provider-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_provider.input.txt",
+      "sha256": "8ccfc47c96c01377318a500dbf05267cdf4bf1a56371b4a9978fab7c67c11255",
+      "bytes": 561
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_provider.lean",
+      "sha256": "04d8503d7b5a6f6df1558251e18dd996e55017abf0270fbedb0ad1e7abf2e464",
+      "bytes": 409
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_provider.stdout.txt",
+      "sha256": "4e21181f07b7e761905d75690fd6d839dbc8fca2338bdc6264d1da1757de5a70",
+      "bytes": 4100
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_reject_empty.input.txt",
+      "sha256": "e11845ab1958f38ea26a02027bf705a9833391d1e620ab45eb1a4efa0140c787",
+      "bytes": 421
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_reject_empty.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_reject_empty.stdout.txt",
+      "sha256": "4abdcd5a0269583e59ec856cf53465c409956bbf48a9956252917e0e33dc3ece",
+      "bytes": 2397
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_reject_provider.input.txt",
+      "sha256": "3a6a0feb7af0061007e03b1711a08451327fa17c7256a3d895ffb68f3e73878c",
+      "bytes": 469
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_reject_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_reject_provider.stdout.txt",
+      "sha256": "6a7f9d0988d947257ffb205c68801e5c7a39390a767408ae2e5a7173e83c5967",
+      "bytes": 4293
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_right-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_right-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_right.input.txt",
+      "sha256": "70df64db4dfb8b886f4a1484722627524eb662563dd4556c374b49b4052aa4ef",
+      "bytes": 494
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_right.lean",
+      "sha256": "fca768aa89bccb833a7e5603f34ba97803c38348c018d1687361a0495ac4ae80",
+      "bytes": 339
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_right.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_both_right.stdout.txt",
+      "sha256": "1ec153b167b6b89b6e6d271cec44b17d21c794655b3b9ab65762202eec5a1077",
+      "bytes": 3026
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_left-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_left-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_left.input.txt",
+      "sha256": "9ce37f1cf5369cd901337ba5458ab224dd1b1dc8a9f5ad5daa7120248f3769c2",
+      "bytes": 496
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_left.lean",
+      "sha256": "01eaa74e7103422c231a735f27b58bb88c08d4cc010bd502a5c18b826254ee0b",
+      "bytes": 340
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_left.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_left.stdout.txt",
+      "sha256": "e5dd1c527abc4d0253b878f7d83a820641e50e39f981169e926c7e0b5b5c1a71",
+      "bytes": 3177
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_provider-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_provider-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_provider.input.txt",
+      "sha256": "09e04dd4616d944aaf94930347606cf9e3c463a0584733093337bc39173c28f6",
+      "bytes": 566
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_provider.lean",
+      "sha256": "04d8503d7b5a6f6df1558251e18dd996e55017abf0270fbedb0ad1e7abf2e464",
+      "bytes": 409
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_provider.stdout.txt",
+      "sha256": "144c1dfb4f5cb1ba88158ce29accc71ade606fab157fe94c4beb21d7a051fdf5",
+      "bytes": 4046
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_reject_empty.input.txt",
+      "sha256": "fa96bd60a7faf017dd4cca4ec8c3206a9a36ccddc2259e7933a220266194d033",
+      "bytes": 423
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_reject_empty.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_reject_empty.stdout.txt",
+      "sha256": "a2d40c0c026d08607bc7f4deb01fbbe5e4222467225e8ee3d367e62995e86e3e",
+      "bytes": 1872
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_reject_provider.input.txt",
+      "sha256": "4ae02247c33d2d0cdba84fb68a351526a3f4f6f3e80ee6e0e392b75981888a94",
+      "bytes": 471
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_reject_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_reject_provider.stdout.txt",
+      "sha256": "ddba4e9e35e2be65b74076a4b605ac2f15ecb52dfd54b03de002b56a911326c2",
+      "bytes": 2989
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_right-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_right-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_right.input.txt",
+      "sha256": "2ecb3dd1593e7bf590ca6c3a4339abe5fe61bbdbf80bc4e27b934040a35b1de2",
+      "bytes": 498
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_right.lean",
+      "sha256": "fca768aa89bccb833a7e5603f34ba97803c38348c018d1687361a0495ac4ae80",
+      "bytes": 339
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_right.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_djinn_right.stdout.txt",
+      "sha256": "17c2bf7f73b1dfbc2409672ea0bf4749f55a05fe1872aa25d724f1828f0814b8",
+      "bytes": 3031
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_left-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_left-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_left.input.txt",
+      "sha256": "372c7c4e2411396bc0a47e8d404c14589dcf3515fb703444e07494304fffbbdf",
+      "bytes": 512
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_left.lean",
+      "sha256": "01eaa74e7103422c231a735f27b58bb88c08d4cc010bd502a5c18b826254ee0b",
+      "bytes": 340
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_left.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_left.stdout.txt",
+      "sha256": "bc4aec859f991769768ce09cc8c499696a2997a998522d8374e5fa182df30e3f",
+      "bytes": 2941
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_provider-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_provider-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_provider.input.txt",
+      "sha256": "5d6525d277e4229a783ec2e4605b7d68d816417bc9dc4e3fa1ed8a5fd3ac3051",
+      "bytes": 586
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_provider.lean",
+      "sha256": "04d8503d7b5a6f6df1558251e18dd996e55017abf0270fbedb0ad1e7abf2e464",
+      "bytes": 409
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_provider.stdout.txt",
+      "sha256": "f0d29a0870537b92c990d84618f7fa64408f2aa236d4adb99c69df15faa3d22e",
+      "bytes": 3305
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_reject_empty.input.txt",
+      "sha256": "f56ad9da515cd9d442e2fc2f6ba0da1cc52d7d3fa80db934782f155cb96c3ff7",
+      "bytes": 431
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_reject_empty.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_reject_empty.stdout.txt",
+      "sha256": "2da3b03af566128e204a33e3fb11a5582300cc1e63d5c284818bf86da9e3ac6c",
+      "bytes": 2132
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_reject_provider.input.txt",
+      "sha256": "1bcd6824fba50600b3259eaeb7b256b08a0e7e5170c150f33a02edf4b0ab3395",
+      "bytes": 479
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_reject_provider.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_reject_provider.stdout.txt",
+      "sha256": "dffc4236f23645336b7dacf7bd8711c5c94eef6813325a5d4b7d4fb9e61edca1",
+      "bytes": 2982
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_right-replay.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_right-replay.stdout.txt",
+      "sha256": "ac3864b0d232d4964e9a90ed2530c73fb6fdd75593974f8249de15c2e3061215",
+      "bytes": 115
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_right.input.txt",
+      "sha256": "999ff483ac72dc85a5a8649ca3f57fec8063144519096da670a2a7955f486d3b",
+      "bytes": 514
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_right.lean",
+      "sha256": "fca768aa89bccb833a7e5603f34ba97803c38348c018d1687361a0495ac4ae80",
+      "bytes": 339
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_right.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/scheduling_exference_right.stdout.txt",
+      "sha256": "07fb41adbbb5a30a4dba9859a5fecc015b753ed62953a93411a7ac5c194f9b18",
+      "bytes": 3091
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/cabal.project",
+      "sha256": "5c3a4c4d485b6e682eb0233c9d9385353c009978cd45013cad3a516b1c3d1554",
+      "bytes": 221
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/leant.cabal",
+      "sha256": "1014f2fd8d59e0974aec2ca1dc683d1192209fe634018fd2f407a2e1b3709fae",
+      "bytes": 8429
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/lib/Djex/test-church/behavior_runtime.py",
+      "sha256": "610aba95c2be827c72b2756c6b88b074166921b733523a3d40c1c23d99a3007a",
+      "bytes": 18155
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Backend.hs",
+      "sha256": "175a93f83363f34bc24a76bd9b7a07eee84cec17f4bd2e996bb511278d97116a",
+      "bytes": 42843
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Backend/Isolated.hs",
+      "sha256": "22485927a2fbdf648549cbb3bd06bad9e848246759a08b2db1e099ca608d3e81",
+      "bytes": 21784
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Builtins.hs",
+      "sha256": "ccf1abe57474a798443c1c2619a03e2f273689b18ec5dd1a38f9f4a253062840",
+      "bytes": 7577
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Classify.hs",
+      "sha256": "7da055e424055073886f6f897fd095b5ad6b0991cd84a18e982de843bebec603",
+      "bytes": 4576
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Format.hs",
+      "sha256": "6929220a7b4d3e26012d0a18f5501a5b35f089e733c430898beee35ff83c38f2",
+      "bytes": 4500
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Json.hs",
+      "sha256": "13782ed23040276f648ed64a70e855a9808666f76554ab8a5e6d8a9b756b2367",
+      "bytes": 6199
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Json/Bounded.hs",
+      "sha256": "b722a7e6fe50407864fff4a90dc474a7f8043ed11dfe4da1c717624de3b6be10",
+      "bytes": 23353
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Options.hs",
+      "sha256": "1dd439b910ed5878901b9b64de932ba539d4d794223cfdd545ca4cda9b7218ce",
+      "bytes": 6803
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Session/Replay.hs",
+      "sha256": "a1ed05ffea7181fccb8ab18de6ab30be3beb65544b2fc998bf1b45f4a73a5a24",
+      "bytes": 1962
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Session/Snapshot.hs",
+      "sha256": "9f5e6a3106f6ab6b3b1779243aa2f4f3a5abc01f764043fd1c0985077a90fd0b",
+      "bytes": 8709
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Behavioral.hs",
+      "sha256": "895667825df2da184d2f14252e92ed93a16c6c41f3313c019086729700c86f7f",
+      "bytes": 6887
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/BehavioralSelection.hs",
+      "sha256": "ba324fe2c5a9d3f397293f17b631b505c941d0dae501a6f1555f9e3877a2e1d3",
+      "bytes": 1781
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/BehavioralSelection/Internal.hs",
+      "sha256": "b78745b197bb07a5cc3bc327f5d2b0c62a3c7ea4e84f8065ddec1020cfbbecd8",
+      "bytes": 12519
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/CandidateObservation.hs",
+      "sha256": "d26a4ccb39591829822dc6f798dcb87494ca5a3547b1a0e28eb7e4442b097984",
+      "bytes": 6046
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/ContextRender.hs",
+      "sha256": "4cc7c5716205a8e74c2a4c0a8f972319de9409f3568d878e255812695e4780ef",
+      "bytes": 34816
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/ContextSource.hs",
+      "sha256": "be74425fbad519b4bbabc823b81ba85cd637fdae048f1304d487daadf9fb48c0",
+      "bytes": 51095
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/ContextUniverse.hs",
+      "sha256": "b7a900e11bb8a105859971c5398e9724192dca471aa60b7b6a3089431d355e4f",
+      "bytes": 5997
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Engine.hs",
+      "sha256": "d7fa31469318698722abc3d57d13fce784ff147365b46ffbe6198a8740328815",
+      "bytes": 256610
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Engine/Parallel.hs",
+      "sha256": "7340f68cff4e7d4a96db6bf5db56c90ddcb3fe062533715840b18058570e2446",
+      "bytes": 1277
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Fragment.hs",
+      "sha256": "c63a0c03554a27760198bd4de0cd31d394ed3adbd45da2e2d08452df1bbf2282",
+      "bytes": 147926
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Adapter.hs",
+      "sha256": "5a2980e2b4e7a808ab51e2b80b8c64e358b6f7a3a5cc6f7e676283cd2bbb4413",
+      "bytes": 7623
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Command.hs",
+      "sha256": "8836634f4b8636b6d42b5768d843f256819762a5ac5c408e601dae6fe6e5d547",
+      "bytes": 17466
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Configuration.hs",
+      "sha256": "7b8277c1632b677b4722e36340ac92bbee8cc5195e1cf678521d6afe80bd89ef",
+      "bytes": 58277
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Configuration/File.hs",
+      "sha256": "fdc56b3a4221e711491eefc8798163e362313cb22041371c9371182e9a7e2ba0",
+      "bytes": 77580
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Configuration/File/Acquire.hs",
+      "sha256": "68659d65445b894d935b960823b1a74210b2503039ab988413d022b29a88b8ab",
+      "bytes": 8649
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Contract.hs",
+      "sha256": "7a3552a75a2fed8d5153d0c662b5bf858128113a356d3054acaf103e5d3fe40f",
+      "bytes": 4842
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Contract/File.hs",
+      "sha256": "de6a8781fe9e8bb485f3a5381e9de7aa381c862723c242e49a6e0fd112895652",
+      "bytes": 6207
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Contract/File/Acquire.hs",
+      "sha256": "e5cd018fc9d78ef15314954413b58ec58bb88140157ec83167fcdaf9448571e1",
+      "bytes": 7726
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/CounterexampleBank/Internal.hs",
+      "sha256": "c07d90a7494ec8eb35b987be00ad0f112c82c731c35e728cde003b95abd10282",
+      "bytes": 57170
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/File/Acquire.hs",
+      "sha256": "ec4c1e79c5f735b460ea83eb01665f87bfbcb3dc2bd3d132c6d72138802e39ab",
+      "bytes": 11010
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Handoff.hs",
+      "sha256": "f4e926327111198b7c28ca594fd30808859ddafdf30ce8a0de1b41281bd075ee",
+      "bytes": 31772
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Integration.hs",
+      "sha256": "a11dd942cc1af0e844fc0b706b2dade6226132b1ea44534f63090d7f93c929ed",
+      "bytes": 25176
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/PostVerification.hs",
+      "sha256": "32cb15747bd971f53d218206f5e382e48380445bfa12c28d00ef6545147181f6",
+      "bytes": 1122
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/PostVerification/Internal.hs",
+      "sha256": "49d62de181e9b1fc7871e9f358fd14f7bb5a0a4310f0b2bf95b345fc8c6e2b96",
+      "bytes": 6178
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Presentation.hs",
+      "sha256": "87b7b2106eb40f0a33d2011ca63e05bf5128806bb6f460b01c77a006269df8de",
+      "bytes": 32238
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Ranking.hs",
+      "sha256": "22050178ca5a5b6a3557f2db8c8b72f79e6aa242fc0f3c5a5b9d46b078d8f43c",
+      "bytes": 2436
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Ranking/Generic.hs",
+      "sha256": "eb979b2c9bf6426e9bc7941d098b57386da5fce9977a977230ce435f68c01e83",
+      "bytes": 92374
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Ranking/Internal.hs",
+      "sha256": "a15bd9878b6e22044551d067868bcb9aa8d4b0f30bc85850c95a1ec20aba08d4",
+      "bytes": 58376
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Selection.hs",
+      "sha256": "df2a51ffa0c86d94aa4ae6b9be301a515ddc6983cc7154f7cdf280c53be520fa",
+      "bytes": 1787
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Selection/Generic.hs",
+      "sha256": "56f001ee6de3366e031f909dc11976fda5538d9d28a5384f6158488561e64871",
+      "bytes": 12515
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Selection/Internal.hs",
+      "sha256": "411b211067bc3ea7cf821af5cbcd5487568341f49b935f412c5cd5e22542788a",
+      "bytes": 12339
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/SpinePair/PostVerification.hs",
+      "sha256": "0f2caf730c11f8293636fc68da47cfe074ca527936d6692183c757dc8fc4f15c",
+      "bytes": 1002
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/SpinePair/PostVerification/Internal.hs",
+      "sha256": "58e4eacf6008e689aaa4954435bb30a8419f5be47a605b578de34dd7766afa11",
+      "bytes": 6949
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/SpinePair/Ranking.hs",
+      "sha256": "05bac42e3da48c741f087fc61c2f3daa31257d1a9c3f94e673ac77e053eae3d7",
+      "bytes": 2214
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/SpinePair/Ranking/Internal.hs",
+      "sha256": "26c3b03a7b2464e6c405cfe0a37ac9884d39f86a771401b348d6cfe5a172278f",
+      "bytes": 62721
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/SpinePair/Selection.hs",
+      "sha256": "317db2a42f59f20ca5b4792ecdc53eb8f54821ca45e52a91ebb3329f0d90c35c",
+      "bytes": 1950
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/SpinePair/Selection/Internal.hs",
+      "sha256": "a1e229d48c52d360537f9e23c8d7bc533e19871084cc6570d54f84503bd45fa5",
+      "bytes": 13556
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Length/Where.hs",
+      "sha256": "775cdf39958ee2348c0049392c76a3dfad114da812ebab9892bb79cd7fde7437",
+      "bytes": 14866
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Observability.hs",
+      "sha256": "c056cc5270585749bd0753904fe10c323f56c055d0e46639609b5e8f13ad8744",
+      "bytes": 10531
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/PostVerification.hs",
+      "sha256": "b2f1374db9689e6d49ee1d7770f70e5b7e9bceada187dbd3af1c186b536c46d7",
+      "bytes": 7779
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/ProviderCache.hs",
+      "sha256": "f439d68acb6781210168bbffa7292bc6e4588b37a9a8f315b7f50d2fbf5b496f",
+      "bytes": 5206
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Render.hs",
+      "sha256": "bd898691d6d70bfa8b85b1e115add8c5bd8650893340cd95ca9f54c5cae20375",
+      "bytes": 123669
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Replay.hs",
+      "sha256": "8e2429829786e932880ac29c9c42146aaf4a020b598d43ac6551731dc0b0f543",
+      "bytes": 1987
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Verification.hs",
+      "sha256": "4045c4cb2560704694d87bc7f20f378f0503ebda77daa492b068bd46e596bc88",
+      "bytes": 13084
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Leant/Synth/Verification/Parallel.hs",
+      "sha256": "59c9fb1266ab08044f486be58f33671ef36bb184ed3d0b566caafa5ee5ed189f",
+      "bytes": 4142
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/src/Main.hs",
+      "sha256": "2466141a0d865cc8057dfae66b83c51be8958f7add39f6cd6ba367f9670ec932",
+      "bytes": 286793
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/test-behavioral/run_provider_scheduling.py",
+      "sha256": "93b6e78dddb682495ed8e7283161d249cfd28b7d07abd353fdef37658d738384",
+      "bytes": 8187
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/test-church/behavior_probe.py",
+      "sha256": "c891f561faf266fc1e96e79f98b97ca14559177beda8b6a1da38e4fa3d2dcbfe",
+      "bytes": 15923
+    },
+    {
+      "path": "runs/provider-scheduling-public-v3/source/test-church/run_corpus.py",
+      "sha256": "a6a8034272ce50cdafd1dcfd6a4a3cdfab3ddbd58a1c4eb26ef3cebf64f6873a",
+      "bytes": 16283
+    }
+  ]
+}
