@@ -94,18 +94,21 @@ actual-False controls. This validates existing context-free support. Contextual
 dictionary universes and universe-bearing global providers remain separate
 implementation requirements beyond that baseline and the native sort release.
 
+The [intrinsic-unit construction release](docs/reports/2026-09-14-intrinsic-unit-construction-acceptance.md)
+adds Exference unit construction in an empty inventory, including arguments of
+local rank-N functions. It preserves the existing constructor path when the
+built-in unit constructor is already present. All **13 extended Haskell operations,
+515 ordinary Exference tests and 100 private engine tests pass**, with exact GHC
+replay and False controls for the public unit cases. This closes the prototype's
+`maybeEither` regression at the original 256-candidate limit.
+
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-keeps completed native product integration under regression coverage. The isolated
-contextual-universe prototype now passes **63 public cells and all 746 native
-tests**, including exact binder universes, checked candidate rejection and intrinsic
-unit construction. It remains unpublished: the Haskell release gate exposes a
-`maybeEither` regression at the original 256-candidate limit, while a fresh build
-of published Djex passes the same query. Preserve that behavior before release;
-neither exact-match nor weak-match constructor costs fixed it. A bounded trace
-comparison is now the next gate. The next source increments are
-class/provider universe identity and contextual polymorphic type arguments, each
-with separate acceptance gates. The linked plan retains terminal evidence and
-keeps prototype results separate from later unaccepted experiments.
+now puts final native contextual integration next. The earlier universe prototype
+passed 63 public cells and all 746 native tests; the final source passes the
+focused native checks and is undergoing its complete native release gates.
+Leant's dependency pin remains at its last accepted native revision until those
+checks finish. Class/provider universe identity and contextual polymorphic type
+arguments follow as separate source increments.
 Exference explicit Haskell kind checking remains an independent requirement.
 The focused Lean Djinn `length` diagnosis precedes integer indexing; both precede
 further extrema implementation. Contextual evidence and supplied-fold trees remain
