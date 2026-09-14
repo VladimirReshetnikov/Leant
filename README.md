@@ -70,18 +70,20 @@ preserves explicit kinds through rank-N source checking and generated Haskell,
 including vacuous and shadowed binders, polymorphic aliases, constrained callbacks
 and impredicative pairs. On the final Djex root snapshot, all 11 one-shot outputs
 and 10 named-`where` outputs compile and execute at their original signatures;
-all 11 actual-False controls pass. All 1,138 tests in six completed suites pass;
-full CLI validation remains open after its 30-minute controller guard.
+all 11 actual-False controls pass. All **1,276 tests in seven suites pass**, including the completed 138-test CLI
+rerun on unchanged source and runtime hashes; its separate receipt is linked
+from the milestone report.
 The adjacent-input behavioral case remains open: it requires `(7,9)` but the
 four observed candidates all fail the predicate. Exference kinded execution is
 still guarded. Leant's dependency pin and native acceptance are unchanged.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes Exference's own kind-checking path and an independent Lean universe
-milestone. The reproduced loss of mixed-product alternatives now justifies one
-bounded construction repair before general search changes. Extrema, integer indexing, Lean Djinn length, contextual
-evidence and supplied-fold trees remain required; unsuccessful reduction
-variants remain paused.
+prioritizes one bounded mixed-product construction repair, then independent
+Lean universe and Exference kind-checking milestones. Integer indexing and the
+distinct Lean Djinn length diagnosis move ahead of further broad extrema
+experiments. Contextual evidence and supplied-fold trees remain required;
+unsuccessful reduction variants remain paused. Each implementation milestone
+requires its original public query and exact replay.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC

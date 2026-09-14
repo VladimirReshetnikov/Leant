@@ -102,21 +102,24 @@ replay and False control after a causal change, at unchanged search bounds.
 
 ## Validation and provenance
 
-The final root strict seven-target build passes. All six completed suites pass:
+The final root strict seven-target build and all seven suites pass:
 540 foundation, 108 typed-candidate/certificate, 128 private source-graph,
-187 integration, 38 API and 137 Djinn unit tests (1,138 total).
+187 integration, 38 API, 137 Djinn unit and 138 CLI tests (**1,276 total**).
 The root source excludes the unrelated, unaccepted `queryFunctionCarriers`
 experiment retained in the validation checkout. Apart from line endings, that
 experiment is the only Haskell/Python source difference between the two tested
 snapshots. The root streaming regression passes without that extension; no
 performance claim is inferred from the separate run timings.
 
-The root controller stopped the serial CLI suite at its 1,800-second
+The initial root controller stopped the serial CLI suite at its 1,800-second
 outer wall guard, after the other six suites passed. Its failure receipt is
-retained. Full CLI validation remains open. A separate CLI-only rerun uses
-visible per-test progress and a 7,200-second outer guard; the test source, query limits, runtime hashes and single-threaded
-execution are unchanged. No pass claim is made for that pending rerun, and its
-in-flight output is excluded from this terminal-receipt archive.
+retained. The separate CLI-only rerun completed successfully: **all 138 tests
+passed in 2,377.98 seconds**, process exit zero, with unchanged source and runtime
+hashes. It used visible per-test progress and a 7,200-second outer guard;
+query limits and single-threaded execution were unchanged. This closes the CLI
+regression gate. The original archive remains immutable; the completed rerun has
+a separate [portable receipt](../../test-church/receipts/djinn-kinded-source-cli-2026-09-13.zip)
+and [SHA-256 manifest](../../test-church/receipts/djinn-kinded-source-cli-2026-09-13.json).
 
 The final root public matrix has **11/11 one-shot exact GHC replays**,
 **10/11 named-`where` exact GHC replays**, **11/11 actual-False controls**, and
@@ -158,20 +161,17 @@ receipts into Leant.
 
 ## Revised next actions
 
-1. Close the remaining CLI regression gate for the Djinn ground-kind source
-   checkpoint. Preserve the adjacent behavioral miss and exclude unaccepted
-   carrier experiments.
-2. Try one bounded repair for the reproduced product-alternative loss, then
-   require the original adjacent-input behavioral query to pass. If it does
-   not, record the new boundary and move to the independent source milestones.
-3. Trace Exference's first loss of lexical kind information through its own
-   checking and provider-evidence path. Bound that investigation so it does not
-   delay independent Lean universe work.
-4. Run public Lean identity and nested-callback probes above universe zero,
-   preserving original universe parameters and exact kernel replay.
-5. Resume the bounded extrema witness trace, then integer `at` and the distinct
-   Lean Djinn `length` miss. Previously unsuccessful reduction variants remain
-   paused until a causal trace supports a materially different experiment.
+1. Retain the completed 1,276-test regression checkpoint and the adjacent
+   behavioral miss as separate outcomes. Keep unaccepted experiments isolated.
+2. Validate one bounded product-construction repair, then require the original
+   adjacent-input query, exact replay and False control at unchanged search bounds.
+3. Probe public Lean identity and nested callbacks above universe zero, and
+   trace Exference's lexical kinds through its own checking and provider evidence.
+   Neither independent source milestone depends on further extrema experiments.
+4. Probe integer `at` and trace the distinct Lean Djinn `length` miss before
+   committing to another broad extrema implementation experiment.
+5. Give extrema one bounded witness-guided diagnosis. Reopen reductions only
+   when a materially different causal construction trace justifies it.
 
 See the [full delivery re-triage](2026-09-13-synthesis-delivery-retriage.md) for
 contextual evidence, supplied-fold trees, acceptance criteria and deferred ideas.

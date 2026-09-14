@@ -1,0 +1,17 @@
+{
+  "scope": "Terminal CLI completion on the frozen Djinn ground-kind root snapshot; no new public behavioral acceptance or native validation.",
+  "status": "passed",
+  "tests": 138,
+  "combined_tests": 1276,
+  "archive_sha256": "2b78bac46a2d40affed2a3b89d7f82a44d5320e59ea32c3cd39ef21fd1fdfe86",
+  "members": {
+    "behavior_runtime.py": "b5240378e17d3fb25af8ad18fc0ba88f0226dc2116b99efe3300f4b006a88028",
+    "controller.py": "f023b2cbb25613ed053ff382a6f3fd172ffe583636be6d7ba00e4bb1d25cceee",
+    "djex-cli-tests.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "djex-cli-tests.stdout.txt": "aa663481e3b63c4c23562fe9ec878ed34662cb451fd4a2715364886ef7984a25",
+    "processes.json": "10b863e1c9d94d4998f1f759b2fab6afe01f5edb8411d9b448643f8fb5b40694",
+    "results.json": "2e37f01bd8e75641f5530f80e2a1c4faf298c0214bb0302ec8a3ec7d0e5118c4"
+  },
+  "prior_archive": "djinn-kinded-source-2026-09-13.zip",
+  "prior_archive_sha256": "3dc8f83b7121214dd8ccee0aa1fe4dc06dfacdead2368dfb3f27bd417f1e7e4a"
+}
