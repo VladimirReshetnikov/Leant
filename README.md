@@ -142,12 +142,17 @@ passes 22 exact GHC replays, 11 actual-False controls and a malformed-kind
 rejection, covering vacuous/shadowed binders, higher-kinded callbacks, aliases
 and impredicative pairs. All **1,659 tests in seven affected suites pass**,
 including certificate retention and compatibility-first deep evaluation.
+The [session-provider identity repair](docs/reports/2026-09-14-session-provider-identity.md)
+retains Lean's fully qualified declaration names through synthesis replay,
+including append and undo. All 768 native tests, six public inventory sessions
+and nine literal-False queries pass. The original integer-indexing diagnostic now admits the intended
+generic `Int` primitive; matching synthesis and provider scheduling remain open.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
 retain source-kinded composition with caller-supplied global-provider kinds,
 deconstructor transport checks, and native dependency adoption as further gates.
-Leant's separately accepted pin remains unchanged. Integer `at` and the original
-query combining two nominal universe selections follow; a focused Lean Djinn
-`length` diagnosis precedes broader class/provider universe work and reductions.
+Leant's separately accepted pin remains unchanged. Integer `at` now has a concrete
+provider-admission diagnosis; the original two-universe query remains open. A focused
+Lean Djinn `length` diagnosis precedes broader class/provider universe work and reductions.
 These scoped releases do not establish arbitrary synthesis completeness.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)

@@ -8,9 +8,11 @@
 module Leant.Synth.Replay
   ( ReplayPlan (..)
   , planReplay
+  , replayDeclarationNames
   ) where
 
 import Data.List (stripPrefix)
+import Leant.Json (JValue, jArray, jLookup, jString)
 
 -- | How to bring a cached environment up to date with the current history:
 -- reuse it as is, replay only the commands that follow the cached prefix,
@@ -28,3 +30,19 @@ planReplay cached current = case stripPrefix cached current of
   Just [] -> Reuse
   Just suffix -> ReplaySuffix suffix
   Nothing -> ReplayAll current
+
+-- | Fully qualified declarations reported by Lean for a successful replay.
+-- Read the structured response, never info-message text or the short source
+-- spelling: neither of those identifies a declaration in its namespace.
+-- The caller must discard this metadata when replay fails, and cache it with
+-- the environment that owns it. Older backends without metadata contribute
+-- no session priority; ordinary root-based discovery remains available.
+replayDeclarationNames :: JValue -> [String]
+replayDeclarationNames response =
+  [ name
+  | Just declarations <- [jLookup "declarations" response >>= jArray]
+  , declaration <- declarations
+  , Just name <- [jLookup "fullName" declaration >>= jString]
+  , not (null name)
+  , (jLookup "kind" declaration >>= jString) /= Just "example"
+  ]

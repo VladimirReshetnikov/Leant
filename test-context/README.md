@@ -1,5 +1,24 @@
 # Lexical-Given synthesis acceptance
 
+## Session provider identity
+
+`run_session_provider_names.py` checks discovery through six public sessions:
+nested namespaces, qualified names, attributes/comments, duplicate short names,
+append/undo, and a rejected declaration. Nine literal-False queries force
+rejection so that structural success cannot hide an incorrect provider inventory.
+The small verification prefix deliberately reaches discovery; this is an
+inventory/cache test, not acceptance of Church integer indexing.
+
+```powershell
+$leantExe = (cabal list-bin leant:exe:leant).Trim()
+python -X utf8 -B test-context/run_session_provider_names.py --leant $leantExe --backend $backendExe --lake $lakeExe --output dist-newstyle/session-provider-names/run-1
+```
+
+Supply the actual Lean REPL and Lake executable paths. The fresh output directory
+retains command inputs, transcripts, source snapshots, runtime hashes and exact
+provider inventories. See the [repair and indexing diagnosis](../docs/reports/2026-09-14-session-provider-identity.md)
+for the original baseline and remaining scheduling obligation.
+
 ## Polymorphic selection through dictionary application
 
 `run_dictionary_selection.py` checks a local qualified consumer selecting a

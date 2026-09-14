@@ -258,7 +258,7 @@ import Leant.Synth.ProviderCache
   , insertProviderCache
   , lookupProviderCache
   )
-import Leant.Synth.Replay (ReplayPlan (..), planReplay)
+import Leant.Synth.Replay (ReplayPlan (..), planReplay, replayDeclarationNames)
 import Leant.Synth.Verification
   ( VariantVerdict (..)
   , VerificationBatch
@@ -370,10 +370,11 @@ data ReplState = ReplState
     -- ^ cached base environment for :synth goal translation - session
     -- imports plus Lean (for run_tac) plus the compiled serializer
     -- prelude; invalidated on import changes
-  , rsSynthEnv :: Maybe (Integer, [String])
+  , rsSynthEnv :: Maybe (Integer, [String], [String])
     -- ^ the base environment with the session history replayed on top
     -- (so session-local names translate), tagged with the history it
-    -- replayed; rebuilt when the history changes
+    -- replayed, plus Lean's fully qualified declarations from successful
+    -- replay entries; rebuilt when the history changes
   , rsProviderWorld :: ProviderWorld
     -- ^ generation of imports and user declarations eligible for live
     -- provider discovery; generated it bindings do not advance it
@@ -2110,9 +2111,9 @@ ensureSynthEnv st = do
   state <- readIORef st
   let history = rsHistory state
   case rsSynthEnv state of
-    Just (env, cachedHistory) -> case planReplay cachedHistory history of
+    Just (env, cachedHistory, declarations) -> case planReplay cachedHistory history of
       Reuse -> pure (Right env)
-      ReplaySuffix suffix -> finishReplay env history suffix
+      ReplaySuffix suffix -> finishReplay env history declarations suffix
       ReplayAll fullHistory -> replayAll fullHistory
     Nothing -> replayAll history
  where
@@ -2120,30 +2121,32 @@ ensureSynthEnv st = do
     baseOr <- ensureSynthBase st
     case baseOr of
       Left err -> pure (Left err)
-      Right base -> finishReplay base history history
+      Right base -> finishReplay base history [] history
 
-  finishReplay env history entries = do
-    replayed <- replaySynth env entries
+  finishReplay env history declarations entries = do
+    replayed <- replaySynth env declarations entries
     case replayed of
       Left err -> pure (Left err)
-      Right env' -> do
-        modifyIORef' st (\s -> s { rsSynthEnv = Just (env', history) })
+      Right (env', declarations') -> do
+        modifyIORef' st (\s -> s
+          { rsSynthEnv = Just (env', history, nub declarations') })
         pure (Right env')
 
-  replaySynth env [] = pure (Right env)
-  replaySynth env (code : rest) = do
-    result <- runCmd st (Just env) code
+  replaySynth env declarations [] = pure (Right (env, declarations))
+  replaySynth env declarations (code : rest) = do
+    result <- runPayload st $ JObj
+      [("cmd", JStr code), ("env", JInt env), ("declarations", JBool True)]
     case result of
       Left err -> pure (Left err)
       Right v | not (hasErrors v), Nothing <- respFatal v
               , Just env' <- respEnv v ->
-        replaySynth env' rest
+        replaySynth env' (declarations ++ replayDeclarationNames v) rest
       Right _ -> do
         emitLn st =<< cDim st
           ("note: `" ++ takeWhile (/= '\n') code
            ++ "` is not visible to :synth (it did not replay over the "
            ++ "Lean import)")
-        replaySynth env rest
+        replaySynth env declarations rest
 
 -- | The goal target (the part after \8866) of a pretty-printed goal, plus
 -- the context lines before it.
@@ -3403,8 +3406,9 @@ loadSynthProvidersWithSourceMode exactSource st query = do
       Right env -> do
         state <- readIORef st
         let world = rsProviderWorld state
-            sessionNames = nub
-              (concatMap sessionDeclNames (rsHistory state))
+            sessionNames = case rsSynthEnv state of
+              Just (currentEnv, _, declarations) | currentEnv == env -> declarations
+              _ -> []
         result <- runCmd st (Just env)
           ((if exactSource then contextualProviderProgramWith else providerProgramWith)
             (rsSynthProviderCap state) sessionNames query)

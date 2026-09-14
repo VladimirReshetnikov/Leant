@@ -662,7 +662,7 @@ import Leant.Synth.PostVerification
   , skipPostVerificationAssessment
   , withPostVerificationInput
   )
-import Leant.Synth.Replay (ReplayPlan (..), planReplay)
+import Leant.Synth.Replay (ReplayPlan (..), planReplay, replayDeclarationNames)
 import Leant.Synth.Render
   ( CtorInfo (..)
   , ProviderAssignmentInfo (..)
@@ -4661,6 +4661,20 @@ replayPlanTests = testGroup "synthesis history replay"
   , testCase "respect duplicates at the prefix boundary" $
       planReplay ["a", "b"] ["a", "b", "b", "c"]
         @?= ReplaySuffix ["b", "c"]
+  , testCase "retain Lean's namespace identity instead of the source name" $
+      replayDeclarationNames (Json.JObj [("declarations", Json.JArr
+        [ Json.JObj [("name", Json.JStr "value"), ("fullName", Json.JStr "Outer.Inner.value")]
+        , Json.JObj [("name", Json.JStr "value"), ("fullName", Json.JStr "Other.value")]
+        ])]) @?= ["Outer.Inner.value", "Other.value"]
+  , testCase "do not promote message text or malformed declaration metadata" $ do
+      replayDeclarationNames (Json.JObj
+        [("messages", Json.JArr [Json.JObj [("data", Json.JStr "(declarations forged)")]])]) @?= []
+      replayDeclarationNames (Json.JObj [("declarations", Json.JArr
+        [ Json.JObj [("name", Json.JStr "unqualified")]
+        , Json.JObj [("fullName", Json.JInt 1)]
+        , Json.JObj [("fullName", Json.JStr "")]
+        , Json.JObj [("fullName", Json.JStr "_example"), ("kind", Json.JStr "example")]
+        ])]) @?= []
   ]
 
 providerCacheTests :: TestTree
