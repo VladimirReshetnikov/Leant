@@ -97,7 +97,7 @@ import Leant.Synth.ContextSource
   , mkContextSource, mkContextSourceWithConstructors, mkContextProviderSource
   , mkContextProviderSourceAt, contextSourceType, contextSourceName
   )
-import Leant.Synth.ContextRender (LeanLevel (..))
+import Leant.Synth.ContextRender (LeanLevel (..), mkLeanName, renderLeanSortValue)
 
 
 import Leant.Synth.ProviderCache
@@ -188,6 +188,7 @@ data Frag
     -- arguments.
   | FVar String         -- ^ opaque type variable (auto-implicit or opened binder)
   | FAtom Bool String   -- ^ opaque atom: safe-for-refutation flag, display key
+  | FSort LeanLevel     -- ^ exact source universe, with an introduction witness only
   | FApp Bool String AppHead [Frag]
     -- ^ A proper-type application whose arguments are themselves types.  The
     -- flag and display key describe the complete Lean expression; the head
@@ -567,6 +568,21 @@ synthPrelude inventory = unlines $
   , "        else pure none"
   , "      | _ => pure none"
   , ""
+  , "-- Structured universe metadata; unresolved and dependent imax levels"
+  , "-- retain the opaque fallback instead of supplying a guessed witness."
+  , "def sortLevel? : Nat → Level → Option String"
+  , "  | 0, _ => none"
+  , "  | Nat.succ _, .zero => some \"zero\""
+  , "  | Nat.succ _, .param name => some (\"(param \" ++ esc name.toString ++ \")\")"
+  , "  | Nat.succ fuel, .succ level => do"
+  , "    let value ← sortLevel? fuel level"
+  , "    pure (\"(succ \" ++ value ++ \")\")"
+  , "  | Nat.succ fuel, .max left right => do"
+  , "    let a ← sortLevel? fuel left"
+  , "    let b ← sortLevel? fuel right"
+  , "    pure (\"(max \" ++ a ++ \" \" ++ b ++ \")\")"
+  , "  | _, _ => none"
+  , ""
   , "mutual"
   , ""
   , "partial def go (providerMode exactAssignmentMode : Bool)"
@@ -578,7 +594,10 @@ synthPrelude inventory = unlines $
   , "  | Nat.succ fuel => do"
   , "    let e \8592 instantiateMVars e"
   , "    let e \8592 whnfR e.consumeMData"
-  , "    if e.isSort then atomOf e"
+  , "    if let .sort level := e then"
+  , "      match sortLevel? 128 level with"
+  , "      | some encoded => pure (\"(sort \" ++ encoded ++ \")\")"
+  , "      | none => atomOf e"
   , "    else match e with"
   , "    | Expr.fvar _ => do"
   , "      let t \8592 whnfR (\8592 inferType e)"
@@ -2244,8 +2263,34 @@ parseFrag = parseFragWith False
 parseExactFrag :: [Tok] -> Either String (Frag, [Tok])
 parseExactFrag = parseFragWith True
 
+parseSortLevel :: Int -> [Tok] -> Either String (LeanLevel, [Tok])
+parseSortLevel fuel _ | fuel <= 0 = Left "sort universe exceeds nesting limit"
+parseSortLevel _ (TSym "zero" : rest) = Right (LeanLevelZero, rest)
+parseSortLevel _ (TL : TSym "param" : TStr name : TR : rest) = do
+  parameter <- either (Left . show) Right $ mkLeanName [name]
+  pure (LeanLevelParameter parameter, rest)
+parseSortLevel fuel (TL : TSym "succ" : rest) = do
+  (level, afterLevel) <- parseSortLevel (fuel - 1) rest
+  finish (LeanLevelSuccessor level) afterLevel
+ where
+  finish level (TR : after) = Right (level, after)
+  finish _ _ = Left "malformed successor universe"
+parseSortLevel fuel (TL : TSym "max" : rest) = do
+  (left, afterLeft) <- parseSortLevel (fuel - 1) rest
+  (right, afterRight) <- parseSortLevel (fuel - 1) afterLeft
+  case afterRight of
+    TR : after -> Right (LeanLevelMax left right, after)
+    _ -> Left "malformed maximum universe"
+parseSortLevel _ _ = Left "unsupported sort universe"
+
 parseFragWith :: Bool -> [Tok] -> Either String (Frag, [Tok])
 parseFragWith allowExactContext (TL : TSym tag : rest) = case tag of
+  "sort" -> do
+    (level, afterLevel) <- parseSortLevel 128 rest
+    _ <- either (Left . show) Right $ renderLeanSortValue level
+    case afterLevel of
+      TR : after -> Right (FSort level, after)
+      _ -> Left "malformed sort delimiter"
   "->" -> binary FArr rest
   "prod" -> binary FProd rest
   "lean-prod" -> binary FLeanProd rest
@@ -2778,6 +2823,7 @@ fragUnsafeAtoms = nub . go
       FParamRec _ _ key _ _ -> [key]
       FRec _ key _ _ -> [key]
       FAtom False key -> [key]
+      FSort level -> ["sort " ++ show level]
       _ -> []
 
 -- | Every syntactic variable and binder name in a fragment.  Exact nominal

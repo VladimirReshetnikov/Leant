@@ -104,6 +104,7 @@ import Test.Tasty.HUnit ((@?=), assertBool, assertEqual, assertFailure, testCase
 
 import qualified ContextRenderSpec
 import qualified ContextSourceSpec
+import qualified SortSourceSpec
 import qualified GlobalContextProviderSpec
 import qualified BackendTraceSpec
 
@@ -784,6 +785,7 @@ main = do
       , visibleTypeApplicationTests
       , ContextRenderSpec.tests
       , ContextSourceSpec.tests
+      , SortSourceSpec.tests
       , GlobalContextProviderSpec.tests
       ]
 

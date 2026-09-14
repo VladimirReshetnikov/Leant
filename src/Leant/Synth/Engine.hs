@@ -133,6 +133,7 @@ module Leant.Synth.Engine
   ) where
 
 import Control.Monad (unless, when, void)
+import Leant.Synth.ContextRender (LeanLevel (..), renderLeanSortValue)
 import Data.Foldable (toList)
 import Data.List (intercalate, isPrefixOf, nub, nubBy, sortOn)
 import Data.Bifunctor (first, second)
@@ -3253,6 +3254,8 @@ data TransState = TransState
     -- ^ opaque proper types used as fixed fields in a shared data schema;
     -- these must be rigid constructors, not undeclared datatype variables
   , tsAtomFamilies :: Map.Map String Name
+  , tsSortFamilies :: Map.Map LeanLevel Name
+  , tsSortWitnesses :: Set.Set LeanLevel
   , tsAtomNext :: Int
   , tsContextClasses :: Map.Map String (Name, [Int])
     -- ^ exact Lean class head -> private checked class and parameter kinds
@@ -3713,6 +3716,8 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
     , tsAppNext = 0
     , tsRigidAtoms = rigidAtoms
     , tsAtomFamilies = Map.empty
+    , tsSortFamilies = Map.empty
+    , tsSortWitnesses = Set.empty
     , tsAtomNext = 0
     , tsContextClasses = Map.empty
     , tsContextNext = 0
@@ -3926,6 +3931,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
           <$> go premisesEnabled a <*> go premisesEnabled b
         FTop -> pure (TypeConstructor unitC)
         FBot -> pure (TypeConstructor voidC)
+        FSort level -> sortOccurrence premisesEnabled level
         FVar v -> TypeVariable <$> variable ("v:" ++ v)
         FAtom _ key -> do
           occurrence <- getsT (Map.lookup key . tsInds)
@@ -4321,6 +4327,40 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                       constructors
                 modifyT (\s -> s { tsDecls = tsDecls s ++ [decl] })
                 pure occurrence
+
+      -- Sort values have exact universe identity and a canonical PUnit type
+      -- witness. Their private declarations are abstract: no eliminator is
+      -- inferred from the existence of this one introduction rule.
+      sortOccurrence premisesEnabled level = do
+        (domain, witness) <- either (failT . show) pure $ renderLeanSortValue level
+        known <- getsT (Map.lookup level . tsSortFamilies)
+        typeName <- case known of
+          Just name -> pure name
+          Nothing -> do
+            index <- getsT tsAtomNext
+            let spelling = "LeantAtom" ++ show index
+            name <- nameT spelling
+            modifyT (\s -> s
+              { tsSortFamilies = Map.insert level name $ tsSortFamilies s
+              , tsAtomNext = index + 1
+              , tsTypeMap = Map.insert spelling ("(" ++ domain ++ ")") $ tsTypeMap s
+              , tsDecls = tsDecls s ++ [AbstractTypeDeclaration () name ProperTypeKind]
+              })
+            pure name
+        registered <- getsT (Set.member level . tsSortWitnesses)
+        -- Closed provider universes need the same canonical witness even
+        -- when recursive constructor offers are disabled for that provider.
+        -- A provider-only universe parameter cannot claim the goal's scope.
+        when ((premisesEnabled || closedSortLevel level) && not registered) $ modifyT (\s -> s
+          { tsSortWitnesses = Set.insert level $ tsSortWitnesses s
+          , tsPrems = tsPrems s ++ [TranslatedPremise witness (FSort level) (TypeConstructor typeName)]
+          })
+        pure $ TypeConstructor typeName
+
+      closedSortLevel LeanLevelZero = True
+      closedSortLevel LeanLevelParameter{} = False
+      closedSortLevel (LeanLevelSuccessor level) = closedSortLevel level
+      closedSortLevel (LeanLevelMax left right) = closedSortLevel left && closedSortLevel right
 
       -- A recursive inductive stays an opaque atom (sharing the
       -- variable any blocked field occurrence produced), but its
@@ -5380,6 +5420,7 @@ schemaEquivalent = go []
         && go binders leftBody rightBody
     (FVar a, FVar b) -> equivalentName binders a b
     (FAtom _ a, FAtom _ b) -> a == b
+    (FSort a, FSort b) -> a == b
     (FApp _ _ leftHead leftArguments,
         FApp _ _ rightHead rightArguments) ->
       equivalentHead binders leftHead rightHead

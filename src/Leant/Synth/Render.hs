@@ -50,6 +50,7 @@ module Leant.Synth.Render
 
 import Control.Monad (foldM)
 import Data.Char (isControl)
+import Data.Foldable (toList)
 import Data.List (intercalate, nub, sortOn, subsequences)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -639,7 +640,7 @@ siteSubsets k = [] : full : sortOn (\s -> (length s, s)) middle
 
 -- Premise stripping ----------------------------------------------------------
 --
--- The engine's candidate binds one lambda per premise: the constructor
+-- The engine's candidate has one argument per premise: the constructor
 -- premises before the lambdas of the engine goal's own arrow spine,
 -- the caller-supplied premises after them.  Both premise blocks are
 -- removed and every use of one is replaced by a reserved-marker local
@@ -657,18 +658,30 @@ stripPremises
   -> Either String (Expression String)
 stripPremises [] _ [] expr = Right expr
 stripPremises outerNames skip innerNames expr = do
-  let (pats, core) = spine expr
-  if length pats < length outerNames + skip + length innerNames
-    then Left "candidate does not bind the constructor premises"
-    else do
-      let (outerPats, afterOuter) = splitAt (length outerNames) pats
-          (goalPats, afterGoal) = splitAt skip afterOuter
-          (innerPats, rest) = splitAt (length innerNames) afterGoal
-      subst <- foldM bindPat Map.empty
-        (zip outerPats outerNames ++ zip innerPats innerNames)
-      let kept = goalPats ++ rest
-      Right (substLocals subst
-        (if null kept then core else Lambda kept core))
+  let (existing, body) = spine expr
+      -- A checked engine term may eta-contract any suffix of this arrow
+      -- spine, including the entire term to a provider name. Restore only
+      -- the arguments required by the retained premise layout before
+      -- substituting its witnesses. Avoid every existing local occurrence
+      -- and pattern binder so the expansion cannot capture a source local.
+      required = length outerNames + skip + length innerNames
+      occupied = Set.fromList $ toList expr
+      added = take (max 0 $ required - length existing)
+        [ name
+        | index <- [0 :: Int ..]
+        , let name = "$premise" ++ show index
+        , name `Set.notMember` occupied
+        ]
+      pats = existing ++ map Bind added
+      core = foldl Apply body $ map Local added
+      (outerPats, afterOuter) = splitAt (length outerNames) pats
+      (goalPats, afterGoal) = splitAt skip afterOuter
+      (innerPats, rest) = splitAt (length innerNames) afterGoal
+  subst <- foldM bindPat Map.empty
+    (zip outerPats outerNames ++ zip innerPats innerNames)
+  let kept = goalPats ++ rest
+  Right (substLocals subst
+    (if null kept then core else Lambda kept core))
  where
   spine (Lambda ps b) = let (more, c) = spine b in (ps ++ more, c)
   spine e = ([], e)
@@ -1793,6 +1806,8 @@ inferFragReplacementsWithVisibility requireVisibility targets = go Set.empty
         matchMany bound replacements (zip parameters parameters')
   go _ replacements (FAtom _ key) (FAtom _ key')
     | key == key' = Just replacements
+  go _ replacements (FSort level) (FSort level')
+    | level == level' = Just replacements
   go _ replacements FTop FTop = Just replacements
   go _ replacements FBot FBot = Just replacements
   go _ replacements FDepth FDepth = Just replacements

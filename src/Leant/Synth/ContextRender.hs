@@ -9,6 +9,7 @@ module Leant.Synth.ContextRender
   , LeanClassInfo (..), LeanNominalInfo (..), LeanProviderInfo (..)
   , ContextRenderEnvironment (..), ContextRenderedTerm (..)
   , ContextRenderError (..), renderLeanContextGraph
+  , renderLeanSortValue
   ) where
 
 import Control.Monad (foldM, unless, when)
@@ -630,6 +631,26 @@ universeText environment = levelText
     a <- levelText (fuel - 1) left
     b <- levelText (fuel - 1) right
     pure $ parens $ "max " ++ a ++ " " ++ b
+
+-- | A source-owned universe is inhabited by the type PUnit at that exact
+-- universe, including Prop. This supplies an introduction witness only;
+-- it does not authorize datatype elimination on arbitrary types.
+renderLeanSortValue :: LeanLevel -> Either ContextRenderError (String, String)
+renderLeanSortValue level = do
+  parameters <- collect 128 level
+  let environment = ContextRenderEnvironment Map.empty Map.empty Map.empty
+        Map.empty Map.empty parameters (0, 0) :: ContextRenderEnvironment ()
+  domain <- binderDomainText environment $ LeanSortDomain level
+  universe <- universeText environment 128 level
+  pure (domain, "_root_.PUnit.{" ++ universe ++ "}")
+ where
+  collect :: Int -> LeanLevel -> Either ContextRenderError (Set.Set LeanName)
+  collect fuel _ | fuel <= 0 = Left ContextProjectionLimitExceeded
+  collect _ LeanLevelZero = Right Set.empty
+  collect _ (LeanLevelParameter name) = Right $ Set.singleton name
+  collect fuel (LeanLevelSuccessor value) = collect (fuel - 1) value
+  collect fuel (LeanLevelMax left right) = Set.union
+    <$> collect (fuel - 1) left <*> collect (fuel - 1) right
 
 givenName :: Q.EvidenceBinderId -> String
 givenName identity = "leantGiven" ++ show (Q.occurrenceIdValue $ Q.evidenceBinderIntroduction identity)

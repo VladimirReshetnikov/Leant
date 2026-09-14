@@ -77,22 +77,26 @@ The [general product-construction release](docs/reports/2026-09-13-product-alter
 now closes the `(7,9)` named-query miss. Its complete 11-case kinded-source matrix
 passes 22 exact GHC replays and 11 actual-False controls; all **383 selected
 regression tests** pass (146 Djinn, 187 integration, 38 API and 12 focused CLI).
-The checked source is integrated into Djex. Native Leant dependency validation
-remains pending; its pin is unchanged. Exference kinded execution remains guarded.
+The checked source is integrated into Djex, and the native release below validates
+Leant against that dependency. Exference explicit Haskell kinded execution remains guarded.
+
+The [native sort/product release](docs/reports/2026-09-13-native-sort-products-acceptance.md)
+retains exact sort levels and supplies canonical type witnesses, including sorts
+needed only by providers. It also repairs eta-reduced premise reconstruction.
+All **726 native tests** pass, together with **90 public checks: 63 exact Lean
+kernel replays and 27 False controls**. Leant now pins the tested Djex product
+implementation. Contextual universe transport remains the next source milestone.
 
 The [public Lean universe baseline](docs/reports/2026-09-13-public-universe-baseline.md)
 passes all 24 cells for identity and nested callbacks at `Type 1` and named
 universe `u`, through Djinn and Exference: 16 exact kernel replays and eight
 actual-False controls. This validates existing context-free support. Contextual
 dictionary universes and universe-bearing global providers remain separate
-implementation requirements; the native dependency pin is unchanged.
+implementation requirements beyond that baseline and the native sort release.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-prioritizes the native sort-value repair needed by the checked product release,
-then contextual Lean universe transport and Exference kind checking. The isolated
-repair passes nine Djinn public cells (six exact kernel replays and three False
-controls), but the latest provider-only sort test fails; the repair and native
-dependency update remain unreleased. Integer indexing and the
+now prioritizes contextual Lean universe transport and Exference kind checking
+after the completed native product integration. Integer indexing and the
 distinct Lean Djinn length diagnosis move ahead of further broad extrema
 experiments. Contextual evidence and supplied-fold trees remain required;
 unsuccessful reduction variants remain paused. Each implementation milestone
