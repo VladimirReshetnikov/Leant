@@ -95,12 +95,15 @@ dictionary universes and universe-bearing global providers remain separate
 implementation requirements beyond that baseline and the native sort release.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-now prioritizes contextual Lean universe transport and Exference kind checking
-after the completed native product integration. Integer indexing and the
-distinct Lean Djinn length diagnosis move ahead of further broad extrema
-experiments. Contextual evidence and supplied-fold trees remain required;
-unsuccessful reduction variants remain paused. Each implementation milestone
-requires its original public query and exact replay.
+removes completed native product integration from active work. Next are exact
+contextual binder universes, class/provider universe selections and contextual
+polymorphic type arguments, each with separate acceptance gates. The isolated
+binder-universe prototype is still under validation; it is not released support.
+Exference explicit Haskell kind checking remains an independent requirement.
+The focused Lean Djinn `length` diagnosis precedes integer indexing; both precede
+further extrema implementation. Contextual evidence and supplied-fold trees remain
+required. Failed reduction variants stay paused pending a new causal trace.
+Each milestone requires its original public query and exact replay.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC
