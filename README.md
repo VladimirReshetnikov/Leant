@@ -77,6 +77,13 @@ The adjacent-input behavioral case remains open: it requires `(7,9)` but the
 four observed candidates all fail the predicate. Exference kinded execution is
 still guarded. Leant's dependency pin and native acceptance are unchanged.
 
+The [public Lean universe baseline](docs/reports/2026-09-13-public-universe-baseline.md)
+passes all 24 cells for identity and nested callbacks at `Type 1` and named
+universe `u`, through Djinn and Exference: 16 exact kernel replays and eight
+actual-False controls. This validates existing context-free support. Contextual
+dictionary universes and universe-bearing global providers remain separate
+implementation requirements; the native dependency pin is unchanged.
+
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
 prioritizes one bounded mixed-product construction repair, then independent
 Lean universe and Exference kind-checking milestones. Integer indexing and the
