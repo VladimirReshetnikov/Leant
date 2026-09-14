@@ -95,12 +95,16 @@ dictionary universes and universe-bearing global providers remain separate
 implementation requirements beyond that baseline and the native sort release.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-keeps completed native product integration under regression coverage. The next
-gate is contextual universe admissibility and Exference type selection: the
-isolated prototype passes 76/78 focused tests, while two unequal-universe cases
-and the attempted intrinsic-unit regression still fail. This is unpublished work.
-Finish that narrow diagnosis before extending class/provider universe selections
-and contextual polymorphic type arguments, each with separate acceptance gates.
+keeps completed native product integration under regression coverage. The isolated
+contextual-universe prototype now passes **63 public cells and all 746 native
+tests**, including exact binder universes, checked candidate rejection and intrinsic
+unit construction. It remains unpublished: the Haskell release gate exposes a
+`maybeEither` regression at the original 256-candidate limit, while a fresh build
+of published Djex passes the same query. Preserve that behavior before release;
+an exact-match constructor cost has not fixed it. The next source increments are
+class/provider universe identity and contextual polymorphic type arguments, each
+with separate acceptance gates. The linked plan retains terminal evidence and
+keeps prototype results separate from later unaccepted experiments.
 Exference explicit Haskell kind checking remains an independent requirement.
 The focused Lean Djinn `length` diagnosis precedes integer indexing; both precede
 further extrema implementation. Contextual evidence and supplied-fold trees remain
