@@ -96,6 +96,8 @@ def main(specifications=None, *, scope=None, label_prefix='product', additional_
                     predicate = 'False' if mode=='false' else spec.get('live_predicate', spec['predicate']).replace('{f}', label)
                     command = ':synth '+spec['type'] if mode=='ordinary' else f':synth {label} : {spec["type"]} where {predicate}'
                     case = dict(name=label, type=spec['type'], command=command, mode='ordinary' if mode=='ordinary' else 'where', engine=engine, operation=spec['label'], expected='no_candidate' if mode=='false' else 'candidate')
+                    if 'constructor_names' in spec:
+                        case['constructor_names'] = spec['constructor_names']
                     source = '\n'.join([':set synth-library off', ':set synth-providers off', ':set synth-classical off', ':set synth-debug on', ':set synth-ranking balanced', ':set synth-shown 1', ':set synth-window 60', ':set synth-verify 12', ':set synth-steps 4096', ':set synth-queue 1024', ':set synth-budget off', ':set synth-djinn-strategy depth-first', ':set synth-timeout 20', ':set synth-engine '+engine, *spec.get('declarations', []), command, ':quit', ''])
                     row = dict(label=label, engine=engine, mode=mode, status='running', command=command)
                     report['results'].append(row); save()

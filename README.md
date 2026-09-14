@@ -107,23 +107,22 @@ preserves exact `Type` binder domains, named universes, shadowing and selected
 callback universes through contextual synthesis. All **63 public universe cases,
 746 native tests, and 42 constructor/strict-binder regression cases pass**, with
 exact Lean replay and False controls. Leant integrates the tested source and pins
-Djex `66b3212b`. Higher-universe classes/providers and selected polymorphic types
-remain separate capabilities.
+Djex `66b3212b`. Higher-universe classes/providers remain separate capabilities;
+selected polymorphic types are covered by the later increment below.
+The [selected polymorphic type release](docs/reports/2026-09-14-selected-polymorphic-types-acceptance.md)
+adds exact nominal universe signatures and source-anchored reconstruction of
+polymorphic type selections, including chained selections and qualified payloads.
+It passes 95 focused checks, all 763 native tests, 72 distinct public checks across
+Djinn, Exference and Both, and all 105 existing contextual regression checks.
+One environment-preparation timeout passed a focused retry at unchanged source,
+runtime identities and limits; the original failed attempt remains in the archive.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-put publication of the scoped polymorphic-selection repair first, followed by a
-focused dictionary-application investigation, Exference's explicit Haskell kinds,
-and integer indexing. Uncommitted
-Leant changes now pass 95 focused checks, all 763 native tests, and 18 public checks
-for chained type selections and dictionary-qualified polymorphic payloads across
-Djinn, Exference and Both. Broader current-source public and regression gates remain
-pending, so these working-tree results are not a release claim. The original query
-using two distinct nominal universe selections remains unresolved and needs a
-causal search trace; it is no longer a blanket prerequisite for publishing the
-passing increment or addressing the explicit-kind guard. Broader
-class/provider universes follow unless a concrete dependency promotes a smaller
-part. The [bounded `length` comparison](docs/reports/2026-09-14-selected-polytype-frontier.md)
-did not isolate the proposed defect; further length, reduction and extrema changes
-require a causal trace. Each milestone needs its original public query and exact replay.
+now focus on selection across dictionary applications, Exference's explicit
+Haskell kinds, and integer indexing. The original query using two distinct
+nominal universe selections remains unresolved and requires a causal search trace.
+Broader class/provider universes follow unless a concrete dependency promotes a
+smaller part. Further length, reduction and extrema changes likewise require a
+new causal trace. This release does not establish arbitrary synthesis completeness.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC
@@ -368,22 +367,20 @@ Companion documents:
   corpora pass 350/350 and extended Exference retains 13/13 behaviors.
   The [fresh native integration](docs/reports/2026-09-12-contextual-list-native-integration.md) passes a strict
   build, **705 unit tests and all ten native gates**, including both 350-signature
-  kernel replays. Leant now pins the tested dependency. A subsequent uncommitted
-  repair passes all six contextual-list probes across Djinn, Exference and Both,
-  with exact kernel replay, and all six existing method-discovery cases. The
-  [expanded diagnostic](docs/reports/2026-09-13-contextual-constructor-frontier.md)
-  completes 17/21 positive replays and all six actual False controls. Djinn's
-  method-with-tail case remains open; the subsequent bounded pass closes nested
-  dictionaries in all three modes; an ineffective ordering experiment was reverted. Full regression
-  acceptance remains required before publication. The latest captured-core
-  experiments still miss the required tail behavior at the original bound. The
-  bounded constructor pass now closes the three nested-context cases but leaves
-  method/tail open; reduction construction and extrema are next. The ledger and scoped dictionary-selection repair
-  are delivered; broader source obligations remain tracked separately.
-  Broader search estimates were rejected after losing Church composition.
-  The current dependency is `ebadbefd`, with complete native selection acceptance. The full 13-operation/19-default coverage
-  across engines is still open.
-  See the [current retriage and evidence boundaries](docs/reports/2026-09-13-synthesis-delivery-retriage.md).
+  kernel replays. The later [constructor release](docs/reports/2026-09-13-contextual-constructor-use-acceptance.md)
+  closes all 21 constructor positives and six actual-False controls, including the
+  previously missing method/tail behavior. Its [earlier diagnostic](docs/reports/2026-09-13-contextual-constructor-frontier.md)
+  retains the 17/21 positive baseline and the reverted ordering experiment.
+  The [contextual-universe release](docs/reports/2026-09-14-contextual-universe-acceptance.md)
+  adds exact binder universes and repeats the constructor and strict-binder gates.
+  The [selected-polymorphic-type release](docs/reports/2026-09-14-selected-polymorphic-types-acceptance.md)
+  extends nominal universe signatures and source-anchored type selection, with
+  72 distinct public cells, 763 native tests and all 105 contextual regression
+  cells accepted. Leant retains the tested Djex pin `66b3212b`.
+  Reduction construction, the original two-universe box query, integer indexing
+  and extrema retain their separate behavioral obligations. The
+  [current priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
+  distinguish those obligations from completed source and constructor releases.
 - **Checked conditional providers in canonical Djex.** The
   [conditional-Given implementation](https://github.com/VladimirReshetnikov/Djex/blob/90c882615ae2a3a296ad963f3f8cb786d4aa614f/docs/reports/2026-09-07-djinn-conditional-givens.md)
   and [guarded nested-Given increment](https://github.com/VladimirReshetnikov/Djex/blob/38435709bf4e70c4b53c541c462b0bbd35837bf2/docs/reports/2026-09-07-djinn-nested-givens.md)

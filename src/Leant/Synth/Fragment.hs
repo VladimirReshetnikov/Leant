@@ -95,8 +95,9 @@ import Text.Read (readMaybe)
 import Leant.Synth.ContextSource
   ( ContextSource, ContextSourceType (..), ContextSourceVisibility (..)
   , mkContextSource, mkContextSourceWithConstructors, mkContextProviderSource
-  , mkContextProviderSourceAt, contextSourceType, contextSourceName
+  , mkContextProviderSourceAt, contextSourceType, contextSourceName, contextNominalIdentity
   )
+import Leant.Synth.ContextUniverse (ContextUniverseSignature (..), selectContextUniverses)
 import Leant.Synth.ContextRender (LeanLevel (..), mkLeanName, renderLeanSortValue)
 
 
@@ -281,6 +282,9 @@ contextSourceFragment = convert . contextSourceType
       in FApp False name (AppNominal name) $ map convert arguments
     ContextNominalAt parts _ _ arguments ->
       let name = contextSourceName parts
+      in FApp False name (AppNominal name) $ map convert arguments
+    ContextNominalExact parts selected arguments ->
+      let name = contextNominalIdentity parts selected
       in FApp False name (AppNominal name) $ map convert arguments
     ContextArrow domain result -> FArr (convert domain) (convert result)
     ContextForall visibility variable body ->
@@ -1519,6 +1523,25 @@ contextSourcePrelude =
   , "        | none => pure none"
   , "    | _ => pure none"
   , ""
+  , "-- Read the uninstantiated declaration; its level parameters remain local."
+  , "private partial def contextUniverseTelescope? (fuel : Nat) (e : Expr) :"
+  , "    MetaM (Option (List Level × Level)) := do"
+  , "  match fuel with"
+  , "  | 0 => pure none"
+  , "  | fuel + 1 =>"
+  , "    let e ← whnfR (← instantiateMVars e).consumeMData"
+  , "    match e with"
+  , "    | .sort level => pure (some ([], level))"
+  , "    | .forallE _ domain body bi =>"
+  , "      let domain ← whnfR domain"
+  , "      let .sort level := domain | return none"
+  , "      if (contextVisibility? bi).isNone then return none"
+  , "      withLocalDeclD (Name.mkSimple \"declarationParameter\") domain fun localValue => do"
+  , "        let some (rest, result) ← contextUniverseTelescope? fuel (body.instantiate1 localValue)"
+  , "          | return none"
+  , "        pure (some (level :: rest, result))"
+  , "    | _ => pure none"
+  , ""
   , "private partial def contextUsesGiven (fuel : Nat) (e : Expr) : MetaM Bool := do"
   , "  match fuel with"
   , "  | 0 => pure true"
@@ -1586,19 +1609,25 @@ contextSourcePrelude =
   , "    | _ =>"
   , "      match e.getAppFn with"
   , "      | .const constant levels =>"
-  , "        if levels.any (fun level => level != .zero) then return none"
   , "        if (← Meta.isClass? e).isSome then return none"
   , "        let some name := contextName? constant | return none"
-  , "        let some arity ← contextTypeZeroArity? 65 (← inferType e.getAppFn) | return none"
+  , "        let declaration ← getConstInfo constant"
+  , "        if declaration.levelParams.length != levels.length then return none"
+  , "        let some (domains, resultSort) ← contextUniverseTelescope? 65 declaration.type | return none"
   , "        let arguments := e.getAppArgs"
-  , "        if arity > 64 || arguments.size != arity then return none"
+  , "        if domains.length > 64 || arguments.size != domains.length then return none"
+  , "        let some domainTexts := domains.mapM (sortLevel? 12) | return none"
+  , "        let some resultText := sortLevel? 12 resultSort | return none"
+  , "        let some selectedTexts := levels.mapM (sortLevel? 12) | return none"
+  , "        let parametersText := String.intercalate \" \" (declaration.levelParams.map fun n => esc n.toString)"
+  , "        let signature := \"(signature (parameters \" ++ parametersText ++ \") (domains \""
+  , "          ++ String.intercalate \" \" domainTexts ++ \") (result \" ++ resultText ++ \"))\""
   , "        let mut argumentsText := \"\""
   , "        for argument in arguments do"
-  , "          let some text ← contextSourceType? fuel depth scope argument | return none"
-  , "          argumentsText := argumentsText ++ \" \" ++ text"
-  , "        let levelsText := String.intercalate \" \" (levels.map fun _ => \"0\")"
-  , "        pure (some (\"(nominal-at \" ++ name ++ \" \" ++ toString arity"
-  , "          ++ \" (levels \" ++ levelsText ++ \") (args\" ++ argumentsText ++ \"))\"))"
+  , "          let some value ← contextSourceType? fuel depth scope argument | return none"
+  , "          argumentsText := argumentsText ++ \" \" ++ value"
+  , "        pure (some (\"(nominal-exact \" ++ name ++ \" \" ++ signature"
+  , "          ++ \" (levels \" ++ String.intercalate \" \" selectedTexts ++ \") (args\" ++ argumentsText ++ \"))\"))"
   , "      | _ => pure none"
   , ""
   , "-- Inspect actual inductive declarations at the goal's exact constant levels."
@@ -1633,7 +1662,6 @@ contextSourcePrelude =
   , "    if visited.contains next then continue"
   , "    visited := next :: visited"
   , "    let (family, levels) := next"
-  , "    if levels.any (fun level => level != .zero) then continue"
   , "    let .inductInfo declaration ← getConstInfo family | continue"
   , "    if Lean.isClass (← getEnv) family || family.isInternalDetail then continue"
   , "    for constructor in declaration.ctors do"
@@ -1644,7 +1672,8 @@ contextSourcePrelude =
   , "      let some name := contextName? constructor | continue"
   , "      let sourceType := info.type.instantiateLevelParams info.levelParams levels"
   , "      let some source ← contextSourceType? 256 0 [] sourceType | continue"
-  , "      let levelsText := String.intercalate \" \" (levels.map fun _ => \"0\")"
+  , "      let some selectedTexts := levels.mapM (sortLevel? 12) | continue"
+  , "      let levelsText := String.intercalate \" \" selectedTexts"
   , "      entries := entries.push (\"(constructor \" ++ name ++ \" (levels \" ++ levelsText ++ \") \" ++ source ++ \")\")"
   , "      pending := pending ++ (← contextNominalOccurrences 256 sourceType)"
   , "  pure (\" (constructors \" ++ String.intercalate \" \" entries.toList ++ \")\")"
@@ -1656,7 +1685,7 @@ contextSourcePrelude =
   , "    let constructors ← contextConstructorPackets e"
   , "    pure (\" (context-source 2 \" ++ source ++ constructors ++ \")\")"
   , "  | none => pure (\" (context-source unsupported \" ++ esc"
-  , "      \"exact lexical-Given source requires Type-0 binders, nominal/class domains, supported visibility and nondependent term arrows\" ++ \")\")"
+  , "      \"exact lexical-Given source requires supported Type/nominal universe signatures, Type-0 class domains, supported visibility and nondependent term arrows\" ++ \")\")"
   , ""
   , "-- Only registered direct projections of actual session classes gain session priority."
   , "-- A namespace sibling, ordinary structure, or superclass/subobject projection does not."
@@ -2004,8 +2033,39 @@ parseContextLevels (TL : TSym "levels" : body) = levels 0 body
   levels count (TSym "0" : remaining) | count < (64 :: Int) = do
     (rest, final) <- levels (count + 1) remaining
     pure (LeanLevelZero : rest, final)
-  levels _ _ = Left "context-source: constant levels require bounded explicit zeros"
+  levels count tokens | count < (64 :: Int) = do
+    (level, remaining) <- parseSortLevel 128 tokens
+    (rest, final) <- levels (count + 1) remaining
+    pure (level : rest, final)
+  levels _ _ = Left "context-source: constant universe vector exceeds limit"
 parseContextLevels _ = Left "context-source: missing constant universe arguments"
+
+parseContextUniverseSignature :: [Tok] -> Either String (ContextUniverseSignature, [Tok])
+parseContextUniverseSignature (TL : TSym "signature" : TL : TSym "parameters" : tokens) = do
+  (parameters, afterParameters) <- names 0 tokens
+  (domains, afterDomains) <- case afterParameters of
+    TL : TSym "domains" : body -> sorts 0 body
+    _ -> Left "context-source: missing declaration parameter sorts"
+  (result, afterResult) <- case afterDomains of
+    TL : TSym "result" : body -> parseSortLevel 128 body
+    _ -> Left "context-source: missing declaration result sort"
+  case afterResult of
+    TR : TR : remaining -> pure (ContextUniverseSignature parameters domains result, remaining)
+    _ -> Left "context-source: malformed declaration universe signature"
+ where
+  names _ (TR : remaining) = Right ([], remaining)
+  names count (TStr name : remaining) | count < (64 :: Int) = do
+    parameter <- either (Left . show) Right $ mkLeanName [name]
+    (rest, final) <- names (count + 1) remaining
+    pure (parameter : rest, final)
+  names _ _ = Left "context-source: invalid declaration universe parameters"
+  sorts _ (TR : remaining) = Right ([], remaining)
+  sorts count body | count < (64 :: Int) = do
+    (level, remaining) <- parseSortLevel 128 body
+    (rest, final) <- sorts (count + 1) remaining
+    pure (level : rest, final)
+  sorts _ _ = Left "context-source: declaration parameter sort limit exceeded"
+parseContextUniverseSignature _ = Left "context-source: missing declaration universe signature"
 
 parseContextSourceType :: Int -> [Tok] -> Either String (ContextSourceType, [Tok])
 parseContextSourceType fuel _ | fuel <= 0 = Left "context-source: source nesting exceeds limit"
@@ -2026,6 +2086,15 @@ parseContextSourceType fuel (TL : TSym tag : rest) = case (tag, rest) of
     finish (ContextArrow domain result) remaining
   ("nominal", body) -> named False False body
   ("nominal-at", body) -> named False True body
+  ("nominal-exact", TL : TSym "name" : names) -> do
+    (parts, afterName) <- nameParts 0 names
+    (signature, afterSignature) <- parseContextUniverseSignature afterName
+    (levels, afterLevels) <- parseContextLevels afterSignature
+    selected <- selectContextUniverses signature levels
+    (arguments, remaining) <- case afterLevels of
+      TL : TSym "args" : values -> argumentsOf 0 values
+      _ -> Left "context-source: missing ordered source arguments"
+    finish (ContextNominalExact parts selected arguments) remaining
   ("given", body) -> named True False body
   _ -> Left "context-source: unsupported source type form"
  where

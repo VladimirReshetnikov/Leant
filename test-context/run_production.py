@@ -332,10 +332,27 @@ def accepted_observation(block, case, term):
             or rendering.get("term") != term or "failure" in rendering):
         raise ValueError("the retained graph did not reproduce its exact accepted renderer alternative")
     graph = origin.get("graph", {})
+    constructor_names = case.get("constructor_names")
+    globals_ = graph.get("globals") if isinstance(graph, dict) else None
+    if constructor_names is None:
+        valid_globals = globals_ == []
+    else:
+        valid_globals = (
+            isinstance(constructor_names, list) and bool(constructor_names)
+            and all(isinstance(name, str) and re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)+", name)
+                    for name in constructor_names)
+            and isinstance(globals_, list) and bool(globals_)
+            and all(isinstance(name, str) and re.fullmatch(r"leantProvider[0-9]+", name) for name in globals_)
+            and len(globals_) == len(set(globals_))
+        )
+        if valid_globals:
+            plain = term.replace("«", "").replace("»", "")
+            valid_globals = all(re.search(re.escape("@_root_." + name) + r"(?=\.\{|[\s;:)])", plain)
+                                for name in constructor_names)
     if (not isinstance(graph, dict) or "failure" in graph or not isinstance(graph.get("root"), str) or not graph["root"]
             or not isinstance(graph.get("root_type"), str) or not graph["root_type"]
             or graph.get("root_closed") is not True or graph.get("erasure_matches_compatibility") is not True
-            or type(graph.get("node_count")) is not int or graph["node_count"] < 1 or graph.get("globals") != []):
+            or type(graph.get("node_count")) is not int or graph["node_count"] < 1 or not valid_globals):
         raise ValueError("accepted origin lost its own closed source graph or exact compatibility association")
     introductions = graph.get("context_introductions")
     applications = graph.get("context_applications")

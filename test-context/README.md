@@ -1,5 +1,33 @@
 # Lexical-Given synthesis acceptance
 
+## Selected polymorphic types and nominal universes
+
+`run_polymorphic_selection.py` checks exact nominal universe selections and
+selected polymorphic payloads through ordinary, named-`where` and actual-False
+queries in Djinn, Exference and Both. Positive results retain their own typed
+graph and rendered term, then replay independently against the original complete
+signature. The reference implementations never enter synthesis sessions.
+
+After building the executable, run the six nominal/polymorphic families and the
+two chained/qualified-payload families separately:
+
+```powershell
+$leantExe = (cabal list-bin leant:exe:leant).Trim()
+python -X utf8 -B test-context/run_polymorphic_selection.py --leant $leantExe --output dist-newstyle/selected-polytypes/core --case fixed_higher_box --case selected_higher_box --case boxed_polymorphic_payload --case boxed_type_one_quantifier --case boxed_named_quantifier --case boxed_strict_quantifier
+python -X utf8 -B test-context/run_polymorphic_selection.py --leant $leantExe --output dist-newstyle/selected-polytypes/chained --case polymorphic_first_of_two_selections --case boxed_qualified_polymorphic_payload
+```
+
+These select 54 and 18 cells respectively. `--engine` narrows a diagnostic run;
+every output directory must be new or empty. The controller retains a
+60-candidate window, 4,096 steps, a 1,024-entry queue, a 20-second synthesis timeout
+and a separate 120-second process guard.
+
+The unfiltered controller also includes `two_box_selections`, the unresolved
+query constructing two nominal universe selections in one result. Do not treat
+the unfiltered invocation as an all-green gate, or a passing subset as closure of
+that diagnostic. The [current priorities](../docs/reports/2026-09-14-synthesis-next-priorities.md)
+distinguish these obligations and record the acceptance evidence.
+
 ## Public production route
 
 `run_production.py` exercises ordinary and named-`where` contextual synthesis

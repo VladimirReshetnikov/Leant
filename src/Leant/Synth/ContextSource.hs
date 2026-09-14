@@ -8,6 +8,7 @@ module Leant.Synth.ContextSource
   , mkContextProviderSourceAt, contextSourceConstructors, contextSourceWithoutConstructors
   , contextSourceType, contextSourceHasGiven
   , contextSourceName
+  , contextNominalIdentity, contextValueIdentity
   , PreparedContextSource, prepareContextSource, prepareContextSourceProviders
   , renderPreparedContextGraph
   , ContextCandidateRejection (..), ContextProjectionFailure (..)
@@ -24,6 +25,7 @@ import Language.Haskell.Synthesis.Name (Boxity (..), Name)
 import qualified Language.Haskell.Synthesis.Type as T
 import qualified Language.Haskell.Synthesis.TypeAtom as A
 import qualified Language.Haskell.Synthesis.TypedGenerated as Q
+import Leant.Synth.ContextUniverse
 import Leant.Synth.ContextRender
 
 data ContextSourceVisibility = ContextExplicit | ContextImplicit | ContextStrictImplicit
@@ -38,6 +40,7 @@ data ContextSourceType
   = ContextVariable String
   | ContextNominal [String] Int [ContextSourceType]
   | ContextNominalAt [String] Int [LeanLevel] [ContextSourceType]
+  | ContextNominalExact [String] ContextUniverseSelection [ContextSourceType]
   | ContextArrow ContextSourceType ContextSourceType
   | ContextForall ContextSourceVisibility String ContextSourceType
   | ContextForallAt ContextSourceVisibility String LeanLevel ContextSourceType
@@ -65,23 +68,27 @@ mkContextSourceWithConstructors source constructors = do
  where
   add (owners, reachable) (parts, packet) = do
     _ <- either (Left . show) Right $ mkLeanName parts
-    when (Set.member parts owners || not (null $ contextSourceConstructors packet)) $
+    let owner = contextValueIdentity parts packet
+    when (Set.member owner owners || not (null $ contextSourceConstructors packet)) $
       Left "context-source: duplicate or nested constructor inventory"
     family <- case resultType $ contextSourceType packet of
-      ContextNominal name _ _ -> Right name
-      ContextNominalAt name _ _ _ -> Right name
+      ContextNominal name _ _ -> Right $ contextSourceName name
+      ContextNominalAt name _ _ _ -> Right $ contextSourceName name
+      ContextNominalExact name selected _ -> Right $ contextNominalIdentity name selected
       _ -> Left "context-source: constructor result is not nominal"
     unless (Set.member family reachable) $
       Left "context-source: constructor family is not reachable from the goal"
-    pure (Set.insert parts owners, Set.union reachable $ nominalNames $ contextSourceType packet)
+    pure (Set.insert owner owners, Set.union reachable $ nominalNames $ contextSourceType packet)
   resultType (ContextForall _ _ body) = resultType body
   resultType (ContextForallAt _ _ _ body) = resultType body
   resultType (ContextArrow _ body) = resultType body
   resultType body = body
   nominalNames current = case current of
     ContextVariable{} -> Set.empty
-    ContextNominal name _ args -> Set.insert name $ Set.unions $ map nominalNames args
-    ContextNominalAt name _ _ args -> Set.insert name $ Set.unions $ map nominalNames args
+    ContextNominal name _ args -> Set.insert (contextSourceName name) $ Set.unions $ map nominalNames args
+    ContextNominalAt name _ _ args -> Set.insert (contextSourceName name) $ Set.unions $ map nominalNames args
+    ContextNominalExact name selected args -> Set.insert (contextNominalIdentity name selected) $
+      Set.unions $ map nominalNames args
     ContextArrow a b -> Set.union (nominalNames a) (nominalNames b)
     ContextForall _ _ body -> nominalNames body
     ContextForallAt _ _ _ body -> nominalNames body
@@ -89,6 +96,12 @@ mkContextSourceWithConstructors source constructors = do
 
 contextSourceName :: [String] -> String
 contextSourceName = intercalate "."
+
+contextNominalIdentity :: [String] -> ContextUniverseSelection -> String
+contextNominalIdentity parts = selectionIdentity (contextSourceName parts)
+
+contextValueIdentity :: [String] -> ContextSource -> String
+contextValueIdentity parts = universeIdentity (contextSourceName parts) . contextSourceValueLevels
 
 contextSourceHasGiven :: ContextSourceType -> Bool
 contextSourceHasGiven source = case source of
@@ -98,6 +111,7 @@ contextSourceHasGiven source = case source of
   ContextForallAt _ _ _ body -> contextSourceHasGiven body
   ContextNominal _ _ arguments -> any contextSourceHasGiven arguments
   ContextNominalAt _ _ _ arguments -> any contextSourceHasGiven arguments
+  ContextNominalExact _ _ arguments -> any contextSourceHasGiven arguments
   ContextVariable{} -> False
 
 mkContextSource :: ContextSourceType -> Either String ContextSource
@@ -110,9 +124,10 @@ mkContextProviderSource = validateContextSource False
 
 mkContextProviderSourceAt :: [LeanLevel] -> ContextSourceType -> Either String ContextSource
 mkContextProviderSourceAt levels source = do
-  validateConstantLevels levels
+  unless (length levels <= 64) $ Left "context-source: constant universe vector exceeds limit"
+  normalized <- traverse normalizeUniverse levels
   packet <- mkContextProviderSource source
-  pure packet { contextSourceValueLevels = levels }
+  pure packet { contextSourceValueLevels = normalized }
 
 validateConstantLevels :: [LeanLevel] -> Either String ()
 validateConstantLevels levels =
@@ -127,6 +142,7 @@ validateContextSource requireGiven source = do
   when (requireGiven && not (contextSourceHasGiven source)) $
     Left "context-source: packet has no lexical Given context"
   _ <- sourceUniverse source
+  _ <- sourceNominalUniverses source
   pure $ ContextSource source [] []
  where
   inspect fuel _ _ _ _ | fuel <= (0 :: Int) = Left "context-source: source exceeds node limit"
@@ -150,56 +166,30 @@ validateContextSource requireGiven source = do
       validateConstantLevels levels
       updated <- insertName name arity arguments (arity, levels) nominals
       inspectArguments (fuel - 1) scope classes updated arguments
+    ContextNominalExact name selected arguments -> do
+      let arity = length $ selectionArgumentSorts selected
+      when (Map.member (contextSourceName name) classes) $
+        Left "context-source: a class identity also occurs as an ordinary nominal type"
+      updated <- insertNameWithIdentity (contextNominalIdentity name selected) name arity arguments
+        (arity, selectionLevels selected) nominals
+      inspectArguments (fuel - 1) scope classes updated arguments
     ContextGiven name arity arguments body -> do
       updated <- insertName name arity arguments arity classes
       (remaining, afterClasses, afterNominals) <- inspectArguments (fuel - 1) scope updated nominals arguments
       inspect remaining scope afterClasses afterNominals body
   inspectArguments fuel scope classes nominals = foldM
     (\(remaining, cs, ns) -> inspect remaining scope cs ns) (fuel, classes, nominals)
-  insertName parts arity arguments metadata names = do
+  insertName parts = insertNameWithIdentity (contextSourceName parts) parts
+  insertNameWithIdentity name parts arity arguments metadata names = do
     _ <- either (Left . show) Right $ mkLeanName parts
     unless (arity >= 0 && arity <= 64 && length arguments == arity) $
       Left "context-source: unsaturated or unsupported nominal/class arity"
-    let name = contextSourceName parts
     case Map.lookup name names of
       Just previous | previous /= metadata -> Left "context-source: inconsistent source arity or universe arguments"
       _ -> pure $ Map.insert name metadata names
 
 typeZeroSort :: LeanLevel
 typeZeroSort = LeanLevelSuccessor LeanLevelZero
-
--- Canonical max-of-offsets form for the supported zero/successor/max fragment.
--- In particular, max u 0 = u and max (u + 1) u = u + 1. This compares
--- universe identities without depending on the source's expression order.
-normalizeUniverse :: LeanLevel -> Either String LeanLevel
-normalizeUniverse level = rebuild <$> collect (128 :: Int) level
- where
-  collect fuel _ | fuel <= 0 = Left "context-source: universe exceeds nesting limit"
-  collect _ LeanLevelZero = Right $ Map.singleton Nothing (0 :: Int)
-  collect _ (LeanLevelParameter name) = Right $ Map.singleton (Just name) 0
-  collect fuel (LeanLevelSuccessor value) = Map.map (+ 1) <$> collect (fuel - 1) value
-  collect fuel (LeanLevelMax left right) = Map.unionWith max
-    <$> collect (fuel - 1) left <*> collect (fuel - 1) right
-  rebuild offsets = foldr1 LeanLevelMax
-    [ iterate LeanLevelSuccessor (maybe LeanLevelZero LeanLevelParameter name) !! offset
-    | (name, offset) <- Map.toAscList reduced
-    ]
-   where
-    reduced = case Map.lookup Nothing offsets of
-      Just constant | any (>= constant) (Map.elems $ Map.delete Nothing offsets) -> Map.delete Nothing offsets
-      _ -> offsets
-
--- Contextual Type binders need a known successor sort. A bare Sort u or Prop
--- requires a separate impredicative-sort account, rather than assuming Type 0.
-typeUniverse :: LeanLevel -> Either String LeanLevel
-typeUniverse level = normalizeUniverse level >>= predecessor
- where
-  predecessor (LeanLevelSuccessor value) = Right value
-  predecessor (LeanLevelMax left right) = do
-    a <- predecessor left
-    b <- predecessor right
-    normalizeUniverse $ LeanLevelMax a b
-  predecessor _ = Left "context-source: contextual type binder requires a Type universe"
 
 -- Every variable carries the domain of its own lexical opening. A higher
 -- universe variable cannot silently enter a still-Type-0 nominal or class.
@@ -219,6 +209,12 @@ sourceUniverse = go Map.empty
       normalizeUniverse $ LeanLevelMax (LeanLevelSuccessor domain) result
     ContextNominal _ _ arguments -> checkArguments scope arguments >> pure LeanLevelZero
     ContextNominalAt _ _ _ arguments -> checkArguments scope arguments >> pure LeanLevelZero
+    ContextNominalExact _ selected arguments -> do
+      actual <- traverse (go scope) arguments
+      expected <- traverse typeUniverse $ selectionArgumentSorts selected
+      unless (actual == expected) $
+        Left "context-source: nominal argument differs from its selected declaration universe"
+      typeUniverse $ selectionResultSort selected
     ContextGiven _ _ arguments body -> checkArguments scope arguments >> go scope body
   checkArguments scope arguments = do
     levels <- traverse (go scope) arguments
@@ -230,6 +226,8 @@ sourceUniverseParameters source = case source of
   ContextVariable{} -> Set.empty
   ContextNominal _ _ arguments -> children arguments
   ContextNominalAt _ _ levels arguments -> Set.union (Set.unions $ map parameters levels) $ children arguments
+  ContextNominalExact _ selected arguments -> Set.union
+    (Set.unions $ map parameters $ selectionLevels selected) $ children arguments
   ContextArrow domain result -> children [domain, result]
   ContextForall _ _ body -> sourceUniverseParameters body
   ContextForallAt _ _ level body -> Set.union (parameters level) $ sourceUniverseParameters body
@@ -241,12 +239,54 @@ sourceUniverseParameters source = case source of
   parameters (LeanLevelSuccessor level) = parameters level
   parameters (LeanLevelMax a b) = Set.union (parameters a) (parameters b)
 
+type NominalUniverse = ([LeanLevel], LeanLevel)
+
+-- Selected instances have separate private keys, but all selections of one
+-- declaration must agree on its closed, alpha-normalized universe template.
+sourceNominalUniverses
+  :: ContextSourceType
+  -> Either String (Map.Map String NominalUniverse, Map.Map [String] ContextUniverseSignature)
+sourceNominalUniverses source = do
+  (instances, declarations, nominals, classes) <- walk
+    (Map.empty, Map.empty, Set.empty, Set.empty) source
+  unless (Set.null $ Set.intersection nominals classes) $
+    Left "context-source: a class identity also occurs as an ordinary nominal type"
+  pure (instances, declarations)
+ where
+  walk state current = case current of
+    ContextVariable{} -> pure state
+    ContextArrow a b -> foldM walk state [a, b]
+    ContextForall _ _ body -> walk state body
+    ContextForallAt _ _ _ body -> walk state body
+    ContextGiven parts _ arguments body ->
+      let (instances, declarations, nominals, classes) = state
+      in foldM walk (instances, declarations, nominals, Set.insert parts classes) (body : arguments)
+    ContextNominal parts arity arguments ->
+      walk state $ ContextNominalAt parts arity [] arguments
+    ContextNominalAt parts arity _ arguments ->
+      add state parts (contextSourceName parts) (replicate arity typeZeroSort, typeZeroSort)
+        Nothing arguments
+    ContextNominalExact parts selected arguments ->
+      add state parts (contextNominalIdentity parts selected)
+        (selectionArgumentSorts selected, selectionResultSort selected)
+        (Just $ selectionSignature selected) arguments
+  add (instances, declarations, nominals, classes) parts key sorts template arguments = do
+    updated <- insert "selected nominal universe signature" key sorts instances
+    declared <- maybe (pure declarations)
+      (\signature -> insert "declaration universe template" parts signature declarations) template
+    foldM walk (updated, declared, Set.insert parts nominals, classes) arguments
+  insert label key value entries = case Map.lookup key entries of
+    Just old | old /= value -> Left $ "context-source: inconsistent " ++ label
+    _ -> pure $ Map.insert key value entries
+
 data PreparedContextSource = PreparedContextSource
   { preparedContextRoot :: LeanType String
   , preparedContextClasses :: Map.Map Name LeanClassInfo
   , preparedContextNominals :: Map.Map Name LeanNominalInfo
   , preparedContextProviders :: Map.Map Name (LeanProviderInfo String)
   , preparedContextUniverses :: Set.Set LeanName
+  , preparedContextNominalUniverses :: Map.Map Name NominalUniverse
+  , preparedContextNominalDeclarations :: Map.Map [String] ContextUniverseSignature
   } deriving (Eq, Show)
 
 -- The two maps come directly from the same completed translation state as
@@ -261,8 +301,13 @@ prepareContextSource classes nominals goal packet = do
   let source = contextSourceType packet
   (projection, classEntries, nominalEntries) <- project source
   aligned <- alignProjection Map.empty projection goal
+  (sourceUniverses, declarations) <- sourceNominalUniverses source
+  universeEntries <- traverse (\(key, sorts) -> do
+    (private, _) <- maybe (Left "context-source: nominal universe lacks its private identity") Right $
+      Map.lookup key nominals
+    pure (private, sorts)) $ Map.toList sourceUniverses
   pure $ PreparedContextSource aligned (Map.fromList classEntries) (Map.fromList nominalEntries) Map.empty
-    (sourceUniverseParameters source)
+    (sourceUniverseParameters source) (Map.fromList universeEntries) declarations
  where
   project current = case current of
     ContextVariable variable -> pure (LeanVariable variable, [], [])
@@ -272,20 +317,25 @@ prepareContextSource classes nominals goal packet = do
       pure (LeanArrow a b, ac ++ bc, an ++ bn)
     ContextNominal parts arity arguments -> project $ ContextNominalAt parts arity [] arguments
     ContextNominalAt parts arity levels arguments -> do
-      (private, actualArity) <- maybe (Left "context-source: nominal has no source-owned translation") Right $
-        Map.lookup (contextSourceName parts) nominals
-      unless (arity == actualArity) $ Left "context-source: translated nominal kind changed"
-      name <- either (Left . show) Right $ mkLeanName parts
-      projected <- traverse project arguments
-      pure (foldl LeanApplication (LeanNominal private) $ map first projected,
-        concatMap second projected,
-        (private, LeanNominalInfo name arity levels) : concatMap third projected)
+      projectNominal (contextSourceName parts) parts arity levels arguments
+    ContextNominalExact parts selected arguments ->
+      projectNominal (contextNominalIdentity parts selected) parts
+        (length $ selectionArgumentSorts selected) (selectionLevels selected) arguments
     ContextForall{} -> projectForall current
     ContextForallAt{} -> projectForall current
     ContextGiven parts arity arguments body -> do
       (constraint, cs, ns) <- projectConstraint (parts, arity, arguments)
       (result, bc, bn) <- project body
       pure (LeanForall [] [constraint] result, cs ++ bc, ns ++ bn)
+  projectNominal key parts arity levels arguments = do
+      (private, actualArity) <- maybe (Left "context-source: nominal has no source-owned translation") Right $
+        Map.lookup key nominals
+      unless (arity == actualArity) $ Left "context-source: translated nominal kind changed"
+      name <- either (Left . show) Right $ mkLeanName parts
+      projected <- traverse project arguments
+      pure (foldl LeanApplication (LeanNominal private) $ map first projected,
+        concatMap second projected,
+        (private, LeanNominalInfo name arity levels) : concatMap third projected)
   projectForall current = do
       let (binders, afterBinders) = allSpine current
           (contexts, body) = givenSpine afterBinders
@@ -340,7 +390,8 @@ prepareContextSourceProviders classes nominals bindings initial =
   add prepared (private, parts, scheme, source) = do
     foreignName <- either (Left . show) Right $ mkLeanName parts
     when (Map.member private (preparedContextProviders prepared)
-        || any ((== foreignName) . contextProviderLeanName)
+        || any (\provider -> contextProviderLeanName provider == foreignName &&
+              contextProviderConstantLevels provider == contextSourceValueLevels source)
           (Map.elems $ preparedContextProviders prepared)) $
       Left "context-source: duplicate global provider owner"
     provider <- prepareContextSource classes nominals scheme source
@@ -348,6 +399,8 @@ prepareContextSourceProviders classes nominals bindings initial =
       Left "context-source: global provider scheme is open"
     combinedClasses <- merge (preparedContextClasses prepared) (preparedContextClasses provider)
     combinedNominals <- merge (preparedContextNominals prepared) (preparedContextNominals provider)
+    combinedNominalUniverses <- merge (preparedContextNominalUniverses prepared) (preparedContextNominalUniverses provider)
+    combinedDeclarations <- merge (preparedContextNominalDeclarations prepared) (preparedContextNominalDeclarations provider)
     when (any (\classInfo -> any
         ((== contextClassLeanName classInfo) . contextNominalLeanName)
         (Map.elems combinedNominals)) (Map.elems combinedClasses)) $
@@ -359,6 +412,8 @@ prepareContextSourceProviders classes nominals bindings initial =
           (LeanProviderInfo foreignName (contextSourceValueLevels source) $ preparedContextRoot provider)
           (preparedContextProviders prepared)
       , preparedContextUniverses = Set.union (preparedContextUniverses prepared) (preparedContextUniverses provider)
+      , preparedContextNominalUniverses = combinedNominalUniverses
+      , preparedContextNominalDeclarations = combinedDeclarations
       }
   merge left right = do
     unless (and $ Map.elems $ Map.intersectionWith (==) left right) $
@@ -419,7 +474,7 @@ renderContextCandidateRejection reason = "context-source: " ++ case reason of
   ContextSelectedUniverseMismatch expected actual ->
     "selected type universe differs from its source binder domain (expected "
       ++ show expected ++ ", selected " ++ show actual ++ ")"
-  ContextNominalArgumentUniverseMismatch -> "higher-universe selection entered a Type-0 nominal parameter"
+  ContextNominalArgumentUniverseMismatch -> "selected nominal argument differs from its declaration universe"
   ContextUnsupportedSelectedPolytype -> "impredicative selected types need unsupported universe evidence"
   ContextUnsupportedSelectedTuple -> "selected tuple type is unsupported"
   ContextUnsupportedSelectedKind -> "selected type is not a proper type"
@@ -428,7 +483,8 @@ integrity :: Either String value -> Either ContextProjectionFailure value
 integrity = Bifunctor.first ContextProjectionIntegrityFailure
 
 newtype Project variable value = Project
-  { runProject :: ProjectionState variable -> Either ContextProjectionFailure (value, ProjectionState variable) }
+  { runProject :: ProjectionState variable
+      -> Either (ContextProjectionFailure, ProjectionState variable) (value, ProjectionState variable) }
 
 instance Functor (Project variable) where
   fmap f (Project action) = Project $ \state -> do
@@ -449,20 +505,34 @@ checked :: Either String value -> Project variable value
 checked = checkedProjection . integrity
 
 checkedProjection :: Either ContextProjectionFailure value -> Project variable value
-checkedProjection result = Project $ \state -> (\value -> (value, state)) <$> result
+checkedProjection result = Project $ \state ->
+  Bifunctor.bimap (\failure -> (failure, state)) (\value -> (value, state)) result
+
+chargeProjection :: Project variable ()
+chargeProjection = Project $ \state@(ProjectionState remaining nodes selections) ->
+  if remaining <= 0
+    then Left (ContextProjectionIntegrityFailure "context-source: rooted projection walk exceeds limit", state)
+    else Right ((), ProjectionState (remaining - 1) nodes selections)
 
 remember :: Eq variable => Q.TermNodeId -> LeanType variable -> Project variable ()
-remember owner metadata = Project $ \(ProjectionState remaining nodes selections) -> do
-  when (remaining <= 0) $ Left $ ContextProjectionIntegrityFailure "context-source: rooted projection walk exceeds limit"
+remember owner metadata = Project $ \state@(ProjectionState remaining nodes selections) ->
   case Map.lookup owner nodes of
-    Just previous -> unless (previous == metadata) $
-      Left $ ContextProjectionIntegrityFailure "context-source: a shared graph node acquired conflicting lexical metadata"
-    Nothing -> pure ()
-  pure ((), ProjectionState (remaining - 1) (Map.insert owner metadata nodes) selections)
+    Just previous | previous /= metadata -> Left
+      (ContextProjectionIntegrityFailure "context-source: a shared graph node acquired conflicting lexical metadata", state)
+    _ -> Right ((), ProjectionState remaining (Map.insert owner metadata nodes) selections)
 
 select :: Q.TermNodeId -> LeanType variable -> Project variable ()
 select owner metadata = Project $ \(ProjectionState remaining nodes selections) ->
   Right ((), ProjectionState remaining nodes (Map.insert owner metadata selections))
+
+-- Retry only an evidence deficit. Roll back provisional metadata, but preserve
+-- every unit of work consumed by the failed branch. A malformed graph or an
+-- established universe mismatch is never a fallback.
+withSelectionEvidence :: Project variable value -> Project variable value -> Project variable value
+withSelectionEvidence first alternative = Project $ \state@(ProjectionState _ nodes selections) -> case runProject first state of
+  Left (ContextProjectionCandidateRejected ContextUnsupportedSelectedPolytype, ProjectionState remaining _ _) ->
+    runProject alternative $ ProjectionState remaining nodes selections
+  result -> result
 
 renderPreparedContextGraph
   :: (Ord variable, Ord local)
@@ -480,7 +550,7 @@ checkPreparedContextGraph
 checkPreparedContextGraph prepared graph = do
   root <- integrity $ node $ Q.termGraphRoot graph
   projection <- integrity $ alignProjection Map.empty (preparedContextRoot prepared) $ Q.termNodeType root
-  (_, ProjectionState _ nodes selections) <- runProject
+  (_, ProjectionState _ nodes selections) <- Bifunctor.first fst $ runProject
     (check Map.empty Map.empty (Q.termGraphRoot graph) projection)
     (ProjectionState 65536 Map.empty Map.empty)
   providers <- integrity $ fmap Map.fromList $ mapM
@@ -516,6 +586,7 @@ checkPreparedContextGraph prepared graph = do
     pure (actual, Q.termNodeForm current)
 
   check scope locals owner expected = do
+    chargeProjection
     (metadata, form) <- retain owner expected
     case form of
       Q.TypedLambda patterns body -> do
@@ -543,7 +614,7 @@ checkPreparedContextGraph prepared graph = do
           check scope (Map.insert variable bindingType locals) body metadata
         _ -> checked $ Left "context-source: unsupported let pattern"
       _ -> do
-        inferred <- infer scope locals owner
+        inferred <- inferWith scope locals owner [([], metadata)]
         _ <- checked $ align metadata $ eraseLeanType inferred
         pure ()
 
@@ -558,7 +629,13 @@ checkPreparedContextGraph prepared graph = do
       pure (locals, result)
     _ -> Left "context-source: unsupported lambda pattern or source arrow"
 
-  infer scope locals owner = do
+  infer scope locals owner = inferWith scope locals owner []
+
+  -- A hint has an exact structural address in this node's type. False follows
+  -- an arrow result; True follows its domain. No unrelated alpha-matching
+  -- source type is allowed to donate a selected forall's binder metadata.
+  inferWith scope locals owner hints = do
+    chargeProjection
     current <- checked $ node owner
     inferred <- case Q.termNodeForm current of
       Q.TypedLocal _ variable -> checked $ maybe
@@ -569,14 +646,15 @@ checkPreparedContextGraph prepared graph = do
         alignProjection Map.empty (contextProviderSourceType provider) $ Q.termNodeType current
       Q.TypedTuple elements -> LeanTuple Boxed <$> traverse (infer scope locals) elements
       Q.TypedApply function argument _ -> do
-        functionType <- infer scope locals function
+        let resultHints = [(False : path, value) | (path, value) <- hints]
+        functionType <- inferWith scope locals function resultHints `withSelectionEvidence` do
+          argumentType <- infer scope locals argument
+          inferWith scope locals function (([True], argumentType) : resultHints)
         case functionType of
           LeanArrow domain result -> check scope locals argument domain >> pure result
           _ -> checked $ Left "context-source: term application did not retain an arrow"
-      Q.TypedVisibleTypeApplication _ function _ witness ->
-        applyType scope locals owner function $ Q.typeApplicationSelected witness
-      Q.TypedImplicitTypeApplication _ function witness ->
-        applyType scope locals owner function $ Q.implicitTypeApplicationSelected witness
+      Q.TypedVisibleTypeApplication{} -> applyTypes scope locals owner hints
+      Q.TypedImplicitTypeApplication{} -> applyTypes scope locals owner hints
       Q.TypedContextApplication _ function _ -> do
         functionType <- infer scope locals function
         case functionType of
@@ -584,21 +662,105 @@ checkPreparedContextGraph prepared graph = do
           _ -> checked $ Left "context-source: dictionary application did not retain its context"
       _ -> checked $ Left "context-source: unsupported unanchored graph construction"
     (actual, _) <- retain owner inferred
+    checked $ mapM_ (\(path, expected) -> do
+      observed <- projectionAt path actual
+      aligned <- align expected $ eraseLeanType observed
+      unless (aligned == observed) $ Left "context-source: application evidence conflicts with exact source metadata") hints
     pure actual
 
-  applyType scope locals owner function selected = do
+  -- Collect consecutive type applications before recovering any erased binder
+  -- metadata. The final expected type constrains every selected variable in
+  -- the original telescope, including a polytype chosen before another binder.
+  applyTypes scope locals owner hints = do
+    (function, applications) <- typeApplications owner []
     functionType <- infer scope locals function
-    checked $ unless (T.freeVariables selected `Set.isSubsetOf` Map.keysSet scope) $
-      Left "context-source: selected variable has no actual source opening"
-    argument <- checkedProjection $ monotype scope selected
-    checkedProjection $ unless (properMonotype argument == Just 0) $
-      Left $ ContextProjectionCandidateRejected ContextUnsupportedSelectedKind
-    expectedUniverse <- checked $ forallUniverse functionType
-    actualUniverse <- checkedProjection $ projectionUniverse scope argument
-    checkedProjection $ unless (actualUniverse == expectedUniverse) $
-      Left $ ContextProjectionCandidateRejected $ ContextSelectedUniverseMismatch expectedUniverse actualUniverse
-    select owner argument
-    checked $ instantiate functionType argument
+    (variables, residual) <- checked $ selectionTelescope (length applications) functionType
+    foldM (applyOne variables residual) functionType $ zip variables applications
+   where
+    applyOne variables residual functionType (variable, (application, selected)) = do
+      checked $ unless (T.freeVariables selected `Set.isSubsetOf` Map.keysSet scope) $
+        Left "context-source: selected variable has no actual source opening"
+      argument <- checkedProjection $ case monotype scope selected of
+        Left (ContextProjectionCandidateRejected ContextUnsupportedSelectedPolytype) ->
+          recoverSelection (Set.fromList variables) residual variable selected hints
+        result -> result
+      checkedProjection $ unless (properMonotype argument == Just 0) $
+        Left $ ContextProjectionCandidateRejected ContextUnsupportedSelectedKind
+      expectedUniverse <- checked $ forallUniverse functionType
+      actualUniverse <- checkedProjection $ projectionUniverse scope argument
+      checkedProjection $ unless (actualUniverse == expectedUniverse) $
+        Left $ ContextProjectionCandidateRejected $ ContextSelectedUniverseMismatch expectedUniverse actualUniverse
+      select application argument
+      instantiated <- checked $ instantiate functionType argument
+      fst <$> retain application instantiated
+
+  typeApplications owner applications = do
+    chargeProjection
+    current <- checked $ node owner
+    case Q.termNodeForm current of
+      Q.TypedVisibleTypeApplication _ function _ witness ->
+        typeApplications function ((owner, Q.typeApplicationSelected witness) : applications)
+      Q.TypedImplicitTypeApplication _ function witness ->
+        typeApplications function ((owner, Q.implicitTypeApplicationSelected witness) : applications)
+      _ -> pure (owner, applications)
+
+  selectionTelescope 0 source = Right ([], source)
+  selectionTelescope count (LeanForall ((variable, _) : rest) constraints body) = do
+    let residual = if null rest && null constraints then body else LeanForall rest constraints body
+    (variables, result) <- selectionTelescope (count - 1) residual
+    pure (variable : variables, result)
+  selectionTelescope _ _ = Left "context-source: type application spine does not match its source telescope"
+
+  projectionAt [] projection = Right projection
+  projectionAt (domain : rest) (LeanArrow a b) = projectionAt rest $ if domain then a else b
+  projectionAt _ _ = Left "context-source: application evidence has no matching source position"
+
+  recoverSelection variables residual variable selected hints = do
+    pieces <- integrity $ fmap concat $ traverse (\(path, expected) -> do
+      template <- projectionAt path residual
+      matchSelection variables Map.empty template expected) hints
+    aligned <- integrity $ traverse (\piece -> alignProjection
+      (Map.fromSet id $ T.freeVariables selected) piece selected)
+      [piece | (owner, piece) <- pieces, owner == variable]
+    case aligned of
+      [] -> Left $ ContextProjectionCandidateRejected ContextUnsupportedSelectedPolytype
+      first : others -> do
+        integrity $ unless (all (== first) others) $
+          Left "context-source: selected type has conflicting source evidence"
+        pure first
+
+  -- Match a source-owned residual telescope against the corresponding expected
+  -- subtree. Bound variables have lexical owners; a selection cannot refer to
+  -- a binder introduced below that position or borrow its visibility/domain.
+  matchSelection selectedVariables bound template expected = case (template, expected) of
+    (LeanVariable variable, _)
+      | Set.member variable selectedVariables && Map.notMember variable bound -> do
+          unless (Set.null $ Set.intersection (T.freeVariables $ eraseLeanType expected)
+            (Set.fromList $ Map.elems bound)) $
+            Left "context-source: selected evidence escapes a nested source binder"
+          pure [(variable, expected)]
+    (LeanVariable variable, LeanVariable actual)
+      | Map.findWithDefault variable variable bound == actual -> pure []
+    (LeanNominal name, LeanNominal actual) | name == actual -> pure []
+    (LeanApplication a b, LeanApplication x y) -> both a x b y
+    (LeanArrow a b, LeanArrow x y) -> both a x b y
+    (LeanTuple boxity fields, LeanTuple actualBoxity actualFields)
+      | boxity == actualBoxity && length fields == length actualFields ->
+          concat <$> sequence (zipWith descend fields actualFields)
+    (LeanForall binders constraints body, LeanForall actualBinders actualConstraints actualBody)
+      | map snd binders == map snd actualBinders && length constraints == length actualConstraints -> do
+          let nested = Map.union (Map.fromList $ zip (map fst binders) (map fst actualBinders)) bound
+              recur = matchSelection selectedVariables nested
+          fields <- fmap concat $ sequence
+            [ if name == actualName && length args == length actualArgs
+                then concat <$> sequence (zipWith recur args actualArgs)
+                else Left "context-source: selected evidence changed a class predicate"
+            | (Constraint name args, Constraint actualName actualArgs) <- zip constraints actualConstraints ]
+          (fields ++) <$> recur body actualBody
+    _ -> Left "context-source: selected evidence does not match its source position"
+   where
+    descend = matchSelection selectedVariables bound
+    both a x b y = (++) <$> descend a x <*> descend b y
 
   monotype scope selected = case selected of
     T.TypeVariable variable
@@ -621,7 +783,13 @@ checkPreparedContextGraph prepared graph = do
       _ -> Nothing
     LeanArrow a b | properMonotype a == Just 0 && properMonotype b == Just 0 -> Just 0
     LeanTuple Boxed fields | length fields /= 1 && all ((== Just 0) . properMonotype) fields -> Just 0
+    LeanForall binders constraints body
+      | all properBinder binders && properMonotype body == Just 0
+      , all (all ((== Just 0) . properMonotype)) constraints -> Just 0
     _ -> Nothing
+   where
+    properBinder (_, LeanBinder _ (LeanSortDomain level)) = either (const False) (const True) $ typeUniverse level
+    properBinder _ = False
 
   forallUniverse (LeanForall ((_, LeanBinder _ (LeanSortDomain level)) : _) _ _) = typeUniverse level
   forallUniverse _ = Left "context-source: type application has no exact Type binder domain"
@@ -631,17 +799,13 @@ checkPreparedContextGraph prepared graph = do
       Map.lookup variable scope
     LeanNominal name
       | Just metadata <- Map.lookup name (preparedContextNominals prepared)
-      , contextNominalKindArity metadata == 0 -> Right LeanLevelZero
+      , contextNominalKindArity metadata == 0 -> nominalUniverse scope name []
     LeanApplication{} -> do
       let (headType, arguments) = applicationSpine projection
       case headType of
         LeanNominal name
           | Just metadata <- Map.lookup name (preparedContextNominals prepared)
-          , contextNominalKindArity metadata == length arguments -> do
-              universes <- traverse (projectionUniverse scope) arguments
-              unless (all (== LeanLevelZero) universes) $
-                Left $ ContextProjectionCandidateRejected ContextNominalArgumentUniverseMismatch
-              Right LeanLevelZero
+          , contextNominalKindArity metadata == length arguments -> nominalUniverse scope name arguments
         _ -> integrity $ Left "context-source: selected application has no exact universe signature"
     LeanArrow domain result -> do
       a <- projectionUniverse scope domain
@@ -650,7 +814,34 @@ checkPreparedContextGraph prepared graph = do
     LeanTuple Boxed fields | length fields /= 1 -> do
       levels <- traverse (projectionUniverse scope) fields
       integrity $ foldM (\a b -> normalizeUniverse $ LeanLevelMax a b) LeanLevelZero levels
+    LeanForall binders constraints body -> do
+      domains <- integrity $ traverse (\(variable, LeanBinder _ domain) -> case domain of
+        LeanSortDomain level -> (,) variable <$> typeUniverse level
+        _ -> Left "context-source: selected forall has an unsupported kind domain") binders
+      let nested = Map.union (Map.fromList domains) scope
+      -- This source route currently admits Type-0 classes only. Keep their
+      -- argument checks after substitution; a dictionary is not erased here.
+      mapM_ (\(Constraint name arguments) -> do
+        metadata <- integrity $ maybe (Left "context-source: selected class has no source metadata") Right $
+          Map.lookup name $ preparedContextClasses prepared
+        levels <- traverse (projectionUniverse nested) arguments
+        integrity $ unless (length levels == length (contextClassParameterKindArities metadata)
+            && all (== LeanLevelZero) levels) $
+          Left "context-source: selected class argument differs from its declaration universe") constraints
+      result <- projectionUniverse nested body
+      integrity $ foldM (\level (_, domain) -> normalizeUniverse $
+        LeanLevelMax (LeanLevelSuccessor domain) level) result domains
     _ -> integrity $ Left "context-source: selected type has no exact universe signature"
+
+  nominalUniverse scope name arguments = do
+    (domains, result) <- integrity $ maybe
+      (Left "context-source: selected nominal has no declaration universe signature") Right $
+      Map.lookup name $ preparedContextNominalUniverses prepared
+    expected <- integrity $ traverse typeUniverse domains
+    actual <- traverse (projectionUniverse scope) arguments
+    unless (actual == expected) $
+      Left $ ContextProjectionCandidateRejected ContextNominalArgumentUniverseMismatch
+    integrity $ typeUniverse result
 
   applicationSpine = go []
    where

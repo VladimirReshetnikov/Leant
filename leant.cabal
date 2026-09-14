@@ -69,6 +69,7 @@ Executable leant
     Leant.Synth.BehavioralSelection
     Leant.Synth.Behavioral
     Leant.Synth.BehavioralSelection.Internal
+    Leant.Synth.ContextUniverse
     Leant.Synth.ContextSource
     Leant.Synth.ContextRender
     Leant.Synth.CandidateObservation
@@ -145,6 +146,8 @@ Test-Suite leant-synth-tests
     BackendTraceSpec
     ContextRenderSpec
     ContextSourceSpec
+    ContextUniverseSpec
+    ContextSelectionSpec
     SortSourceSpec
     GlobalContextProviderSpec
     Leant.Backend
@@ -154,6 +157,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Behavioral
     Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.ContextRender
+    Leant.Synth.ContextUniverse
     Leant.Synth.ContextSource
     Leant.Synth.CandidateObservation
     Leant.Synth.Engine
@@ -232,6 +236,7 @@ Benchmark leant-parallel-bench
   Hs-Source-Dirs:   bench-parallel, src
   Main-Is:          Bench.hs
   Other-Modules:
+    Leant.Synth.ContextUniverse
     Leant.Synth.ContextSource
     Leant.Synth.ContextRender
     Leant.Synth.Engine

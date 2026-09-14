@@ -1,5 +1,5 @@
 {
-  "scope": "Triage snapshot only; implementation uncommitted. This does not replace a complete source and replay acceptance archive.",
+  "scope": "Historical triage snapshots and the scoped accepted increment. The acceptance manifest supplies the complete reproducibility archive.",
   "runs": [
     {
       "receipt": "C:\\Leant\\dist-newstyle\\context-nominal-universes-v1\\results.json",
@@ -920,5 +920,44 @@
     "two_selection_release_dependency": false,
     "dictionary_boundary_evidence": "Source inspection: TypedContextApplication infers its function without forwarding expected-result hints. Public failure not yet established.",
     "exference_boundary_evidence": "Checked source kinds are retained and validated, then execution is explicitly rejected with DJEX_EXF_SOURCE_KINDS."
+  },
+  "current_public_coverage": {
+    "status": "passed",
+    "distinct_cells": 54,
+    "exact_empty_axiom_replays": 36,
+    "actual_false_controls": 18,
+    "scope": "Current-source coverage across original53 and focused retry3; original timeout retained. This is additional to the18 chained/qualified-payload cells.",
+    "verification_receipt": "C:\\Leant\\dist-newstyle\\selected-public-coverage-v1.json",
+    "verification_receipt_sha256": "9b18cdde239b96e6b2ec77a4de89302cee75aab0aad79f12e0c049b0d3acbcce",
+    "runs": [
+      {
+        "receipt": "C:\\Leant\\dist-newstyle\\context-selected-polytypes-portable-v1\\results.json",
+        "receipt_sha256": "ec6df0db23db514881b3b7f8796e5018755a0ae3050c8fc889d14ac86474bbf8",
+        "status": "failed",
+        "sources_unchanged": true,
+        "runtimes_unchanged": true,
+        "passed": 53,
+        "failed": 1
+      },
+      {
+        "receipt": "C:\\Leant\\dist-newstyle\\context-selected-polytypes-portable-retry-v1\\results.json",
+        "receipt_sha256": "d7c6fb123c832d46ad039fc0c86842431f1c8dde2a500c262e22627aa8ffd81e",
+        "status": "passed",
+        "sources_unchanged": true,
+        "runtimes_unchanged": true,
+        "passed": 3,
+        "failed": 0
+      }
+    ]
+  },
+  "accepted_increment": {
+    "report": "2026-09-14-selected-polymorphic-types-acceptance.md",
+    "manifest": "selected-polymorphic-types-acceptance-2026-09-14.json",
+    "archive_sha256": "ef8d1f03d8be493298f8a8481f0de2590324c4717b3109e1d982b490c93e48dd",
+    "public_cells": 72,
+    "native_tests": 763,
+    "focused_tests": 95,
+    "contextual_regression_cells": 105,
+    "remaining_scope": "Dictionary-application selection investigation, original two-box query, Exference explicit Haskell kinds and integer indexing remain open."
   }
 }

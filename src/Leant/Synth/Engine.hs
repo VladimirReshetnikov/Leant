@@ -290,7 +290,7 @@ import Leant.Synth.Fragment
   )
 import Leant.Synth.ContextSource
   ( ContextSource, PreparedContextSource, prepareContextSource, prepareContextSourceProviders
-  , contextSourceName, contextSourceConstructors
+  , contextValueIdentity, contextSourceConstructors
   , renderPreparedContextGraph
   , ContextCandidateRejection, ContextProjectionFailure (..)
   , renderContextCandidateRejection, checkPreparedContextGraph
@@ -1535,7 +1535,7 @@ synthesizeContextualWithProvidersSkippingDetailedWith streaming limits engine st
   suppliedPackets <- mapM contextualProviderPacket suppliedProviders
   constructorEntries <- mapM (retainConstructor suppliedPackets) $ contextSourceConstructors source
   let constructors =
-        [ ProviderFragWithContextSource (contextSourceName parts)
+        [ ProviderFragWithContextSource (contextValueIdentity parts packet)
             (contextSourceFragment packet) parts (Right packet)
         | Just (parts, packet) <- constructorEntries
         ]
@@ -1553,7 +1553,8 @@ synthesizeContextualWithProvidersSkippingDetailedWith streaming limits engine st
   -- declaration. Reuse it only when the complete source packet agrees,
   -- including constant levels. A matching printed name is not authority.
   retainConstructor supplied entry@(parts, packet) =
-    case [other | (name, other) <- supplied, name == parts] of
+    case [other | (name, other) <- supplied,
+          contextValueIdentity name other == contextValueIdentity parts packet] of
       [] -> Right $ Just entry
       matches
         | all (== packet) matches -> Right Nothing
@@ -1567,7 +1568,7 @@ contextualProviderPacket provider = case provider of
     source <- either
       (Left . ("context-source: global provider inventory requires complete source metadata: " ++))
       Right packet
-    unless (providerLeanName provider == contextSourceName parts
+    unless (providerLeanName provider == contextValueIdentity parts source
         && fragment == contextSourceFragment source) $
       Left "context-source: provider packet does not own its name and scheme"
     pure (parts, source)
