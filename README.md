@@ -45,7 +45,7 @@ binders within the documented supported fragment.
 
 | Capability | Current scope and detailed evidence |
 | --- | --- |
-| Explicit Haskell ground kinds, both engines | The [11-case public corpus](docs/reports/2026-09-14-exference-kinded-source-acceptance.md) passes for Djinn and Exference, including vacuous/shadowed binders, higher-kinded callbacks, aliases and impredicative pairs. Provider-kind composition and native adoption remain further gates. |
+| Explicit Haskell ground kinds, both engines | The [11-case public corpus](docs/reports/2026-09-14-exference-kinded-source-acceptance.md) passes for Djinn and Exference, including vacuous/shadowed binders, higher-kinded callbacks, aliases and impredicative pairs. The [provider-kind and polymorphic-field follow-up](docs/reports/2026-09-14-provider-kind-integration.md) closes two integration failures; native adoption remains a further gate. |
 | Selected polymorphic types and dictionaries in Lean | [Nominal and chained selections](docs/reports/2026-09-14-selected-polymorphic-types-acceptance.md), [dictionary-qualified selection](docs/reports/2026-09-14-dictionary-selection-acceptance.md), [contextual universes](docs/reports/2026-09-14-contextual-universe-acceptance.md) and [strict-implicit binders](docs/reports/2026-09-13-strict-implicit-source-acceptance.md) have scoped acceptance. The original simultaneous two-universe query remains open. |
 | Church composition and product construction | Accepted [nested Church composition](docs/reports/2026-09-13-maybe-either-head-use-acceptance.md), [intrinsic-unit construction](docs/reports/2026-09-14-intrinsic-unit-construction-acceptance.md) and [native sort/product construction](docs/reports/2026-09-13-native-sort-products-acceptance.md) retain exact replay and rejection controls. |
 | Search responsiveness and provider discovery | The [Haskell Djinn proof-prefix repair](docs/reports/2026-09-14-contextual-proof-cutoff-acceptance.md) resolves the observed default timeout. Lean [qualified provider identity](docs/reports/2026-09-14-session-provider-identity.md) and [cooperative scheduling](docs/reports/2026-09-14-provider-scheduling.md) preserve session names, structural continuation and existing limits. |
@@ -56,7 +56,7 @@ not claim a fresh full native unit-suite run. Earlier reports retain their own
 source/runtime snapshots and validation counts.
 
 The [current priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-are Exference kind integration and native dependency adoption, original integer
+are native adoption of the tested Exference kind integration, original integer
 `at`, then simultaneous two-universe composition. Leant currently pins Djex
 `9a2d59d9`; the later Haskell kind and proof-prefix milestones await native
 integration. Provider admission is repaired, but the original integer query
