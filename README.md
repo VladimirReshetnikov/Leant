@@ -117,8 +117,12 @@ Djinn, Exference and Both, and all 105 existing contextual regression checks.
 One environment-preparation timeout passed a focused retry at unchanged source,
 runtime identities and limits; the original failed attempt remains in the archive.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-now focus on selection across dictionary applications, Exference's explicit
-Haskell kinds, and integer indexing. The original query using two distinct
+first finish dictionary selection: a local Leant repair passes 98 focused and
+766 native tests plus the Exference and Both public examples. That follow-up is
+not yet released; Djinn still fails the new example, and its contextual type
+choices omit a needed supplied forall. The proposed core repair still needs
+isolated validation. Exference's explicit Haskell kinds and integer indexing
+follow. The original query using two distinct
 nominal universe selections remains unresolved and requires a causal search trace.
 Broader class/provider universes follow unless a concrete dependency promotes a
 smaller part. Further length, reduction and extrema changes likewise require a

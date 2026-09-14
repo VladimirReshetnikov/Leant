@@ -959,5 +959,28 @@
     "focused_tests": 95,
     "contextual_regression_cells": 105,
     "remaining_scope": "Dictionary-application selection investigation, original two-box query, Exference explicit Haskell kinds and integer indexing remain open."
+  },
+  "dictionary_followup_retriage": {
+    "supersedes": "Earlier dictionary-boundary assessment was source inspection only; new local failure and repair evidence supersede that assessment. Published nominal milestone counts remain unchanged.",
+    "manifest": "dictionary-selection-triage-2026-09-14.json",
+    "manifest_sha256": "bfea4ce56df3cf430af8601efbab049a57dfd246972472934840decfda96b79a",
+    "implementation_status": "uncommitted",
+    "execution_order": [
+      "1a: release the locally validated Leant dictionary repair after affected public regressions",
+      "1b: establish Djinn baseline and validate scoped quantified choices",
+      "2: Exference explicit Haskell kinds",
+      "3: integer at",
+      "4: original two-universe query causal diagnostic; repair conditional",
+      "5: higher classes/providers unless an earlier concrete dependency",
+      "6: length/reductions/extrema only with new causal evidence"
+    ],
+    "native_tests": 766,
+    "focused_tests": 98,
+    "engine_status": {
+      "exference": "3 public cells passed",
+      "both": "3 public cells passed",
+      "djinn": "3 public cells failed"
+    },
+    "direct_djinn_baseline": "not executed: new test failed strict compilation on name shadowing"
   }
 }
