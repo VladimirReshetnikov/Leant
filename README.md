@@ -101,7 +101,8 @@ tests**, including exact binder universes, checked candidate rejection and intri
 unit construction. It remains unpublished: the Haskell release gate exposes a
 `maybeEither` regression at the original 256-candidate limit, while a fresh build
 of published Djex passes the same query. Preserve that behavior before release;
-an exact-match constructor cost has not fixed it. The next source increments are
+neither exact-match nor weak-match constructor costs fixed it. A bounded trace
+comparison is now the next gate. The next source increments are
 class/provider universe identity and contextual polymorphic type arguments, each
 with separate acceptance gates. The linked plan retains terminal evidence and
 keeps prototype results separate from later unaccepted experiments.
