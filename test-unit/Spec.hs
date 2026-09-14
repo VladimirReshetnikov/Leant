@@ -106,6 +106,7 @@ import qualified ContextRenderSpec
 import qualified ContextSourceSpec
 import qualified ContextUniverseSpec
 import qualified ContextSelectionSpec
+import qualified ContextDictionarySelectionSpec
 import qualified SortSourceSpec
 import qualified GlobalContextProviderSpec
 import qualified BackendTraceSpec
@@ -789,6 +790,7 @@ main = do
       , ContextSourceSpec.tests
       , ContextUniverseSpec.tests
       , ContextSelectionSpec.tests
+      , ContextDictionarySelectionSpec.tests
       , SortSourceSpec.tests
       , GlobalContextProviderSpec.tests
       ]

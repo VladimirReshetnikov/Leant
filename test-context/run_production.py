@@ -42,10 +42,9 @@ IDENTITY = f"∀ (α : Type), [{CLASS} α] → α → α"
 FORWARDING = SCHEME + " → " + SCHEME
 LOCAL_GIVEN = f"∀ (α : Type), [{CLASS} α] → {SCHEME} → α → {TOKEN}"
 UNSUPPORTED_SOURCE = (
-    "exact lexical-Given source requires Type-0 binders, nominal/class domains, "
+    "exact lexical-Given source requires supported Type/nominal universe signatures, Type-0 class domains, "
     "supported visibility and nondependent term arrows"
 )
-GLOBAL_REFUSAL = "context-source: global provider inventory requires complete source metadata"
 FORBIDDEN_TERM = re.compile(
     r"\b(?:sorry|admit|unsafe|axiom|inferInstance|inferInstanceAs|Classical)\b"
     r"|\b(?:ContextOracle|ContextSyntax|ContextReplay|BehaviorChurch|BehaviorControl|BehaviorCandidates)\."
@@ -108,10 +107,6 @@ def specifications():
             type=IDENTITY, predicate="False",
             oracle=f"fun (α : Type) [unusedDictionary : {CLASS} α] (x : α) => x",
             observation_count=1, expected="no_candidate"),
-        "higher_universe": dict(
-            type=f"∀ (α : Type), [{CLASS} α] → (∀ (β : Type 1), β → β)",
-            predicate="True", oracle=f"fun (α : Type) [unusedDictionary : {CLASS} α] (β : Type 1) (x : β) => x",
-            observation_count=0, expected="unsupported", required_refusal=UNSUPPORTED_SOURCE),
         "constant_universe": dict(
             # The universe occurs only in a Prop field, so the actual class
             # parameter and result remain Type 0. Dropping this vector would
@@ -121,16 +116,6 @@ def specifications():
             extra_declarations=[UNIVERSE_DECLARATION],
             extra_inventory=[UNIVERSE_CLASS, UNIVERSE_CLASS + ".mk", UNIVERSE_CLASS + ".evidence"],
             observation_count=0, expected="unsupported", required_refusal=UNSUPPORTED_SOURCE),
-        "global_metadata": dict(
-            # The abstract local lane has no Token value. Discovery is enabled
-            # only for this explicit inventory-refusal control; no helper or
-            # implementation declaration is added to the live environment.
-            type=f"∀ (α : Type), [{CLASS} α] → {TOKEN}",
-            predicate=conjunction([
-                f"{TOKEN}.payload (@{{f}} Nat {dictionary('Nat', payload)}) = {payload}"
-                for payload in (7, 11)]),
-            oracle=f"fun (α : Type) [d : {CLASS} α] => {TOKEN}.mk (@{CLASS}.tag α d)",
-            providers=True, observation_count=2, expected="unsupported", required_refusal=GLOBAL_REFUSAL),
     }
 
 
@@ -531,7 +516,7 @@ def main():
                                 timeout=args.timeout, process_timeout=args.process_timeout,
                                 provider_cap=args.provider_cap, strategy="interleave", shown=1,
                                 ranking="balanced", debug=True, library=False, classical=False,
-                                providers="off except explicit global_metadata refusal control"),
+                                providers="off"),
                   expected_cases=len(cases), source_hashes_before=before, preflights=preflights, results=[],
                   scope="public ordinary and named-where contextual synthesis; exact displayed variant/graph/owner association and independent full-type Lean replay with finite dictionary payload observations; no global/universe support claim")
     receipt = output / "results.json"

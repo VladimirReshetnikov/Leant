@@ -35,10 +35,10 @@ class CoverageTests(unittest.TestCase):
     def test_complete_inventory_separates_modes_and_false(self):
         cases = production.selected_cases(["djinn", "exference", "both"],
                                           list(production.specifications()), ["ordinary", "where"])
-        self.assertEqual(len(cases), 39)
-        self.assertEqual(len({entry["name"] for entry in cases}), 39)
+        self.assertEqual(len(cases), 27)
+        self.assertEqual(len({entry["name"] for entry in cases}), 27)
         self.assertEqual(sum(entry["expected"] == "candidate" for entry in cases), 18)
-        self.assertEqual(sum(entry["expected"] == "unsupported" for entry in cases), 18)
+        self.assertEqual(sum(entry["expected"] == "unsupported" for entry in cases), 6)
         false_cases = [entry for entry in cases if entry["operation"] == "reject_all"]
         self.assertEqual(len(false_cases), 3)
         self.assertTrue(all(entry["mode"] == "where" for entry in false_cases))
@@ -75,7 +75,7 @@ class CoverageTests(unittest.TestCase):
 
     def test_refusals_observe_the_selected_mode(self):
         for mode in ("ordinary", "where"):
-            entry = case("higher_universe", mode)
+            entry = case("constant_universe", mode)
             block = "λ> " + entry["command"] + "\nsynthesis engine error: " + entry["required_refusal"] + "\n"
             if mode == "where":
                 block += "supplied behavioral assertion: 0 passed, 0 falsified, 0 inconclusive\n"

@@ -1,5 +1,24 @@
 # Lexical-Given synthesis acceptance
 
+## Polymorphic selection through dictionary application
+
+`run_dictionary_selection.py` checks a local qualified consumer selecting a
+supplied forall, directly and inside a nominal wrapper. Its result parameter
+is rigid; observations distinguish both the dictionary and the supplied payload.
+Each of the two cases has ordinary, named-`where` and actual-False queries in
+Djinn, Exference and Both, for 18 cells. Positive outputs replay exactly at their
+complete types with empty axiom inventories. Reference solutions are confined
+to independent oracle processes.
+
+```powershell
+$leantExe = (cabal list-bin leant:exe:leant).Trim()
+python -X utf8 -B test-context/run_dictionary_selection.py --leant $leantExe --output dist-newstyle/dictionary-selection/run-1
+```
+
+The gate retains 4,096 steps, a 60-candidate window, a 1,024-entry queue, a
+20-second synthesis timeout and a separate 120-second process guard. `--case`
+and `--engine` select diagnostic subsets; every output directory must be fresh.
+
 ## Selected polymorphic types and nominal universes
 
 `run_polymorphic_selection.py` checks exact nominal universe selections and
@@ -31,19 +50,25 @@ distinguish these obligations and record the acceptance evidence.
 ## Public production route
 
 `run_production.py` exercises ordinary and named-`where` contextual synthesis
-through the live executable in Djinn, Exference, and Both. Its fixed 39-cell
+through the live executable in Djinn, Exference, and Both. Its fixed 27-cell
 matrix covers local identity, constrained rank-N forwarding and forced local
-Given application, three actual False controls, and eighteen explicit metadata
+Given application, three actual False controls, and six selected-class-universe
 refusals. Search receives only the declared class and nominal datatype;
 reference implementations remain in independent oracle processes.
 
-The [accepted production receipt](receipts/ordinary-context-streaming.json)
-records **39/39 passing cells**, with all eighteen exactly displayed candidates
+The [historical production receipt](receipts/ordinary-context-streaming.json)
+records **39/39 passing cells** at its earlier implementation, with all eighteen exactly displayed candidates
 independently checked at their complete Lean types. Their replay contains 72
 finite payload observations and 144 empty axiom inventories. Candidate receipts
 retain the displayed variant's own graph, renderer and engine. Source,
 executable, resolved kernel, command and replay-input identities stayed unchanged.
-The strict executable/unit build and the complete **680-test** serial suite pass.
+That historical strict build and **680-test** serial suite passed. Its blanket
+higher-universe and provider refusals are no longer current expectations: higher
+universes have their own acceptance runner, and provider behavior depends on
+the engine and available source metadata. Those twelve obsolete refusal cells
+have left this lexical-only gate; the remaining selected-class-universe refusal
+uses the current diagnostic. The original failed 39-cell rerun is retained in
+the dictionary-integration evidence rather than relabeled as a pass.
 
 Run from the repository root after the strict build:
 

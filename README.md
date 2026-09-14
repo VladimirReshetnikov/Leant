@@ -121,19 +121,20 @@ adds scoped quantified choices to Djinn's contextual specialization. It passes
 147 Djinn tests and both Haskell engines' direct/wrapped public examples, with
 eight exact GHC replays and four actual-False controls. Djinn's public acceptance
 uses 4,096 choices; the retained default unbounded-search timeout remains open.
+The [native dictionary-selection release](docs/reports/2026-09-14-dictionary-selection-acceptance.md)
+preserves source evidence across dictionary application and integrates Djex
+`9a2d59d9`. Its strict build, emitted Lean serializer, 98 focused tests and all
+766 native tests pass. The 69 affected public checks comprise 46 exact Lean
+replays, 17 actual-False controls and six explicit class-universe refusals.
+The report records the corrected lexical harness, retained failed attempt and
+complete source/runtime/replay archive.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-now treat dictionary selection as release work: the local Leant implementation
-with Djex `9a2d59d9` passes 98 focused tests and 69 affected public checks
-(46 exact Lean replays, 17 actual-False controls and six class-universe refusals).
-The full 766-test native suite on this dependency and implementation publication
-remain pending; the earlier 766-test pass used the previous pin. These local
-results have a [triage index](test-church/receipts/dictionary-integration-retriage-2026-09-14.json),
-not yet a complete native release archive.
-Next feature priorities are Exference's explicit Haskell kinds, integer `at`,
-and the original query combining two distinct nominal universe selections.
-The default Djinn timeout gets a bounded diagnosis; broader class/provider
-universes and further length, reduction and extrema changes require their own
-discriminating evidence. This does not establish arbitrary synthesis completeness.
+move dictionary selection out of feature implementation. Next are Exference's
+explicit Haskell kinds, integer `at`, and the original query combining two
+nominal universe selections. The default Djinn timeout gets a bounded diagnosis;
+broader class/provider universes and further length, reduction and extrema
+changes require their own discriminating evidence. This scoped release does
+not establish arbitrary synthesis completeness.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC

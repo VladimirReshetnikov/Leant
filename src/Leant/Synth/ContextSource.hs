@@ -543,6 +543,10 @@ renderPreparedContextGraph prepared graph = Bifunctor.first diagnostic $ checkPr
   diagnostic (ContextProjectionIntegrityFailure failure) = failure
   diagnostic (ContextProjectionCandidateRejected reason) = renderContextCandidateRejection reason
 
+-- Paths identify source-owned positions; a dictionary telescope is distinct
+-- from an ordinary function arrow even though its evidence is erased in search.
+data ProjectionStep = ProjectionArrowDomain | ProjectionArrowResult | ProjectionContextBody
+
 checkPreparedContextGraph
   :: (Ord variable, Ord local)
   => PreparedContextSource -> Q.TermGraph (T.Type variable) local
@@ -631,8 +635,8 @@ checkPreparedContextGraph prepared graph = do
 
   infer scope locals owner = inferWith scope locals owner []
 
-  -- A hint has an exact structural address in this node's type. False follows
-  -- an arrow result; True follows its domain. No unrelated alpha-matching
+  -- A hint has an exact structural address in this node's type. Steps follow
+  -- an arrow domain/result or a discharged context body. No unrelated alpha-matching
   -- source type is allowed to donate a selected forall's binder metadata.
   inferWith scope locals owner hints = do
     chargeProjection
@@ -646,17 +650,18 @@ checkPreparedContextGraph prepared graph = do
         alignProjection Map.empty (contextProviderSourceType provider) $ Q.termNodeType current
       Q.TypedTuple elements -> LeanTuple Boxed <$> traverse (infer scope locals) elements
       Q.TypedApply function argument _ -> do
-        let resultHints = [(False : path, value) | (path, value) <- hints]
+        let resultHints = [(ProjectionArrowResult : path, value) | (path, value) <- hints]
         functionType <- inferWith scope locals function resultHints `withSelectionEvidence` do
           argumentType <- infer scope locals argument
-          inferWith scope locals function (([True], argumentType) : resultHints)
+          inferWith scope locals function (([ProjectionArrowDomain], argumentType) : resultHints)
         case functionType of
           LeanArrow domain result -> check scope locals argument domain >> pure result
           _ -> checked $ Left "context-source: term application did not retain an arrow"
       Q.TypedVisibleTypeApplication{} -> applyTypes scope locals owner hints
       Q.TypedImplicitTypeApplication{} -> applyTypes scope locals owner hints
       Q.TypedContextApplication _ function _ -> do
-        functionType <- infer scope locals function
+        functionType <- inferWith scope locals function
+          [(ProjectionContextBody : path, value) | (path, value) <- hints]
         case functionType of
           LeanForall [] (_ : _) result -> pure result
           _ -> checked $ Left "context-source: dictionary application did not retain its context"
@@ -712,7 +717,9 @@ checkPreparedContextGraph prepared graph = do
   selectionTelescope _ _ = Left "context-source: type application spine does not match its source telescope"
 
   projectionAt [] projection = Right projection
-  projectionAt (domain : rest) (LeanArrow a b) = projectionAt rest $ if domain then a else b
+  projectionAt (ProjectionArrowDomain : rest) (LeanArrow domain _) = projectionAt rest domain
+  projectionAt (ProjectionArrowResult : rest) (LeanArrow _ result) = projectionAt rest result
+  projectionAt (ProjectionContextBody : rest) (LeanForall [] (_ : _) body) = projectionAt rest body
   projectionAt _ _ = Left "context-source: application evidence has no matching source position"
 
   recoverSelection variables residual variable selected hints = do

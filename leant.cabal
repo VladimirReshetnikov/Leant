@@ -148,6 +148,7 @@ Test-Suite leant-synth-tests
     ContextSourceSpec
     ContextUniverseSpec
     ContextSelectionSpec
+    ContextDictionarySelectionSpec
     SortSourceSpec
     GlobalContextProviderSpec
     Leant.Backend
