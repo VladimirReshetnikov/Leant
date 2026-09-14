@@ -1,5 +1,7 @@
 # Exference lexical kind ownership and independent checker prerequisite
 
+> Historical prerequisite. The [subsequent public ground-kind milestone](2026-09-14-exference-kinded-source-acceptance.md) connects this scope to search and passes the original 11-case public corpus. The 120-test controller below reproduces this earlier revision; the newer report supplies the current integration controller and remaining provider/native obligations.
+
 Exference now has a private lexical kind scope and an independent expression-checking entrance that consumes it. The final strict build passes **120 private engine tests and all 515 ordinary Exference tests**. This is a prerequisite for explicit Haskell kinded synthesis: the public adapter still returns DJEX_EXF_SOURCE_KINDS, and the public 11-case synthesis matrix remains open.
 
 ## Implemented behavior

@@ -78,7 +78,7 @@ now closes the `(7,9)` named-query miss. Its complete 11-case kinded-source matr
 passes 22 exact GHC replays and 11 actual-False controls; all **383 selected
 regression tests** pass (146 Djinn, 187 integration, 38 API and 12 focused CLI).
 The checked source is integrated into Djex, and the native release below validates
-Leant against that dependency. Exference explicit Haskell kinded execution remains guarded.
+Leant against that dependency. Exference explicit Haskell kinds are covered by the later public milestone below.
 
 The [native sort/product release](docs/reports/2026-09-13-native-sort-products-acceptance.md)
 retains exact sort levels and supplies canonical type witnesses, including sorts
@@ -135,21 +135,19 @@ checks the requested raw proof prefix before conversion. All 148 Djinn and 187
 adapter integration tests pass, along with eight exact GHC replays and six
 rejection controls across default and finite-budget public runs. Search defaults
 and limits are unchanged; Leant retains its separately accepted native pin above.
+The [Exference public ground-kind milestone](docs/reports/2026-09-14-exference-kinded-source-acceptance.md)
+now connects lexical kind ownership through alias expansion, search, independent
+checking and emitted-candidate evidence. The original 11-case Exference corpus
+passes 22 exact GHC replays, 11 actual-False controls and a malformed-kind
+rejection, covering vacuous/shadowed binders, higher-kinded callbacks, aliases
+and impredicative pairs. All **1,659 tests in seven affected suites pass**,
+including certificate retention and compatibility-first deep evaluation.
 The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-move dictionary selection and this timeout repair out of feature implementation.
-Next are a checked public Exference kind-support increment, integer `at`, and the
-original query combining two nominal universe selections. The new
-[Exference lexical-kind checker prerequisite](docs/reports/2026-09-14-exference-kind-scope-prerequisite.md)
-preserves kind ownership through forall opening and substitution and rejects
-wrong-kind expressions in independent checking. Its strict build, 120 private
-engine tests and all 515 ordinary Exference tests pass. Public kinded search
-remains guarded. The next gate is one complete public kinded query with exact GHC
-replay, including consistent kind transport and preservation of candidate evidence;
-later unvalidated local edits do not inherit the published test results. Integer
-`at` remains an independent next baseline. A focused Lean Djinn `length` diagnosis
-precedes broader class/provider universe work and reductions/extrema. The plan
-gives each item an acceptance gate and keeps native dependency adoption separate
-from Haskell root acceptance.
+retain source-kinded composition with caller-supplied global-provider kinds,
+deconstructor transport checks, and native dependency adoption as further gates.
+Leant's separately accepted pin remains unchanged. Integer `at` and the original
+query combining two nominal universe selections follow; a focused Lean Djinn
+`length` diagnosis precedes broader class/provider universe work and reductions.
 These scoped releases do not establish arbitrary synthesis completeness.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
