@@ -95,10 +95,12 @@ dictionary universes and universe-bearing global providers remain separate
 implementation requirements beyond that baseline and the native sort release.
 
 The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-removes completed native product integration from active work. Next are exact
-contextual binder universes, class/provider universe selections and contextual
-polymorphic type arguments, each with separate acceptance gates. The isolated
-binder-universe prototype is still under validation; it is not released support.
+keeps completed native product integration under regression coverage. The next
+gate is contextual universe admissibility and Exference type selection: the
+isolated prototype passes 76/78 focused tests, while two unequal-universe cases
+and the attempted intrinsic-unit regression still fail. This is unpublished work.
+Finish that narrow diagnosis before extending class/provider universe selections
+and contextual polymorphic type arguments, each with separate acceptance gates.
 Exference explicit Haskell kind checking remains an independent requirement.
 The focused Lean Djinn `length` diagnosis precedes integer indexing; both precede
 further extrema implementation. Contextual evidence and supplied-fold trees remain
