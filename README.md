@@ -102,18 +102,16 @@ built-in unit constructor is already present. All **13 extended Haskell operatio
 replay and False controls for the public unit cases. This closes the prototype's
 `maybeEither` regression at the original 256-candidate limit.
 
-The [revised delivery plan](docs/reports/2026-09-13-synthesis-delivery-retriage.md)
-now puts final native contextual integration next. The earlier universe prototype
-passed 63 public cells and all 746 native tests; the final source passes the
-focused native checks and is undergoing its complete native release gates.
-Leant's dependency pin remains at its last accepted native revision until those
-checks finish. Class/provider universe identity and contextual polymorphic type
-arguments follow as separate source increments.
-Exference explicit Haskell kind checking remains an independent requirement.
-The focused Lean Djinn `length` diagnosis precedes integer indexing; both precede
-further extrema implementation. Contextual evidence and supplied-fold trees remain
-required. Failed reduction variants stay paused pending a new causal trace.
-Each milestone requires its original public query and exact replay.
+The [latest priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
+put final native contextual integration first: the final source now passes all
+63 public universe cells and all 746 native tests; affected constructor and
+strict-binder regressions remain the publication gate. The published Leant pin
+stays at its accepted native revision until that gate closes.
+Next comes one bounded Lean Djinn `length` diagnostic, followed by contextual
+polymorphic type selection and staged class/provider universe support. Explicit
+Haskell kinds in Exference and integer indexing remain independent obligations.
+Extrema implementation requires a causal witness trace; failed reduction variants
+stay paused. Each milestone requires its original public query and exact replay.
 
 The [ground-kind rendering repair and extrema checkpoint](docs/reports/2026-09-13-kinded-rendering-extrema-baseline.md)
 preserves explicit binder kinds in emitted signatures and passes eight GHC
