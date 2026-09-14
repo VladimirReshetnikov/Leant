@@ -50,13 +50,16 @@ binders within the documented supported fragment.
 | Church composition and product construction | Accepted [nested Church composition](docs/reports/2026-09-13-maybe-either-head-use-acceptance.md), [intrinsic-unit construction](docs/reports/2026-09-14-intrinsic-unit-construction-acceptance.md) and [native sort/product construction](docs/reports/2026-09-13-native-sort-products-acceptance.md) retain exact replay and rejection controls. |
 | Search responsiveness and provider discovery | The [Haskell Djinn proof-prefix repair](docs/reports/2026-09-14-contextual-proof-cutoff-acceptance.md) resolves the observed default timeout. Lean [qualified provider identity](docs/reports/2026-09-14-session-provider-identity.md) and [cooperative scheduling](docs/reports/2026-09-14-provider-scheduling.md) preserve session names, structural continuation and existing limits. |
 
-The latest native scheduling increment passes a strict executable build and
-18 public cells: 11 exact Lean replays and seven actual-False controls. It does
-not claim a fresh full native unit-suite run. Earlier reports retain their own
-source/runtime snapshots and validation counts.
+The native scheduling release passed a strict executable build and 18 public
+cells: 11 exact Lean replays and seven actual-False controls. A subsequent
+dependency-adoption run passed its strict build and 764 of 768 native tests;
+four source-text scheduling guards still expect the previous implementation
+layout. The [current integration gate](docs/reports/2026-09-14-synthesis-next-priorities.md#immediate-release-prerequisite)
+remains open, and its prepared public matrix has not run. Earlier reports
+retain their own source/runtime snapshots and validation counts.
 
 The [current priorities](docs/reports/2026-09-14-synthesis-next-priorities.md)
-are native adoption of the tested Exference kind integration, original integer
+are closing the native integration gate, original integer
 `at`, then simultaneous two-universe composition. Leant currently pins Djex
 `9a2d59d9`; the later Haskell kind and proof-prefix milestones await native
 integration. Provider admission is repaired, but the original integer query
